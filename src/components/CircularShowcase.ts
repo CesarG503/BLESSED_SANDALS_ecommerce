@@ -67,8 +67,8 @@ export class CircularShowcase {
 
   private render(): void {
     this.container.innerHTML = `
-      <!-- CONTENEDOR RUNWAY PARA SCROLL Y PINNING -->
-      <section class="showcase-scroll-runway" id="showcase-runway">
+      <!-- CONTENEDOR RUNWAY PARA SCROLL Y PINNING (MARGEN REDUCIDO Y PROPORCIONAL) -->
+      <section class="showcase-scroll-runway" id="showcase-runway" style="min-height: 120vh;">
         <div class="showcase-sticky-viewport" id="showcase-viewport">
           
           <!-- MARCA DE AGUA Y ENCABEZADO MINIMALISTA -->
