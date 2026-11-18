@@ -318,6 +318,15 @@
   z-index: 1;
 }
 
+/* ESPACIADOR SUPERIOR QUE PRESERVA LA PROPORCIÓN Y POSICIÓN EXACTA SIN TEXTO */
+.showcase-header-spacer {
+  width: 100%;
+  height: 105px;
+  margin-top: 20px;
+  pointer-events: none;
+  visibility: hidden;
+}
+
 .showcase-header-content {
   text-align: center;
   margin-top: 20px;

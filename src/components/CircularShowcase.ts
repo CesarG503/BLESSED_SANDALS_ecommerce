@@ -32,11 +32,10 @@ export class CircularShowcase {
     { index: 9, id: 'blessed-slide-10', name: 'Blessed Slide Gold Accent', edition: 'Edición #10', colorName: 'Gold Luxury', price: 75, image: '/assets/slide/slide.png', badge: 'PREMIUM' }
   ];
 
-  // Estado físico de rotación
+  // Estado físico de rotación continua
   private currentAngle: number = Math.PI / 2; // Inicia con el primer par en la cima del arco
-  private targetAngle: number = Math.PI / 2;
-  private velocity: number = 0;
-  private isHovered: boolean = false;
+  private velocity: number = -0.0012; // Velocidad de crucero lenta y continua
+  private isHoveringShoe: boolean = false;
   private activeHoveredIndex: number | null = null;
   private activeCardIndex: number | null = null;
   private animationFrameId: number | null = null;
@@ -75,13 +74,8 @@ export class CircularShowcase {
           <!-- MARCA DE AGUA Y ENCABEZADO MINIMALISTA -->
           <div class="showcase-watermark" aria-hidden="true">BLESSED</div>
           
-          <div class="showcase-header-content">
-            <div class="showcase-badge animate-fade-in">
-              <span class="showcase-badge-pulse"></span> SERIE LIMITADA • 10 EDICIONES EXCLUSIVAS
-            </div>
-            <h2 class="showcase-title">BLESSED SLIDE • COLECCIÓN 2026</h2>
-            <p class="showcase-subtitle">Gira con el scroll en cualquier dirección o mantén el cursor sobre un par para desplegar su tarjeta.</p>
-          </div>
+          <!-- ESPACIADOR MINIMALISTA SUPERIOR (PRESERVA PROPORCIÓN Y POSICIÓN EXACTA) -->
+          <div class="showcase-header-spacer" aria-hidden="true"></div>
 
           <!-- PISTA DE ARCO CIRCULAR -->
           <div class="showcase-orbit-stage" id="orbit-stage">
@@ -149,6 +143,7 @@ export class CircularShowcase {
 
       const triggerHover = () => {
         this.cancelHideCard();
+        this.isHoveringShoe = true;
         itemEl.classList.add('is-focusing');
 
         // Si la tarjeta ya está abierta para este par exacto, mantenerla activa
@@ -170,6 +165,8 @@ export class CircularShowcase {
 
       const cancelHover = () => {
         itemEl.classList.remove('is-focusing');
+        this.isHoveringShoe = false;
+
         // Si teníamos un temporizador para abrir este calzado y el cursor salió antes, cancelarlo
         if (this.hoverIntentTimer && this.activeCardIndex !== idx) {
           clearTimeout(this.hoverIntentTimer);
@@ -202,8 +199,7 @@ export class CircularShowcase {
       });
     });
 
-    // 2. CORREDOR Y BUFFER DE TOLERANCIA ULTRA-AMPLIO A NIVEL DOCUMENTO
-    // Garantiza que pasar rápido entre el calzado y la tarjeta JAMÁS cierre la tarjeta
+    // 2. Corredor seguro enfocado entre el calzado y la tarjeta activa
     document.addEventListener('pointermove', (e: PointerEvent) => {
       if (this.activeCardIndex === null || this.isCardDragging) return;
 
@@ -214,11 +210,11 @@ export class CircularShowcase {
       const shoeRect = shoeEl.getBoundingClientRect();
       const cardRect = cardEl.getBoundingClientRect();
 
-      // Buffer ultra amplio: abarca el zapato, la tarjeta y hasta 100px adicionales alrededor
-      const minX = Math.min(shoeRect.left, cardRect.left) - 100;
-      const maxX = Math.max(shoeRect.right, cardRect.right) + 100;
-      const minY = Math.min(shoeRect.top, cardRect.top) - 60;
-      const maxY = Math.max(shoeRect.bottom, cardRect.bottom) + 80;
+      // Corredor enfocado: abarca el calzado, la tarjeta y la zona directa de conexión con 20px de margen
+      const minX = Math.min(shoeRect.left, cardRect.left) - 20;
+      const maxX = Math.max(shoeRect.right, cardRect.right) + 20;
+      const minY = Math.min(shoeRect.top, cardRect.top) - 15;
+      const maxY = Math.max(shoeRect.bottom, cardRect.bottom) + 20;
 
       const inSafeCorridor = (
         e.clientX >= minX &&
@@ -228,10 +224,8 @@ export class CircularShowcase {
       );
 
       if (inSafeCorridor) {
-        // El usuario está sobre el zapato, sobre la tarjeta o en tránsito rápido entre ellos
         this.cancelHideCard();
       } else {
-        // Solo si el usuario claramente se apartó de la zona de interés
         if (!this.hideCardTimeout) {
           this.scheduleHideCard();
         }
@@ -242,49 +236,41 @@ export class CircularShowcase {
     document.addEventListener('pointerdown', (e: PointerEvent) => {
       const target = e.target as HTMLElement;
       if (!target.closest('#orbit-stage') && this.activeCardIndex !== null && !this.isCardDragging) {
-        this.activeCardIndex = null;
-        this.activeHoveredIndex = null;
-        this.isHovered = false;
         this.hideHoverCard();
       }
     });
 
-    // 3. Control de rotación con SCROLL DE PÁGINA (hacia abajo)
+    // 3. Control de rotación con SCROLL DE PÁGINA (bidireccional, suave y sin saltos)
+    let lastScrollY = window.scrollY;
     window.addEventListener('scroll', () => {
       if (!runway) return;
       const rect = runway.getBoundingClientRect();
-      const windowHeight = window.innerHeight;
-      const totalScrollable = runway.offsetHeight - windowHeight;
+      const currentScrollY = window.scrollY;
+      const deltaY = currentScrollY - lastScrollY;
+      lastScrollY = currentScrollY;
 
-      if (window.scrollY > 15 && rect.top <= 0 && rect.bottom >= windowHeight) {
-        const scrolledDistance = -rect.top;
-        const progress = Math.max(0, Math.min(1, scrolledDistance / totalScrollable));
-        this.targetAngle = (Math.PI / 2) + progress * (Math.PI * 3.6);
-      }
-    });
-
-    // 4. Control de Wheel / Trackpad a nivel de VENTANA para SCROLL INFINITO HACIA ARRIBA
-    window.addEventListener('wheel', (e) => {
-      if (!runway) return;
-      const rect = runway.getBoundingClientRect();
-
-      // Si el viewport del showcase está a la vista
-      if (rect.top >= -30 && rect.bottom > 200) {
-        // En lo más alto de la página (window.scrollY <= 15):
-        // Permitir rotación infinita hacia arriba (e.deltaY < 0) o hacia abajo (e.deltaY > 0)
-        if (window.scrollY <= 15) {
-          const delta = e.deltaY * 0.0006;
-          this.velocity += delta;
-          this.targetAngle += delta;
+      // Si el runway del showcase está dentro del área visible de la ventana
+      if (rect.bottom > 0 && rect.top < window.innerHeight) {
+        if (Math.abs(deltaY) > 0) {
+          // Cada movimiento de scroll empuja suavemente la velocidad en esa dirección
+          this.velocity += deltaY * 0.0016;
+          // Limitar la velocidad máxima para garantizar un movimiento elegante y sin giros bruscos
+          this.velocity = Math.max(-0.045, Math.min(0.045, this.velocity));
         }
       }
     }, { passive: true });
 
-    // Rueda directamente sobre el escenario
-    stage?.addEventListener('wheel', (e) => {
-      const delta = e.deltaY * 0.0005;
-      this.velocity += delta;
-      this.targetAngle += delta;
+    // 4. Control de Wheel / Trackpad a nivel de VENTANA para giro suave bidireccional
+    window.addEventListener('wheel', (e: WheelEvent) => {
+      if (!runway) return;
+      const rect = runway.getBoundingClientRect();
+
+      // Si el showcase está visible en el viewport
+      if (rect.top <= 100 && rect.bottom >= 150) {
+        const delta = e.deltaY * 0.0008;
+        this.velocity += delta;
+        this.velocity = Math.max(-0.045, Math.min(0.045, this.velocity));
+      }
     }, { passive: true });
 
     // 5. Drag & Touch de fondo para móvil
@@ -292,30 +278,29 @@ export class CircularShowcase {
       if ((e.target as HTMLElement).closest('#showcase-hover-card')) return;
       this.isStageDragging = true;
       this.touchStartX = e.touches[0].clientX;
-      this.isHovered = true;
+      this.velocity = 0;
     }, { passive: true });
 
     window.addEventListener('touchmove', (e) => {
       if (!this.isStageDragging) return;
       const currentX = e.touches[0].clientX;
       const deltaX = currentX - this.touchStartX;
-      this.currentAngle += deltaX * 0.003;
-      this.targetAngle += deltaX * 0.003;
+      this.currentAngle -= deltaX * 0.003;
+      this.velocity = -deltaX * 0.0012;
       this.touchStartX = currentX;
     }, { passive: true });
 
     window.addEventListener('touchend', () => {
       this.isStageDragging = false;
-      this.isHovered = false;
     });
 
     // 6. Botones laterales
     this.container.querySelector('#orbit-prev-btn')?.addEventListener('click', () => {
-      this.targetAngle -= (Math.PI * 2) / 10;
+      this.velocity -= 0.035;
     });
 
     this.container.querySelector('#orbit-next-btn')?.addEventListener('click', () => {
-      this.targetAngle += (Math.PI * 2) / 10;
+      this.velocity += 0.035;
     });
 
     // 7. Botón hacia el catálogo
@@ -429,41 +414,45 @@ export class CircularShowcase {
       clearTimeout(this.hideCardTimeout);
       this.hideCardTimeout = null;
     }
-    this.isHovered = true;
   }
 
   private scheduleHideCard(): void {
     if (this.isCardDragging) return;
     if (this.hideCardTimeout) clearTimeout(this.hideCardTimeout);
 
-    // 650ms de tolerancia generosa: permite cualquier transición rápida o diagonal
+    // 280ms de gracia: cierre rápido, natural y sin demoras molestas
     this.hideCardTimeout = window.setTimeout(() => {
       if (!this.isCardDragging) {
-        this.isHovered = false;
-        this.activeHoveredIndex = null;
-        this.activeCardIndex = null;
         this.hideHoverCard();
       }
-    }, 650);
+    }, 280);
   }
 
   private startAnimationLoop(): void {
     const loop = () => {
-      // Rotación suave continua en reposo (solo cuando no hay tarjeta activa ni drag)
-      if (!this.isHovered && !this.isStageDragging && !this.isCardDragging && this.activeCardIndex === null) {
-        this.currentAngle += 0.0015;
+      const isInteracting = this.isHoveringShoe || this.isStageDragging || this.isCardDragging || this.activeCardIndex !== null;
+
+      if (isInteracting) {
+        // Cuando hay interacción activa (hover sobre calzado, tarjeta abierta o arrastre):
+        // Frena suavemente a 0 para mantener el calzado fijo y facilitar lectura y clics
+        this.velocity *= 0.82;
+        if (Math.abs(this.velocity) < 0.0001) {
+          this.velocity = 0;
+        }
+      } else {
+        // Cuando no hay interacción:
+        // Si hay velocidad residual de scroll/rueda, aplicarla y amortiguar suavemente
+        if (Math.abs(this.velocity) > 0.0016) {
+          this.velocity *= 0.94;
+        } else {
+          // Transición suave hacia la velocidad de crucero en reposo (-0.0012 rad/frame)
+          const cruiseSpeed = -0.0012;
+          this.velocity += (cruiseSpeed - this.velocity) * 0.035;
+        }
       }
 
-      // Aplicar inercia y amortiguación
-      if (Math.abs(this.velocity) > 0.00001) {
-        this.currentAngle += this.velocity;
-        this.velocity *= 0.92;
-      }
-
-      // Interpolar hacia targetAngle cuando hay interacción
-      if (Math.abs(this.targetAngle - this.currentAngle) > 0.001 && !this.isHovered && this.activeCardIndex === null) {
-        this.currentAngle += (this.targetAngle - this.currentAngle) * 0.08;
-      }
+      // Aplicar velocidad al ángulo de rotación continuo de forma fluida
+      this.currentAngle += this.velocity;
 
       this.updatePositions();
       this.animationFrameId = requestAnimationFrame(loop);
@@ -623,6 +612,9 @@ export class CircularShowcase {
     if (hoverCard) {
       hoverCard.classList.remove('is-active', 'is-dragging');
     }
+    this.isHoveringShoe = false;
+    this.activeCardIndex = null;
+    this.activeHoveredIndex = null;
   }
 
   private handleShoeClick(index: number): void {
