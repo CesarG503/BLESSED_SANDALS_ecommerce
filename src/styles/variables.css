@@ -1,0 +1,45 @@
+:root {
+  /* Paleta de Colores Blessed Sandals & Minimal Nike */
+  --color-primary: #111111;
+  --color-secondary: #707072;
+  --color-muted: #8d8d8d;
+  --color-border: #e5e5e5;
+  --color-border-light: #f0f0f0;
+  --color-bg-page: #ffffff;
+  --color-bg-subtle: #f8f8f8;
+  --color-bg-card: #f6f6f6;
+  
+  /* Acentos de Marca */
+  --brand-green: #0B3B24;
+  --brand-green-hover: #134e32;
+  --brand-green-light: #e8f3ec;
+  --brand-gold: #d2b588;
+  --brand-gold-hover: #be9e6c;
+  --color-accent-red: #cf2228;
+  --color-accent-red-hover: #b01b20;
+
+  /* Tipografía */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-heading: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+
+  /* Espaciado y Layout */
+  --header-height: 72px;
+  --topbar-height: 36px;
+  --sidebar-width: 260px;
+  --container-max-width: 1400px;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 16px;
+  --radius-full: 9999px;
+
+  /* Sombras y Elevación */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.12);
+  --shadow-card-hover: 0 12px 28px rgba(0, 0, 0, 0.07);
+
+  /* Transiciones */
+  --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-smooth: 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}

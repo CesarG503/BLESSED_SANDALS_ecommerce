@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BLESSED SANDALS & SNEAKERS | Tienda Oficial</title>
+    <meta name="description" content="Tienda oficial de Blessed Sandals y calzado exclusivo Jordan. Diseños contemporáneos, confort absoluto y ediciones de colección." />
+    
+    <!-- Favicon usando el Isotipo de Blessed Sandals -->
+    <link rel="icon" type="image/png" href="/assets/logo/Isotipo.png" />
+    
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+
+    <!-- Google Model Viewer (Web Component para visualizar modelos 3D GLB con AR) -->
+    <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js"></script>
+
+    <!-- Estilos Globales -->
+    <link rel="stylesheet" href="/src/styles/main.css" />
+  </head>
+  <body>
+    <!-- CONTENEDOR DE LA CABECERA -->
+    <div id="header-app"></div>
+
+    <!-- HERO BANNER INTERACTIVO -->
+    <div id="hero-app"></div>
+
+    <!-- SECCIÓN PRINCIPAL DEL CATÁLOGO DE PRODUCTOS -->
+    <main class="catalog-section" id="catalog-section">
+      <div class="container">
+        <div class="catalog-layout">
+          <!-- BARRA LATERAL DE FILTROS (ESCRITORIO) -->
+          <div id="filters-sidebar-app"></div>
+
+          <!-- ÁREA DEL CATÁLOGO Y GRID DE PRODUCTOS -->
+          <div id="product-grid-app"></div>
+        </div>
+      </div>
+    </main>
+
+    <!-- PIE DE PÁGINA (FOOTER) -->
+    <div id="footer-app"></div>
+
+    <!-- MODAL DE VISTA RÁPIDA (QUICK VIEW) -->
+    <div id="quickview-modal-app" class="modal-container"></div>
+
+    <!-- MODAL DE VISUALIZADOR 3D -->
+    <div id="modal-3d-app" class="modal-container"></div>
+
+    <!-- MODAL DE BÚSQUEDA RÁPIDA -->
+    <div id="search-modal-app" class="modal-container"></div>
+
+    <!-- DRAWER LATERAL DE BOLSA DE COMPRAS (CART) -->
+    <div id="cart-drawer-app" class="drawer-container"></div>
+
+    <!-- DRAWER LATERAL DE FAVORITOS (WISHLIST) -->
+    <div id="wishlist-drawer-app" class="drawer-container"></div>
+
+    <!-- DRAWER DE FILTROS EN DISPOSITIVOS MÓVILES -->
+    <div id="mobile-filters-drawer-app" class="mobile-filters-drawer"></div>
+
+    <!-- SCRIPT PRINCIPAL DE LA APLICACIÓN -->
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

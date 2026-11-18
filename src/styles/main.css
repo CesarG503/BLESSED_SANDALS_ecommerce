@@ -1,0 +1,42 @@
+@import './variables.css';
+@import './reset.css';
+@import './animations.css';
+@import './components.css';
+
+/* Mobile Drawer de Filtros */
+.mobile-filters-drawer {
+  position: fixed;
+  inset: 0;
+  z-index: 1050;
+  pointer-events: none;
+  visibility: hidden;
+  transition: visibility var(--transition-normal);
+}
+
+.mobile-filters-drawer.is-open {
+  pointer-events: auto;
+  visibility: visible;
+}
+
+.mobile-filters-panel {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  max-width: 340px;
+  background-color: #ffffff;
+  padding: 24px;
+  overflow-y: auto;
+  box-shadow: var(--shadow-lg);
+  z-index: 2;
+}
+
+.mobile-filters-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: 16px;
+}
