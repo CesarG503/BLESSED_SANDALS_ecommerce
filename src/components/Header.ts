@@ -22,42 +22,53 @@ export class Header {
     const wishlistCount = this.store.wishlist.length;
 
     this.container.innerHTML = `
-      <!-- BARRA DE ANUNCIOS SUPERIOR -->
-      <div class="top-announcement-bar">
-        <div class="announcement-slider">
-          <span class="announcement-item">✨ ENVÍO GRATIS EN PEDIDOS SUPERIORES A $50 • DEVOLUCIONES GRATUITAS EN 30 DÍAS</span>
+      <!-- BARRA DE ANUNCIOS SUPERIOR EN BUCLE INFINITO -->
+      <div class="top-announcement-bar" aria-label="Promociones y Envíos">
+        <div class="announcement-marquee">
+          <div class="marquee-track">
+            <span class="marquee-item">✨ ENVÍO GRATIS EN PEDIDOS SUPERIORES A $50 • DEVOLUCIONES GRATUITAS EN 30 DÍAS</span>
+            <span class="marquee-sep">•</span>
+            <span class="marquee-item">🔥 NUEVA COLECCIÓN BLESSED SANDALS 2026 DISPONIBLE</span>
+            <span class="marquee-sep">•</span>
+            <span class="marquee-item">✨ ENVÍO GRATIS EN PEDIDOS SUPERIORES A $50 • DEVOLUCIONES GRATUITAS EN 30 DÍAS</span>
+            <span class="marquee-sep">•</span>
+            <span class="marquee-item">⚡ 10% DE DESCUENTO CON EL CÓDIGO BLESSED10</span>
+            <span class="marquee-sep">•</span>
+            <span class="marquee-item">✨ ENVÍO GRATIS EN PEDIDOS SUPERIORES A $50 • DEVOLUCIONES GRATUITAS EN 30 DÍAS</span>
+            <span class="marquee-sep">•</span>
+            <span class="marquee-item">🔥 NUEVA COLECCIÓN BLESSED SANDALS 2026 DISPONIBLE</span>
+            <span class="marquee-sep">•</span>
+            <span class="marquee-item">✨ ENVÍO GRATIS EN PEDIDOS SUPERIORES A $50 • DEVOLUCIONES GRATUITAS EN 30 DÍAS</span>
+            <span class="marquee-sep">•</span>
+            <span class="marquee-item">⚡ 10% DE DESCUENTO CON EL CÓDIGO BLESSED10</span>
+            <span class="marquee-sep">•</span>
+          </div>
         </div>
       </div>
 
-      <!-- NAVBAR PRINCIPAL -->
+      <!-- NAVBAR PRINCIPAL FIJO -->
       <header class="main-header" id="site-header">
         <div class="header-inner container">
-          
-          <!-- BOTÓN HAMBURGUESA (MÓVIL) -->
-          <button class="mobile-menu-btn" id="mobile-menu-toggle" aria-label="Abrir menú">
-            ${Icons.menu('w-6 h-6')}
-          </button>
 
-          <!-- LOGOTIPO DE LA TIENDA -->
-          <a href="#" class="brand-logo" id="brand-home-link">
-            <img src="/assets/logo/Imagotipo_alpha.png" alt="BLESSED SANDALS" class="logo-image" />
-            <div class="brand-text-fallback">
+          <!-- LOGOTIPO MINIMALISTA ELEGANTE (SIN ISOLOGO DESPROPORCIONADO) -->
+          <a href="#" class="brand-logo" id="brand-home-link" aria-label="Blessed Sandals Inicio">
+            <div class="brand-text-wrap">
               <span class="brand-title">BLESSED</span>
               <span class="brand-subtitle">SANDALS</span>
             </div>
           </a>
 
           <!-- ENLACES DE NAVEGACIÓN PRINCIPAL -->
-          <nav class="main-nav" id="main-navigation">
+          <nav class="main-nav" id="main-navigation" aria-label="Navegación principal">
             <ul class="nav-list">
               <li class="nav-item">
-                <a href="#catalog" class="nav-link active" data-category="all">TODO EL CALZADO</a>
+                <a href="#catalog" class="nav-link active" data-category="all">NOVEDADES</a>
               </li>
               <li class="nav-item">
                 <a href="#catalog" class="nav-link" data-category="sandals">SANDALIAS</a>
               </li>
               <li class="nav-item">
-                <a href="#catalog" class="nav-link" data-category="shoes">ZAPATILLAS JORDAN</a>
+                <a href="#catalog" class="nav-link" data-category="shoes">ZAPATILLAS</a>
               </li>
               <li class="nav-item">
                 <a href="#catalog" class="nav-link" data-gender="Hombre">HOMBRE</a>
@@ -66,21 +77,21 @@ export class Header {
                 <a href="#catalog" class="nav-link" data-gender="Mujer">MUJER</a>
               </li>
               <li class="nav-item">
-                <a href="#catalog" class="nav-link nav-link-special" data-badge="MÁS VENDIDO">DESTACADOS</a>
+                <a href="#catalog" class="nav-link nav-link-special" data-badge="MÁS VENDIDO">OFERTAS</a>
               </li>
             </ul>
           </nav>
 
-          <!-- ACCIONES DE CABECERA (BÚSQUEDA, FAVORITOS, CARRITO) -->
+          <!-- ACCIONES DE CABECERA (ICONOS MÁS PEQUEÑOS Y REFINADOS) -->
           <div class="header-actions">
-            <!-- BUSCADOR RÁPIDO -->
+            <!-- BUSCADOR -->
             <button class="action-btn" id="header-search-btn" title="Buscar productos" aria-label="Buscar">
-              ${Icons.search('w-5 h-5')}
+              ${Icons.search('w-4 h-4')}
             </button>
 
             <!-- FAVORITOS / WISHLIST -->
             <button class="action-btn" id="header-wishlist-btn" title="Favoritos" aria-label="Lista de deseos">
-              ${Icons.heart('w-5 h-5')}
+              ${Icons.heart('w-4 h-4')}
               <span class="badge wishlist-badge ${wishlistCount > 0 ? 'is-visible' : ''}" id="wishlist-counter">
                 ${wishlistCount}
               </span>
@@ -88,30 +99,12 @@ export class Header {
 
             <!-- BOLSA DE COMPRAS -->
             <button class="action-btn cart-btn" id="header-cart-btn" title="Bolsa de compras" aria-label="Bolsa de compras">
-              ${Icons.bag('w-5 h-5')}
+              ${Icons.bag('w-4 h-4')}
               <span class="badge cart-badge ${cartCount > 0 ? 'is-visible' : ''}" id="cart-counter">
                 ${cartCount}
               </span>
             </button>
           </div>
-        </div>
-
-        <!-- MENÚ DESPLEGABLE MÓVIL -->
-        <div class="mobile-nav-drawer" id="mobile-nav-drawer">
-          <div class="mobile-nav-header">
-            <img src="/assets/logo/Isologo.png" alt="Blessed" class="mobile-logo" />
-            <button class="mobile-close-btn" id="mobile-nav-close">
-              ${Icons.close('w-6 h-6')}
-            </button>
-          </div>
-          <ul class="mobile-nav-list">
-            <li><a href="#catalog" class="mobile-nav-link" data-category="all">Todos los Productos</a></li>
-            <li><a href="#catalog" class="mobile-nav-link" data-category="sandals">Sandalias Blessed</a></li>
-            <li><a href="#catalog" class="mobile-nav-link" data-category="shoes">Colección Jordan</a></li>
-            <li><a href="#catalog" class="mobile-nav-link" data-gender="Hombre">Hombre</a></li>
-            <li><a href="#catalog" class="mobile-nav-link" data-gender="Mujer">Mujer</a></li>
-            <li><a href="#catalog" class="mobile-nav-link" data-gender="Unisex">Unisex</a></li>
-          </ul>
         </div>
       </header>
     `;
@@ -134,7 +127,7 @@ export class Header {
     });
 
     // Filtros de navegación
-    const navLinks = this.container.querySelectorAll('.nav-link, .mobile-nav-link');
+    const navLinks = this.container.querySelectorAll('.nav-link');
     navLinks.forEach((link) => {
       link.addEventListener('click', (e) => {
         e.preventDefault();
@@ -151,9 +144,6 @@ export class Header {
           this.store.setFilter('genders', [gender as any]);
         }
 
-        // Cerrar menú móvil si está abierto
-        this.toggleMobileNav(false);
-
         // Scroll suave al catálogo
         const catalogEl = document.getElementById('catalog-section');
         if (catalogEl) {
@@ -168,25 +158,6 @@ export class Header {
       this.store.resetFilters();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     });
-
-    // Menú móvil
-    const mobileToggle = this.container.querySelector('#mobile-menu-toggle');
-    const mobileClose = this.container.querySelector('#mobile-nav-close');
-    mobileToggle?.addEventListener('click', () => this.toggleMobileNav(true));
-    mobileClose?.addEventListener('click', () => this.toggleMobileNav(false));
-  }
-
-  private toggleMobileNav(open: boolean): void {
-    const drawer = this.container.querySelector('#mobile-nav-drawer');
-    if (drawer) {
-      if (open) {
-        drawer.classList.add('is-open');
-        document.body.style.overflow = 'hidden';
-      } else {
-        drawer.classList.remove('is-open');
-        document.body.style.overflow = '';
-      }
-    }
   }
 
   private updateBadges(): void {
@@ -219,7 +190,7 @@ export class Header {
     window.addEventListener('scroll', () => {
       const header = document.getElementById('site-header');
       if (header) {
-        if (window.scrollY > 20) {
+        if (window.scrollY > 10) {
           header.classList.add('is-scrolled');
         } else {
           header.classList.remove('is-scrolled');

@@ -23,7 +23,7 @@
   --font-heading: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 
   /* Espaciado y Layout */
-  --header-height: 72px;
+  --header-height: 64px;
   --topbar-height: 36px;
   --sidebar-width: 260px;
   --container-max-width: 1400px;
