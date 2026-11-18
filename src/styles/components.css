@@ -491,11 +491,11 @@
   position: absolute;
   top: 0;
   left: 0;
-  width: 350px;
+  width: 320px;
   z-index: 1000;
   opacity: 0;
   visibility: hidden;
-  transition: opacity 0.28s cubic-bezier(0.16, 1, 0.3, 1), transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: opacity 0.22s cubic-bezier(0.16, 1, 0.3, 1), transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
   transform: scale(0.92);
   pointer-events: none;
   perspective: 1200px;
@@ -516,16 +516,16 @@
 
 .showcase-hover-modal.is-dragging .hover-card-inner {
   cursor: grabbing !important;
-  box-shadow: 0 40px 80px rgba(0, 0, 0, 0.24), 0 15px 35px rgba(11, 59, 36, 0.18) !important;
-  transform: scale(1.05);
+  box-shadow: 0 35px 70px rgba(0, 0, 0, 0.25), 0 12px 30px rgba(11, 59, 36, 0.2) !important;
+  transform: scale(1.04);
 }
 
 /* PUENTE INVISIBLE PARA TRANSICIÓN RÁPIDA DE CURSOR/DEDO */
 .hover-card-bridge {
   position: absolute;
   top: -85px;
-  left: -40px;
-  right: -40px;
+  left: -20px;
+  right: -20px;
   height: 95px;
   background: transparent;
   pointer-events: auto;
@@ -534,16 +534,15 @@
 
 .hover-card-inner {
   position: relative;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
   border: 1px solid rgba(255, 255, 255, 0.9);
   border-radius: 20px;
-  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.16), 0 10px 24px rgba(11, 59, 36, 0.08);
-  padding: 14px 24px 20px;
-  min-width: 320px;
-  max-width: 370px;
-  text-align: center;
+  box-shadow: 0 24px 50px rgba(0, 0, 0, 0.14), 0 8px 24px rgba(11, 59, 36, 0.08);
+  padding: 10px 18px 16px;
+  width: 100%;
+  text-align: left;
   transform-style: preserve-3d;
   transition: transform 0.12s ease-out, box-shadow 0.2s ease;
   overflow: hidden;
@@ -557,22 +556,22 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 4px 0 12px;
+  padding: 2px 0 8px;
   cursor: grab;
 }
 
 .card-drag-bar {
-  width: 40px;
+  width: 36px;
   height: 4px;
   border-radius: var(--radius-full);
-  background-color: #d8ded9;
+  background-color: #dbe2dc;
   transition: all var(--transition-fast);
 }
 
 .card-drag-handle:hover .card-drag-bar,
 .showcase-hover-modal.is-dragging .card-drag-bar {
   background-color: #0b3b24;
-  width: 52px;
+  width: 48px;
 }
 
 .card-gloss-overlay {
@@ -584,107 +583,179 @@
   transition: background 0.05s ease;
 }
 
-.hover-card-badge-row {
+.hover-card-top-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 8px;
+  margin-bottom: 2px;
   transform: translateZ(16px);
 }
 
 .hover-card-tag {
-  font-size: 0.68rem;
+  font-size: 0.65rem;
   font-weight: 800;
   color: var(--color-accent-red);
   letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
-.hover-card-num {
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: #0b3b24;
-  background-color: #eaf1ed;
-  padding: 2px 10px;
-  border-radius: var(--radius-full);
+/* CONTENEDOR DE LA IMAGEN DEL OBJETO EN LA CARD */
+.hover-card-img-wrap {
+  width: 100%;
+  height: 85px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 2px 0 6px;
+  transform: translateZ(20px);
+}
+
+.hover-card-img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.16));
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.hover-card-inner:hover .hover-card-img {
+  transform: scale(1.06) translateY(-2px);
+}
+
+/* INFO DE TEXTO CON MÁS ESPACIADO Y TAMAÑO REFINADO */
+.hover-card-info {
+  margin-top: 10px;
+  margin-bottom: 14px;
+  padding: 0 2px;
 }
 
 .hover-card-name {
-  font-size: 1.15rem;
-  font-weight: 900;
+  font-size: 0.78rem;
+  font-weight: 800;
   color: #111111;
   line-height: 1.25;
-  transform: translateZ(26px);
+  letter-spacing: 0.01em;
+  margin-bottom: 5px;
+  transform: translateZ(24px);
+  transition: color var(--transition-fast);
+}
+
+.hover-card-name:hover {
+  color: #0b3b24;
 }
 
 .hover-card-desc {
-  font-size: 0.78rem;
+  font-size: 0.62rem;
   color: var(--color-secondary);
-  margin-top: 4px;
-  transform: translateZ(18px);
+  line-height: 1.45;
+  letter-spacing: 0.02em;
+  transform: translateZ(16px);
 }
 
 .hover-card-bottom-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: 16px;
   padding-top: 14px;
+  margin-top: 6px;
   border-top: 1px solid var(--color-border-light);
-  transform: translateZ(28px);
+  transform: translateZ(26px);
 }
 
 .hover-card-price-box {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+  gap: 2px;
   line-height: 1.1;
 }
 
 .hover-card-price {
-  font-size: 1.15rem;
+  font-size: 0.90rem;
   font-weight: 800;
   color: #0b3b24;
 }
 
 .hover-card-stock {
-  font-size: 0.65rem;
+  font-size: 0.58rem;
   color: #16a34a;
   font-weight: 600;
+  letter-spacing: 0.03em;
+  margin-top: 2px;
 }
 
 .hover-card-btns {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
-.btn-hover-action {
-  padding: 7px 14px;
+/* BOTONES DE ICONO (CORAZÓN Y OJO DE VISTA RÁPIDA) */
+.btn-card-icon {
+  width: 32px;
+  height: 32px;
   border-radius: var(--radius-full);
-  font-size: 0.75rem;
-  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f1f4f1;
+  color: #222222;
+  border: 1px solid rgba(0, 0, 0, 0.06);
   transition: all var(--transition-fast);
+  cursor: pointer;
+  flex-shrink: 0;
 }
 
-.btn-hover-quick {
-  background-color: #ffffff;
-  color: #111111;
-  border: 1px solid var(--color-border);
+.btn-card-icon:hover {
+  background-color: #e3ede5;
+  color: #0b3b24;
+  transform: scale(1.08);
 }
 
-.btn-hover-quick:hover {
-  background-color: #f5f5f5;
-  border-color: #111111;
+.btn-card-wishlist.is-active,
+.btn-card-wishlist .is-filled {
+  color: var(--color-accent-red);
+  background-color: #fee2e2;
 }
 
+/* BOTÓN AÑADIR VERDE CON EL + ESTRICTAMENTE A LA PAR */
 .btn-hover-add {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  white-space: nowrap;
   background-color: #0b3b24;
   color: #ffffff;
+  padding: 7px 15px;
+  border-radius: var(--radius-full);
+  font-size: 0.78rem;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+  line-height: 1;
 }
 
 .btn-hover-add:hover {
-  background-color: #134e32;
+  background-color: #124d31;
   transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(11, 59, 36, 0.28);
+}
+
+.btn-add-plus {
+  font-size: 0.95rem;
+  font-weight: 800;
+  line-height: 1;
+  display: inline-block;
+}
+
+.btn-add-label {
+  display: inline-block;
+  line-height: 1;
+  font-size: 0.78rem;
 }
 
 /* BOTONES LATERALES DE NAVEGACIÓN MANUAL */

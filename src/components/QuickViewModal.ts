@@ -30,6 +30,10 @@ export class QuickViewModal {
       this.selectedSize = product.sizes[0] || 40;
     }
 
+    if (this.selectedColorIndex >= product.colors.length) {
+      this.selectedColorIndex = 0;
+    }
+
     const selectedColor = product.colors[this.selectedColorIndex] || product.colors[0];
     const currentImg = selectedColor.image || product.image;
     const isFav = this.store.isInWishlist(product.id);

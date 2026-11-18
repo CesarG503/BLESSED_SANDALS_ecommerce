@@ -331,7 +331,11 @@ export class CircularShowcase {
 
     // Iniciar arrastre con PointerDown (funciona para Mouse y Touch)
     hoverCard.addEventListener('pointerdown', (e: PointerEvent) => {
-      if ((e.target as HTMLElement).closest('.btn-hover-action')) return;
+      const target = e.target as HTMLElement;
+      // NUNCA iniciar arrastre si se hizo clic en botones o elementos interactivos
+      if (target.closest('button, a, input, select, .btn-card-icon, .btn-hover-add, .btn-hover-action, [data-action]')) {
+        return;
+      }
 
       this.isCardDragging = true;
       hoverCard.classList.add('is-dragging');
@@ -535,11 +539,12 @@ export class CircularShowcase {
     const shoeX = cx + rx * Math.cos(angle);
     const shoeY = cy - ry * Math.sin(angle);
 
-    const cardWidth = 350;
-    const cardHeight = 220;
+    const isWishlisted = this.store.isInWishlist(item.id);
+    const cardWidth = 320;
+    const cardHeight = 260;
 
-    // SIEMPRE UN POQUITO MÁS ABAJO DEL PAR (shoeY + 85px sitúa el inicio de la tarjeta justo debajo de la suela de forma limpia)
-    let cardY = shoeY + 85;
+    // SIEMPRE UN POQUITO MÁS ABAJO DEL PAR (shoeY + 75px sitúa el inicio de la tarjeta justo debajo de la suela de forma limpia)
+    let cardY = shoeY + 75;
     const maxCardY = height - cardHeight - 12;
     if (cardY > maxCardY) {
       cardY = maxCardY;
@@ -569,14 +574,26 @@ export class CircularShowcase {
         <!-- CAPA DE BRILLO 3D DINÁMICO -->
         <div class="card-gloss-overlay"></div>
 
-        <div class="hover-card-badge-row">
+        <!-- FILA SUPERIOR: BADGE Y FAVORITOS -->
+        <div class="hover-card-top-row">
           <span class="hover-card-tag">${item.badge}</span>
-          <span class="hover-card-num">${item.edition}</span>
+          <button type="button" class="btn-card-icon btn-hover-action btn-card-wishlist ${isWishlisted ? 'is-active' : ''}" data-action="wishlist" title="${isWishlisted ? 'En Favoritos' : 'Añadir a Favoritos'}" aria-label="Favorito">
+            ${Icons.heart('w-4 h-4', isWishlisted)}
+          </button>
         </div>
 
-        <h4 class="hover-card-name">${item.name}</h4>
-        <p class="hover-card-desc">Tono: <strong>${item.colorName}</strong> • Espuma CloudFoam Ultra</p>
+        <!-- IMAGEN DEL OBJETO / CALZADO (CLICK ABRE VISTA RÁPIDA) -->
+        <div class="hover-card-img-wrap btn-hover-action" data-action="quickview" style="cursor: pointer;" title="Vista rápida de ${item.name}">
+          <img src="${item.image}" alt="${item.name}" class="hover-card-img" draggable="false" />
+        </div>
+
+        <!-- NOMBRE UN POCO MÁS PEQUEÑO Y DESCRIPCIÓN CON MÁS ESPACIADO -->
+        <div class="hover-card-info">
+          <h4 class="hover-card-name btn-hover-action" data-action="quickview" style="cursor: pointer;" title="Vista rápida de ${item.name}">${item.name}</h4>
+          <p class="hover-card-desc">Tono: <strong>${item.colorName}</strong> • CloudFoam Ultra</p>
+        </div>
         
+        <!-- FILA INFERIOR: PRECIO Y ACCIONES -->
         <div class="hover-card-bottom-row">
           <div class="hover-card-price-box">
             <span class="hover-card-price">$${item.price.toFixed(2)}</span>
@@ -584,11 +601,14 @@ export class CircularShowcase {
           </div>
 
           <div class="hover-card-btns">
-            <button class="btn-hover-action btn-hover-quick" data-action="quickview" data-index="${index}">
-              Vista Rápida
+            <!-- VISTA RÁPIDA (OJO) -->
+            <button type="button" class="btn-card-icon btn-hover-action btn-hover-quick" data-action="quickview" data-index="${index}" title="Vista Rápida" aria-label="Vista Rápida">
+              ${Icons.eye('w-4 h-4')}
             </button>
-            <button class="btn-hover-action btn-hover-add" data-action="quickadd" data-index="${index}">
-              + Añadir
+            <!-- BOTÓN AÑADIR (VERDE CON + A LA PAR) -->
+            <button type="button" class="btn-hover-add btn-hover-action" data-action="quickadd" data-index="${index}" title="Añadir a la bolsa" aria-label="Añadir">
+              <span class="btn-add-plus">+</span>
+              <span class="btn-add-label">Añadir</span>
             </button>
           </div>
         </div>
@@ -596,30 +616,40 @@ export class CircularShowcase {
     `;
 
     // Eventos de botones
-    hoverCard.querySelector('[data-action="quickview"]')?.addEventListener('click', (e) => {
+    const wishlistBtn = hoverCard.querySelector('[data-action="wishlist"]') as HTMLElement | null;
+    wishlistBtn?.addEventListener('click', (e) => {
+      e.preventDefault();
       e.stopPropagation();
-      this.handleShoeClick(index);
+      const product = this.buildProductFromItem(item);
+      const isFav = this.store.toggleWishlist(product);
+      wishlistBtn.classList.toggle('is-active', isFav);
+      wishlistBtn.innerHTML = Icons.heart('w-4 h-4', isFav);
+      Toast.show(
+        isFav ? `¡${item.name} añadido a tus favoritos!` : `Eliminado de favoritos`,
+        isFav ? 'Favoritos' : 'Información',
+        isFav ? 'success' : 'info'
+      );
     });
 
-    hoverCard.querySelector('[data-action="quickadd"]')?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.quickAddToCart(item);
+    hoverCard.querySelectorAll('[data-action="quickview"]').forEach((el) => {
+      el.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.handleShoeClick(index);
+      });
+    });
+
+    hoverCard.querySelectorAll('[data-action="quickadd"]').forEach((el) => {
+      el.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.quickAddToCart(item);
+      });
     });
   }
 
-  private hideHoverCard(): void {
-    const hoverCard = this.container.querySelector('#showcase-hover-card') as HTMLElement | null;
-    if (hoverCard) {
-      hoverCard.classList.remove('is-active', 'is-dragging');
-    }
-    this.isHoveringShoe = false;
-    this.activeCardIndex = null;
-    this.activeHoveredIndex = null;
-  }
-
-  private handleShoeClick(index: number): void {
-    const item = this.items[index];
-    const product: Product = {
+  private buildProductFromItem(item: SlideItem): Product {
+    return {
       id: item.id,
       name: item.name,
       subtitle: `Sandalia Ergonómica ${item.edition}`,
@@ -638,37 +668,32 @@ export class CircularShowcase {
       features: ['Secado ultrarrápido', 'Plantilla con soporte de arco', 'Antideslizante'],
       description: `El modelo ${item.name} forma parte de la serie exclusiva de 10 pares de Blessed Sandals 2026. Diseñada para un descanso superior y un estilo inconfundible.`,
       rating: 5.0,
-      reviewCount: 48 + index * 12,
+      reviewCount: 48 + item.index * 12,
       inStock: true,
       createdAt: '2026-02-17'
     };
+  }
 
+  private hideHoverCard(): void {
+    const hoverCard = this.container.querySelector('#showcase-hover-card') as HTMLElement | null;
+    if (hoverCard) {
+      hoverCard.classList.remove('is-active', 'is-dragging');
+    }
+    this.isHoveringShoe = false;
+    this.activeCardIndex = null;
+    this.activeHoveredIndex = null;
+  }
+
+  private handleShoeClick(index: number): void {
+    const item = this.items[index];
+    const product = this.buildProductFromItem(item);
     this.store.openQuickView(product);
   }
 
   private quickAddToCart(item: SlideItem): void {
-    const product: Product = {
-      id: item.id,
-      name: item.name,
-      subtitle: `Sandalia Ergonómica ${item.edition}`,
-      category: 'sandals',
-      gender: 'Unisex',
-      price: item.price,
-      image: item.image,
-      gallery: [item.image],
-      colors: [{ name: item.colorName, hex: '#0B3B24', image: item.image }],
-      sizes: [40],
-      height: 'Baja',
-      technology: ['CloudFoam'],
-      features: ['Confort total'],
-      description: item.name,
-      rating: 5.0,
-      reviewCount: 50,
-      inStock: true,
-      createdAt: '2026-02-17'
-    };
-
+    const product = this.buildProductFromItem(item);
     this.store.addToCart(product, 40, item.colorName);
+    this.store.toggleCart(true);
     Toast.show(`¡${item.name} añadido a tu bolsa de compras!`, 'Añadido con Éxito', 'success');
   }
 
