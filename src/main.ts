@@ -1,6 +1,6 @@
 import { Store } from './state/store';
 import { Header } from './components/Header';
-import { HeroBanner } from './components/HeroBanner';
+import { CircularShowcase } from './components/CircularShowcase';
 import { FilterSidebar } from './components/FilterSidebar';
 import { ProductGrid } from './components/ProductGrid';
 import { QuickViewModal } from './components/QuickViewModal';
@@ -11,12 +11,14 @@ import { Model3DModal } from './components/Model3DModal';
 import { Footer } from './components/Footer';
 import { Icons } from './components/Icons';
 
+
+
 document.addEventListener('DOMContentLoaded', () => {
   const store = Store.getInstance();
 
   // Inicialización de componentes modulares
   new Header('header-app');
-  new HeroBanner('hero-app');
+  new CircularShowcase('hero-app');
   new FilterSidebar('filters-sidebar-app');
   new ProductGrid('product-grid-app');
   new QuickViewModal('quickview-modal-app');
