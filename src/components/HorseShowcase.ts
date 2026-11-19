@@ -262,7 +262,7 @@ export class HorseShowcase {
 
       // 2. Animación de aparición de productos con elevación y nitidez cinematográfica
       const cards = this.container.querySelectorAll<HTMLElement>('.horse-products-grid .product-card');
-      const triggerY = windowH * 0.90; // Desencadena elegantemente al entrar en el viewport inferior
+      const triggerY = windowH * 0.75; // Umbral ajustado para que los productos tarden un poco más en empezar a aparecer al hacer scroll
       cards.forEach((card) => {
         const cardRect = card.getBoundingClientRect();
         if (cardRect.top < triggerY) {
