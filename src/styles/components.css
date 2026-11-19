@@ -19,6 +19,7 @@
   background-color: var(--color-primary);
   color: #ffffff;
 }
+
 .btn-primary:hover {
   background-color: #2b2b2b;
   transform: translateY(-2px);
@@ -30,6 +31,7 @@
   color: var(--color-primary);
   border: 1.5px solid var(--color-border);
 }
+
 .btn-outline:hover {
   border-color: var(--color-primary);
   background-color: var(--color-bg-subtle);
@@ -42,6 +44,7 @@
   text-underline-offset: 3px;
   transition: color var(--transition-fast);
 }
+
 .btn-text-link:hover {
   color: var(--color-primary);
 }
@@ -101,6 +104,7 @@
   0% {
     transform: translate3d(0, 0, 0);
   }
+
   100% {
     transform: translate3d(-50%, 0, 0);
   }
@@ -826,9 +830,12 @@
 }
 
 @keyframes floatArrow {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: translateY(0);
   }
+
   50% {
     transform: translateY(6px);
   }
@@ -1122,7 +1129,8 @@
   transition: all var(--transition-fast);
 }
 
-.sort-select:hover, .sort-select:focus {
+.sort-select:hover,
+.sort-select:focus {
   background-color: var(--color-bg-subtle);
   border-color: var(--color-border);
 }
@@ -1200,7 +1208,8 @@
 }
 
 /* CHECKBOXES & RADIOS */
-.custom-checkbox, .custom-radio {
+.custom-checkbox,
+.custom-radio {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -1209,7 +1218,8 @@
   user-select: none;
 }
 
-.custom-checkbox input, .custom-radio input {
+.custom-checkbox input,
+.custom-radio input {
   display: none;
 }
 
@@ -1224,12 +1234,12 @@
   transition: all var(--transition-fast);
 }
 
-.custom-checkbox input:checked + .checkbox-indicator {
+.custom-checkbox input:checked+.checkbox-indicator {
   background-color: var(--color-primary);
   border-color: var(--color-primary);
 }
 
-.custom-checkbox input:checked + .checkbox-indicator::after {
+.custom-checkbox input:checked+.checkbox-indicator::after {
   content: '';
   width: 5px;
   height: 9px;
@@ -1244,7 +1254,7 @@
   transition: color var(--transition-fast);
 }
 
-.custom-radio input:checked ~ .radio-label {
+.custom-radio input:checked~.radio-label {
   color: var(--color-primary);
   font-weight: 600;
 }
@@ -1563,7 +1573,8 @@
   transform: translateY(-2px);
 }
 
-.show-more-count, .catalog-end-note {
+.show-more-count,
+.catalog-end-note {
   font-size: 0.8125rem;
   color: var(--color-secondary);
   text-align: center;
@@ -1896,12 +1907,14 @@
   visibility: hidden;
 }
 
-.modal-container.is-active, .modal-container.is-open {
+.modal-container.is-active,
+.modal-container.is-open {
   pointer-events: auto;
   visibility: visible;
 }
 
-.modal-backdrop, .search-backdrop {
+.modal-backdrop,
+.search-backdrop {
   position: absolute;
   inset: 0;
   background-color: rgba(0, 0, 0, 0.55);
@@ -1979,7 +1992,8 @@
   transition: all var(--transition-fast);
 }
 
-.thumb-btn.is-active, .thumb-btn:hover {
+.thumb-btn.is-active,
+.thumb-btn:hover {
   border-color: var(--color-primary);
 }
 
@@ -2379,8 +2393,13 @@
 }
 
 @keyframes toastProgress {
-  from { width: 100%; }
-  to { width: 0%; }
+  from {
+    width: 100%;
+  }
+
+  to {
+    width: 0%;
+  }
 }
 
 /* ==========================================================================
@@ -2612,5 +2631,770 @@
   .toast-item {
     min-width: unset;
     width: 100%;
+  }
+}
+
+/* ==========================================================================
+   SHOWCASE HORIZONTAL DE CABALLO CON ANIMACIÓN DE SCROLL (RUNNING HORSE)
+   ========================================================================== */
+
+.horse-showcase-section {
+  position: relative;
+  width: 100%;
+  background: var(--color-bg-page, #ffffff);
+  border-top: 1px solid var(--color-border-light, #f0f0f0);
+  padding-top: 60px;
+  padding-bottom: 240px;
+  overflow: clip;
+}
+
+.horse-scroll-runway {
+  position: relative;
+  width: 100%;
+  min-height: 270vh;
+}
+
+/* VIEWPORT DINÁMICO: GESTIÓN PROFESIONAL CON TRES ESTADOS DE PIN */
+.horse-sticky-viewport {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding-top: calc(var(--header-height, 64px) + var(--topbar-height, 36px) + 12px);
+  padding-bottom: 46px;
+  /* Margen elegante y cómodo respecto al borde inferior */
+  padding-left: 32px;
+  padding-right: 32px;
+  overflow: hidden;
+  box-sizing: border-box;
+  background: #f7f8f6;
+  transition: opacity 0.15s ease;
+}
+
+/* Estado 1: Antes del anclaje (en la cima de la pista) */
+.horse-sticky-viewport.is-before {
+  position: absolute;
+  top: 0;
+  bottom: auto;
+  left: 0;
+}
+
+/* Estado 2: FIJO (FIXED) durante el recorrido de scroll */
+.horse-sticky-viewport.is-pinned {
+  position: fixed;
+  top: 0;
+  bottom: auto;
+  left: 0;
+  z-index: 60;
+}
+
+/* Estado 3: Al llegar al footer, se queda asentado arriba del footer (unpin / no fixed) */
+.horse-sticky-viewport.is-after {
+  position: absolute;
+  top: auto;
+  bottom: 0;
+  left: 0;
+}
+
+/* Marca de Agua y Efecto Ambiental */
+.horse-watermark-bg {
+  position: absolute;
+  top: 18%;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: clamp(3.8rem, 13vw, 14rem);
+  font-weight: 900;
+  color: rgba(0, 0, 0, 0.025);
+  letter-spacing: -0.04em;
+  pointer-events: none;
+  user-select: none;
+  z-index: 0;
+  white-space: nowrap;
+}
+
+.horse-ambient-glow {
+  position: absolute;
+  top: 35%;
+  left: 50%;
+  width: 75vw;
+  height: 55vh;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(ellipse, rgba(210, 181, 136, 0.06) 0%, rgba(11, 59, 36, 0.02) 45%, rgba(255, 255, 255, 0) 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Encabezado y Barra de Métricas */
+.horse-header-box {
+  position: relative;
+  z-index: 3;
+  text-align: center;
+  max-width: 760px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.horse-badge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 14px;
+  border-radius: var(--radius-full);
+  background: rgba(11, 59, 36, 0.08);
+  border: 1px solid rgba(11, 59, 36, 0.16);
+  color: #0b3b24;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.horse-live-pulse {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: #16a34a;
+  box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.25);
+  animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse-ring {
+
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  50% {
+    transform: scale(1.35);
+    opacity: 0.7;
+  }
+}
+
+.horse-title {
+  font-size: clamp(1.35rem, 2.4vw, 2.1rem);
+  font-weight: 900;
+  color: #111111;
+  letter-spacing: -0.02em;
+  margin-bottom: 4px;
+}
+
+.horse-subtitle {
+  font-size: 0.80rem;
+  color: #666666;
+  max-width: 580px;
+  line-height: 1.35;
+  margin-bottom: 10px;
+}
+
+.horse-metric-container {
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.horse-metric-track {
+  width: 100%;
+  height: 5px;
+  background: rgba(0, 0, 0, 0.07);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.horse-metric-bar {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #d2b588, #0b3b24);
+  border-radius: 999px;
+  transition: width 0.06s linear;
+}
+
+.horse-metric-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.64rem;
+  font-weight: 700;
+  color: #777777;
+  letter-spacing: 0.04em;
+}
+
+/* ==========================================================================
+   CATÁLOGO DE PRODUCTOS EN EL HORSE SHOWCASE (GRID DE 3 COLUMNAS HABITUAL)
+   ========================================================================== */
+.horse-catalog-container {
+  position: relative;
+  z-index: 2;
+  margin-top: 48px;
+}
+
+.horse-products-grid.products-grid-container {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 36px 28px;
+}
+
+/* Tarjetas con proporciones armónicas y animación de aparición cinematográfica */
+.horse-products-grid .product-card {
+  animation: none !important;
+  background-color: transparent;
+  border-radius: var(--radius-md, 8px);
+  will-change: opacity, transform, filter;
+  /* Animación inicial oculta: elevación más pronunciada, perspectiva 3D y suave desenfoque */
+  opacity: 0;
+  transform: translateY(68px) scale(0.92) perspective(900px) rotateX(8deg);
+  filter: blur(8px);
+  transition: opacity 0.75s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.75s cubic-bezier(0.16, 1, 0.3, 1),
+    filter 0.65s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.3s ease;
+}
+
+/* Estado revelado: irrumpe con presencia, nitidez y dinamismo */
+.horse-products-grid .product-card.horse-card-revealed {
+  opacity: 1;
+  transform: translateY(0) scale(1) perspective(900px) rotateX(0deg);
+  filter: blur(0px);
+}
+
+.horse-products-grid .product-card:hover {
+  transform: translateY(-6px) scale(1.015);
+}
+
+/* Escalonamiento (stagger) por columnas para una ola fluida y natural */
+.horse-products-grid .product-card:nth-child(3n + 1) {
+  transition-delay: 0.04s;
+}
+
+.horse-products-grid .product-card:nth-child(3n + 2) {
+  transition-delay: 0.16s;
+}
+
+.horse-products-grid .product-card:nth-child(3n + 3) {
+  transition-delay: 0.28s;
+}
+
+/* Contenedor de imagen en el showcase: proporciones correctas sin marcos blancos accidentales */
+.horse-products-grid .product-image-container {
+  background-color: #f6f6f6;
+  border-radius: var(--radius-md, 8px);
+  padding: 0;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Fotografías de calzado: llenan el marco limpiamente con su estudio original */
+.horse-products-grid .product-card-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Sandalias en PNG transparente: encuadre centrado y armónico */
+.horse-products-grid .product-card-img[src*="slide"] {
+  object-fit: contain;
+  padding: 22px;
+}
+
+/* Air Jordan 11 Retro (jordan.jpg): encuadre de la suela centrado y equilibrado */
+.horse-products-grid #img-prod-002 {
+  object-position: center 65%;
+}
+
+.horse-products-grid .product-card:hover .product-card-img {
+  transform: scale(1.06);
+}
+
+.horse-catalog-end-note {
+  text-align: center;
+  padding: 48px 16px 20px;
+  color: var(--color-secondary, #707072);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+/* ==========================================================================
+   CONTENEDOR DEL CABALLO FIJO EN PANTALLA (PINNING CONTROLLER PROFESIONAL)
+   ========================================================================== */
+.horse-fixed-runner-container {
+  width: 100%;
+  pointer-events: none;
+  z-index: 45;
+  opacity: 1;
+}
+
+/* Estado 1: Anclado naturalmente a la web al inicio de la sección (ya presente y visible, sin pop-in) */
+.horse-fixed-runner-container.is-before {
+  position: absolute;
+  top: 70px;
+  bottom: auto;
+  left: 0;
+  right: 0;
+  opacity: 1;
+  pointer-events: none;
+}
+
+/* Estado 2: FIJO (FIXED) abajo en la pantalla mientras avanza el scroll */
+.horse-fixed-runner-container.is-pinned {
+  position: fixed;
+  bottom: 15px;
+  top: auto;
+  left: 0;
+  right: 0;
+  opacity: 1;
+}
+
+/* Estado 3: Al llegar al footer, se queda asentado en la base de la sección sin ser fixed */
+.horse-fixed-runner-container.is-after {
+  position: absolute;
+  bottom: 25px;
+  top: auto;
+  left: 0;
+  right: 0;
+  opacity: 1;
+}
+
+/* Arena Principal y Pista (Para compatibilidad con ShowcasePromo) */
+.horse-arena {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+  height: 60vh;
+  min-height: 440px;
+  max-height: 580px;
+  display: flex;
+  align-items: flex-end;
+  overflow: visible;
+}
+
+/* Entidad del Caballo en Canvas (FIJO EN EJE VERTICAL, SOLO SE MUEVE EN HORIZONTAL) */
+.horse-runner-wrap {
+  position: relative;
+  left: 0;
+  width: clamp(280px, 24vw, 400px);
+  aspect-ratio: 16 / 9;
+  pointer-events: none;
+  z-index: 8;
+  will-change: transform;
+}
+
+.horse-canvas {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  mix-blend-mode: multiply;
+  display: block;
+}
+
+.horse-dust-puff {
+  position: absolute;
+  bottom: 12px;
+  left: 20%;
+  width: 90px;
+  height: 26px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(210, 181, 136, 0.45) 0%, rgba(210, 181, 136, 0) 70%);
+  filter: blur(5px);
+  pointer-events: none;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+/* Estela de Productos (DISTRIBUIDOS EN HORIZONTAL Y VERTICAL) */
+.horse-products-trail {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+  z-index: 6;
+}
+
+/* Distribución Vertical: Tarjetas Superiores e Inferiores */
+.horse-card-upper {
+  top: 18px;
+  bottom: auto;
+}
+
+.horse-card-lower {
+  bottom: 22px;
+  top: auto;
+}
+
+/* Distribución Horizontal a lo largo de la pista */
+#horse-card-0 {
+  left: calc(3% + 0px);
+}
+
+#horse-card-1 {
+  left: calc(24% + 0px);
+}
+
+#horse-card-2 {
+  left: calc(46% + 0px);
+}
+
+#horse-card-3 {
+  left: calc(67% + 0px);
+}
+
+/* Tarjeta de Producto con animación en ejes X e Y */
+.horse-product-card {
+  position: absolute;
+  width: clamp(190px, 16vw, 225px);
+  opacity: 0;
+  transform: translate3d(-45px, 55px, 0) scale(0.76);
+  transition: opacity 0.22s cubic-bezier(0.16, 1, 0.3, 1), transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, opacity;
+  pointer-events: none;
+  user-select: none;
+}
+
+.horse-product-card.is-active-reveal {
+  pointer-events: auto !important;
+  user-select: auto;
+}
+
+/* Contenedor interior para aislamiento de flotación y hover 3D */
+.h-card-inner {
+  position: relative;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(11, 59, 36, 0.05);
+  border-radius: 14px;
+  padding: 12px;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease;
+}
+
+.horse-product-card:hover .h-card-inner {
+  box-shadow: 0 24px 50px rgba(0, 0, 0, 0.14), 0 6px 18px rgba(11, 59, 36, 0.12) !important;
+  transform: translateY(-6px) scale(1.03) !important;
+}
+
+/* Animaciones flotantes sutiles cuando los productos están asentados */
+@keyframes float-upper {
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes float-lower {
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+.horse-product-card.is-settled.horse-card-upper:not(:hover) .h-card-inner {
+  animation: float-upper 4.2s ease-in-out infinite;
+}
+
+.horse-product-card.is-settled.horse-card-lower:not(:hover) .h-card-inner {
+  animation: float-lower 4.6s ease-in-out 0.8s infinite;
+}
+
+.h-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.h-card-badge {
+  font-size: 0.58rem;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  background: rgba(11, 59, 36, 0.08);
+  color: #0b3b24;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.h-card-icon-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #f1f4f1;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  color: #222222;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.h-card-icon-btn:hover {
+  background: #e3ede5;
+  color: #0b3b24;
+  transform: scale(1.08);
+}
+
+.h-card-icon-btn.is-active,
+.h-card-icon-btn .is-filled {
+  background: #fee2e2;
+  color: #cf2228;
+}
+
+.h-card-img-wrap {
+  width: 100%;
+  height: 105px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 4px 0 8px;
+  cursor: pointer;
+}
+
+.h-card-img {
+  max-width: 95%;
+  max-height: 95%;
+  object-fit: contain;
+  filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.14));
+  transition: transform 0.25s ease;
+}
+
+.h-card-img-wrap:hover .h-card-img {
+  transform: scale(1.08) translateY(-2px);
+}
+
+.h-card-info {
+  margin-bottom: 8px;
+  padding: 0 2px;
+}
+
+.h-card-title {
+  font-size: 0.76rem;
+  font-weight: 800;
+  color: #111111;
+  line-height: 1.25;
+  margin-bottom: 2px;
+  cursor: pointer;
+  transition: color 0.15s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.h-card-title:hover {
+  color: #0b3b24;
+}
+
+.h-card-subtitle {
+  font-size: 0.60rem;
+  color: #707072;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.h-card-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-border-light);
+}
+
+.h-card-price-box {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+
+.h-card-price {
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: #0b3b24;
+}
+
+.h-card-stock {
+  font-size: 0.54rem;
+  font-weight: 600;
+  color: #16a34a;
+}
+
+.h-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.h-card-btn-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 11px;
+  border-radius: var(--radius-full);
+  background: #0b3b24;
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.h-card-btn-add:hover {
+  background: #124d31;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(11, 59, 36, 0.25);
+}
+
+.h-btn-plus {
+  font-size: 0.88rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.h-btn-label {
+  line-height: 1;
+}
+
+/* Adaptación Responsiva para Pantallas Medianas y Móviles */
+@media (max-width: 991px) {
+  .horse-products-grid.products-grid-container {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 24px 16px;
+  }
+
+  .horse-products-grid .product-card:nth-child(2n + 1) {
+    transition-delay: 0.04s;
+  }
+
+  .horse-products-grid .product-card:nth-child(2n + 2) {
+    transition-delay: 0.14s;
+  }
+
+  .horse-showcase-section {
+    padding-bottom: 200px;
+  }
+
+  .horse-scroll-runway {
+    min-height: 240vh;
+  }
+
+  .horse-sticky-viewport {
+    padding: calc(var(--header-height, 64px) + 36px + 8px) 16px 24px;
+  }
+
+  .horse-arena {
+    height: 54vh;
+    min-height: 380px;
+  }
+
+  .horse-runner-wrap {
+    width: clamp(240px, 42vw, 340px);
+    z-index: 9;
+  }
+
+  .horse-products-trail {
+    display: flex;
+    position: absolute;
+    bottom: 24px;
+    top: auto;
+    left: 12px;
+    width: max-content;
+    gap: 14px;
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .horse-product-card {
+    position: relative;
+    left: auto !important;
+    top: auto !important;
+    bottom: auto !important;
+    flex-shrink: 0;
+    width: 195px;
+  }
+}
+
+@media (max-width: 640px) {
+  .horse-products-grid.products-grid-container {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .horse-products-grid .product-card {
+    transition-delay: 0.04s !important;
+  }
+
+  .horse-showcase-section {
+    padding-bottom: 180px;
+  }
+
+  .horse-scroll-runway {
+    min-height: 210vh;
+  }
+
+  .horse-title {
+    font-size: 1.25rem;
+  }
+
+  .horse-subtitle {
+    font-size: 0.74rem;
+  }
+
+  .horse-metric-container {
+    max-width: 300px;
+  }
+
+  .horse-runner-wrap {
+    width: clamp(200px, 60vw, 280px);
+  }
+
+  .horse-product-card {
+    width: 175px;
+  }
+
+  .h-card-inner {
+    padding: 10px;
+  }
+
+  .h-card-img-wrap {
+    height: 85px;
+  }
+
+  .h-card-title {
+    font-size: 0.72rem;
+  }
+
+  .h-card-btn-add {
+    padding: 4px 8px;
+    font-size: 0.68rem;
   }
 }

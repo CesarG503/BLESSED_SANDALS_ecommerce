@@ -16,7 +16,7 @@ body {
   background-color: var(--color-bg-page);
   color: var(--color-primary);
   line-height: 1.5;
-  overflow-x: hidden;
+  overflow-x: clip;
   padding-top: calc(var(--topbar-height) + var(--header-height));
 }
 

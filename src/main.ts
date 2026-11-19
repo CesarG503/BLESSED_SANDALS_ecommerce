@@ -8,6 +8,7 @@ import { CartDrawer } from './components/CartDrawer';
 import { WishlistDrawer } from './components/WishlistDrawer';
 import { SearchModal } from './components/SearchModal';
 import { Model3DModal } from './components/Model3DModal';
+import { HorseShowcase } from './components/HorseShowcase';
 import { Footer } from './components/Footer';
 import { Icons } from './components/Icons';
 
@@ -26,6 +27,7 @@ document.addEventListener('DOMContentLoaded', () => {
   new WishlistDrawer('wishlist-drawer-app');
   new SearchModal('search-modal-app');
   new Model3DModal('modal-3d-app');
+  new HorseShowcase('horse-showcase-app');
   new Footer('footer-app');
 
   // Inicialización de drawer de filtros móvil
