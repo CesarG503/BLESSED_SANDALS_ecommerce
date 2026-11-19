@@ -1,0 +1,57 @@
+name: ecommerce
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ecommerce-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ecommerce_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ecommerce_password}
+      POSTGRES_DB: ${POSTGRES_DB:-ecommerce_db}
+    ports:
+      - "${POSTGRES_PORT:-5434}:5432"
+    volumes:
+      - ecommerce_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ecommerce_user} -d ${POSTGRES_DB:-ecommerce_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: ecommerce-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY_ID:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_ACCESS_KEY:-minioadmin123}
+    ports:
+      - "${MINIO_PORT:-9002}:9000"
+      - "${MINIO_CONSOLE_PORT:-9003}:9001"
+    volumes:
+      - ecommerce_minio_data:/data
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: ecommerce-minio-init
+    depends_on:
+      - minio
+    restart: "no"
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set local http://minio:9000 ${S3_ACCESS_KEY_ID:-minioadmin} ${S3_SECRET_ACCESS_KEY:-minioadmin123}; do
+        echo 'Esperando conexión con MinIO...';
+        sleep 2;
+      done;
+      mc mb --ignore-existing local/${S3_BUCKET:-ecommerce-assets};
+      mc anonymous set download local/${S3_BUCKET:-ecommerce-assets};
+      echo 'Bucket ${S3_BUCKET:-ecommerce-assets} creado y configurado correctamente para descargas públicas.';
+      "
+
+volumes:
+  ecommerce_postgres_data:
+    name: ecommerce_postgres_data
+  ecommerce_minio_data:
+    name: ecommerce_minio_data
