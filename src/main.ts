@@ -7,6 +7,8 @@ import { QuickViewModal } from './components/QuickViewModal';
 import { CartDrawer } from './components/CartDrawer';
 import { WishlistDrawer } from './components/WishlistDrawer';
 import { SearchModal } from './components/SearchModal';
+import { PromoModal } from './components/PromoModal';
+import { AuthModal } from './components/AuthModal';
 import { Model3DModal } from './components/Model3DModal';
 import { HorseShowcase } from './components/HorseShowcase';
 import { Footer } from './components/Footer';
@@ -26,6 +28,8 @@ document.addEventListener('DOMContentLoaded', () => {
   new CartDrawer('cart-drawer-app');
   new WishlistDrawer('wishlist-drawer-app');
   new SearchModal('search-modal-app');
+  new PromoModal('promo-modal-app');
+  new AuthModal('auth-modal-app');
   new Model3DModal('modal-3d-app');
   new HorseShowcase('horse-showcase-app');
   new Footer('footer-app');

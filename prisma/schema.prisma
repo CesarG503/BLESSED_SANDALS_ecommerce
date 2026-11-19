@@ -1,0 +1,260 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED
+}
+
+// ============================================================================
+// MODELOS DE USUARIO Y AUTENTICACIÓN
+// ============================================================================
+
+model User {
+  id           String        @id @default(uuid())
+  email        String        @unique
+  passwordHash String
+  name         String
+  avatar       String?
+  phone        String?
+  role         Role          @default(USER)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  addresses    Address[]
+  orders       Order[]
+  reviews      Review[]
+  wishlist     Wishlist[]
+  promoUsages  PromoUsage[]
+
+  @@map("users")
+}
+
+model Address {
+  id           String   @id @default(uuid())
+  userId       String
+  fullName     String
+  phone        String
+  street       String
+  city         String
+  state        String
+  postalCode   String
+  country      String   @default("SV")
+  isDefault    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("addresses")
+}
+
+// ============================================================================
+// MODELOS DE CATÁLOGO Y PRODUCTOS
+// ============================================================================
+
+model Category {
+  id          String    @id @default(uuid())
+  name        String    @unique
+  slug        String    @unique
+  description String?
+  image       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  products    Product[]
+
+  @@map("categories")
+}
+
+model Product {
+  id            String         @id @default(uuid())
+  name          String
+  slug          String         @unique
+  subtitle      String?
+  description   String?
+  price         Float
+  originalPrice Float?
+  badge         String?
+  gender        String         @default("Unisex")
+  height        String?
+  image         String
+  model3dUrl    String?
+  inStock       Boolean        @default(true)
+  featured      Boolean        @default(false)
+  categoryId    String
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  category      Category       @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  colors        ProductColor[]
+  sizes         ProductSize[]
+  reviews       Review[]
+  orderItems    OrderItem[]
+  wishlistItems Wishlist[]
+
+  @@map("products")
+}
+
+model ProductColor {
+  id        String   @id @default(uuid())
+  productId String
+  name      String
+  hex       String
+  image     String?
+
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("product_colors")
+}
+
+model ProductSize {
+  id        String   @id @default(uuid())
+  productId String
+  size      Float
+  stock     Int      @default(15)
+
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, size])
+  @@map("product_sizes")
+}
+
+// ============================================================================
+// CÓDIGOS PROMOCIONALES / CUPONES DE DESCUENTO
+// ============================================================================
+
+model PromoCode {
+  id            String       @id @default(uuid())
+  code          String       @unique
+  description   String
+  discountType  DiscountType @default(PERCENTAGE)
+  discountValue Float
+  minPurchase   Float?
+  maxDiscount   Float?
+  usageLimit    Int?
+  timesUsed     Int          @default(0)
+  isActive      Boolean      @default(true)
+  startsAt      DateTime     @default(now())
+  expiresAt     DateTime?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  orders        Order[]
+  usages        PromoUsage[]
+
+  @@map("promo_codes")
+}
+
+model PromoUsage {
+  id          String    @id @default(uuid())
+  promoCodeId String
+  userId      String
+  orderId     String?
+  usedAt      DateTime  @default(now())
+
+  promoCode   PromoCode @relation(fields: [promoCodeId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("promo_usages")
+}
+
+// ============================================================================
+// PEDIDOS Y ORDENES DE COMPRA
+// ============================================================================
+
+model Order {
+  id          String      @id @default(uuid())
+  orderNumber String      @unique
+  userId      String
+  status      OrderStatus @default(PENDING)
+  subtotal    Float
+  discount    Float       @default(0)
+  shipping    Float       @default(0)
+  total       Float
+  promoCodeId String?
+  notes       String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Restrict)
+  promoCode   PromoCode?  @relation(fields: [promoCodeId], references: [id], onDelete: SetNull)
+  items       OrderItem[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id        String   @id @default(uuid())
+  orderId   String
+  productId String
+  size      Float
+  color     String?
+  quantity  Int
+  unitPrice Float
+  total     Float
+
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@map("order_items")
+}
+
+// ============================================================================
+// FAVORITOS Y RESEÑAS
+// ============================================================================
+
+model Wishlist {
+  id        String   @id @default(uuid())
+  userId    String
+  productId String
+  addedAt   DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@map("wishlists")
+}
+
+model Review {
+  id        String   @id @default(uuid())
+  userId    String
+  productId String
+  rating    Int      @default(5)
+  comment   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("reviews")
+}

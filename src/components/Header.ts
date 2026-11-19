@@ -89,6 +89,14 @@ export class Header {
               ${Icons.search('w-4 h-4')}
             </button>
 
+            <!-- CÓDIGOS PROMOCIONALES / CUPONES (ENTRE LUPA Y CORAZÓN) -->
+            <button class="action-btn promo-btn ${this.store.appliedPromo ? 'is-active' : ''}" id="header-promo-btn" title="${this.store.appliedPromo ? 'Cupón activo: ' + this.store.appliedPromo.code : 'Colocar código promocional'}" aria-label="Código promocional">
+              ${Icons.ticket('w-4 h-4')}
+              <span class="badge promo-badge ${this.store.appliedPromo ? 'is-visible' : ''}" id="promo-counter">
+                %
+              </span>
+            </button>
+
             <!-- FAVORITOS / WISHLIST -->
             <button class="action-btn" id="header-wishlist-btn" title="Favoritos" aria-label="Lista de deseos">
               ${Icons.heart('w-4 h-4')}
@@ -104,6 +112,12 @@ export class Header {
                 ${cartCount}
               </span>
             </button>
+
+            <!-- USUARIO / LOGIN / PERFIL (AL FINAL) -->
+            <button class="action-btn user-btn ${this.store.currentUser ? 'is-authenticated' : ''}" id="header-user-btn" title="${this.store.currentUser ? 'Mi perfil (' + this.store.currentUser.name + ')' : 'Iniciar sesión / Mi cuenta'}" aria-label="Cuenta de usuario">
+              ${Icons.user('w-4 h-4')}
+              <span class="user-status-dot ${this.store.currentUser ? 'is-online' : ''}" id="user-status-dot"></span>
+            </button>
           </div>
         </div>
       </header>
@@ -116,6 +130,11 @@ export class Header {
       this.store.toggleCart(true);
     });
 
+    // Códigos Promocionales / Cupones (entre lupa y corazón)
+    this.container.querySelector('#header-promo-btn')?.addEventListener('click', () => {
+      this.store.togglePromo(true);
+    });
+
     // Wishlist
     this.container.querySelector('#header-wishlist-btn')?.addEventListener('click', () => {
       this.store.toggleWishlistDrawer(true);
@@ -124,6 +143,11 @@ export class Header {
     // Búsqueda
     this.container.querySelector('#header-search-btn')?.addEventListener('click', () => {
       this.store.toggleSearch(true);
+    });
+
+    // Usuario / Login / Perfil (al final)
+    this.container.querySelector('#header-user-btn')?.addEventListener('click', () => {
+      this.store.toggleAuth(true);
     });
 
     // Filtros de navegación
@@ -163,6 +187,8 @@ export class Header {
   private updateBadges(): void {
     const cartCount = this.store.getCartCount();
     const wishlistCount = this.store.wishlist.length;
+    const hasPromo = !!this.store.appliedPromo;
+    const user = this.store.currentUser;
 
     const cartCounter = this.container.querySelector('#cart-counter');
     if (cartCounter) {
@@ -182,6 +208,34 @@ export class Header {
         wishlistCounter.classList.add('is-visible');
       } else {
         wishlistCounter.classList.remove('is-visible');
+      }
+    }
+
+    const promoCounter = this.container.querySelector('#promo-counter');
+    const promoBtn = this.container.querySelector('#header-promo-btn');
+    if (promoCounter && promoBtn) {
+      if (hasPromo) {
+        promoCounter.classList.add('is-visible');
+        promoBtn.classList.add('is-active');
+        promoBtn.setAttribute('title', `Cupón activo: ${this.store.appliedPromo?.code}`);
+      } else {
+        promoCounter.classList.remove('is-visible');
+        promoBtn.classList.remove('is-active');
+        promoBtn.setAttribute('title', 'Colocar código promocional');
+      }
+    }
+
+    const userBtn = this.container.querySelector('#header-user-btn');
+    const userDot = this.container.querySelector('#user-status-dot');
+    if (userBtn && userDot) {
+      if (user) {
+        userBtn.classList.add('is-authenticated');
+        userDot.classList.add('is-online');
+        userBtn.setAttribute('title', `Mi perfil (${user.name})`);
+      } else {
+        userBtn.classList.remove('is-authenticated');
+        userDot.classList.remove('is-online');
+        userBtn.setAttribute('title', 'Iniciar sesión / Mi cuenta');
       }
     }
   }

@@ -6,8 +6,6 @@ import confetti from 'canvas-confetti';
 export class CartDrawer {
   private container: HTMLElement;
   private store: Store;
-  private discountPercent: number = 0;
-  private promoCodeApplied: string = '';
 
   constructor(containerId: string) {
     this.store = Store.getInstance();
@@ -21,10 +19,11 @@ export class CartDrawer {
   public render(): void {
     const isOpen = this.store.isCartOpen;
     const cart = this.store.cart;
-    const subtotal = this.store.getCartTotal();
-    const discount = (subtotal * this.discountPercent) / 100;
+    const subtotal = this.store.getCartSubtotal();
+    const discount = this.store.getDiscountAmount();
     const shipping = subtotal > 50 || subtotal === 0 ? 0 : 9.99;
     const total = Math.max(0, subtotal - discount + shipping);
+    const appliedPromo = this.store.appliedPromo;
 
     const freeShippingThreshold = 50;
     const freeShippingProgress = Math.min(100, (subtotal / freeShippingThreshold) * 100);
@@ -128,12 +127,15 @@ export class CartDrawer {
           <div class="drawer-footer">
             <!-- CUPÓN DE DESCUENTO -->
             <div class="promo-box">
-              <input type="text" id="promo-input" placeholder="Código (Prueba: BLESSED10)" value="${this.promoCodeApplied}" class="promo-input" />
-              <button class="btn-apply-promo" id="btn-apply-promo">Aplicar</button>
+              <input type="text" id="promo-input" placeholder="Código (Prueba: BLESSED10)" value="${appliedPromo ? appliedPromo.code : ''}" class="promo-input" />
+              <button class="btn-apply-promo" id="btn-apply-promo">${appliedPromo ? 'Cambiar' : 'Aplicar'}</button>
             </div>
             ${
-              this.discountPercent > 0
-                ? `<p class="promo-success-msg">✓ 10% de descuento aplicado (${this.promoCodeApplied})</p>`
+              appliedPromo
+                ? `<div class="promo-applied-badge-row">
+                    <span class="promo-success-msg">✓ Cupón activo: <strong>${appliedPromo.code}</strong> (${appliedPromo.description})</span>
+                    <button class="btn-remove-promo-cart" id="btn-remove-promo-cart" title="Remover cupón">✕</button>
+                  </div>`
                 : ''
             }
 
@@ -143,10 +145,10 @@ export class CartDrawer {
                 <span>$${subtotal.toFixed(2)}</span>
               </div>
               ${
-                discount > 0
+                discount > 0 && appliedPromo
                   ? `
                 <div class="summary-row discount">
-                  <span>Descuento (${this.discountPercent}%)</span>
+                  <span>Descuento (${appliedPromo.code})</span>
                   <span>-$${discount.toFixed(2)}</span>
                 </div>
               `
@@ -222,14 +224,21 @@ export class CartDrawer {
     this.container.querySelector('#btn-apply-promo')?.addEventListener('click', () => {
       const input = this.container.querySelector('#promo-input') as HTMLInputElement | null;
       const code = input?.value.trim().toUpperCase();
-      if (code === 'BLESSED10' || code === 'JORDAN10' || code === 'VERANO') {
-        this.discountPercent = 10;
-        this.promoCodeApplied = code;
-        Toast.show('¡Cupón aplicado exitosamente! 10% de descuento', 'Descuento', 'success');
-        this.render();
+      if (code) {
+        const res = this.store.applyPromo(code);
+        if (res.success) {
+          Toast.show(res.message, 'Cupón Aplicado', 'success');
+        } else {
+          Toast.show(res.message, 'Cupón no válido', 'warning');
+        }
       } else {
-        Toast.show('Código inválido. Prueba con "BLESSED10"', 'Cupón no válido', 'warning');
+        this.store.togglePromo(true);
       }
+    });
+
+    this.container.querySelector('#btn-remove-promo-cart')?.addEventListener('click', () => {
+      this.store.removePromo();
+      Toast.show('Cupón removido');
     });
 
     // Checkout simulación con fuegos artificiales de confeti

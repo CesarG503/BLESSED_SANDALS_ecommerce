@@ -1,5 +1,7 @@
 import { Product, FilterState } from '../types/product';
 import { CartItem, WishlistItem } from '../types/cart';
+import { User } from '../types/auth';
+import { PromoCode } from '../types/promo';
 import { StorageService } from '../services/storageService';
 import { ProductService } from '../services/productService';
 
@@ -27,6 +29,52 @@ export class Store {
   public cart: CartItem[] = [];
   public wishlist: WishlistItem[] = [];
 
+  // Usuario y Autenticación
+  public currentUser: User | null = null;
+  public isAuthOpen: boolean = false;
+
+  // Promociones y Descuentos
+  public isPromoOpen: boolean = false;
+  public appliedPromo: PromoCode | null = null;
+  public promoCodes: PromoCode[] = [
+    {
+      id: 'promo-1',
+      code: 'BLESSED10',
+      description: '10% de descuento en toda la tienda',
+      discountType: 'PERCENTAGE',
+      discountValue: 10,
+      minPurchase: 30,
+      isActive: true
+    },
+    {
+      id: 'promo-2',
+      code: 'BLESSED20',
+      description: '20% de descuento para miembros VIP',
+      discountType: 'PERCENTAGE',
+      discountValue: 20,
+      minPurchase: 100,
+      isActive: true
+    },
+    {
+      id: 'promo-3',
+      code: 'WILD15',
+      description: '15% de descuento en colección Blessed Wild',
+      discountType: 'PERCENTAGE',
+      discountValue: 15,
+      minPurchase: 50,
+      isActive: true
+    },
+    {
+      id: 'promo-4',
+      code: 'VERANO25',
+      description: '$25 de descuento en compras superiores a $120',
+      discountType: 'FIXED',
+      discountValue: 25,
+      minPurchase: 120,
+      isActive: true
+    }
+  ];
+
   public isCartOpen: boolean = false;
   public isWishlistOpen: boolean = false;
   public isMobileFiltersOpen: boolean = false;
@@ -39,6 +87,8 @@ export class Store {
   private constructor() {
     this.cart = StorageService.getCart();
     this.wishlist = StorageService.getWishlist();
+    this.currentUser = StorageService.getUser();
+    this.appliedPromo = StorageService.getPromo();
   }
 
   public static getInstance(): Store {
@@ -152,12 +202,90 @@ export class Store {
     this.notify();
   }
 
-  public getCartTotal(): number {
+  public getCartSubtotal(): number {
     return this.cart.reduce((total, item) => total + item.product.price * item.quantity, 0);
+  }
+
+  public getDiscountAmount(): number {
+    const subtotal = this.getCartSubtotal();
+    if (!this.appliedPromo || subtotal === 0) return 0;
+    if (this.appliedPromo.minPurchase && subtotal < this.appliedPromo.minPurchase) return 0;
+
+    if (this.appliedPromo.discountType === 'PERCENTAGE') {
+      return (subtotal * this.appliedPromo.discountValue) / 100;
+    } else {
+      return Math.min(subtotal, this.appliedPromo.discountValue);
+    }
+  }
+
+  public getCartTotal(): number {
+    const subtotal = this.getCartSubtotal();
+    const discount = this.getDiscountAmount();
+    return Math.max(0, subtotal - discount);
   }
 
   public getCartCount(): number {
     return this.cart.reduce((total, item) => total + item.quantity, 0);
+  }
+
+  // --- ACCIONES DE PROMOCIONES / CUPONES ---
+  public applyPromo(code: string): { success: boolean; message: string } {
+    const clean = code.trim().toUpperCase();
+    const found = this.promoCodes.find((p) => p.code === clean && p.isActive);
+    if (!found) {
+      return { success: false, message: `El código "${code}" no es válido o ha expirado.` };
+    }
+    const subtotal = this.getCartSubtotal();
+    if (found.minPurchase && subtotal > 0 && subtotal < found.minPurchase) {
+      return {
+        success: false,
+        message: `El código ${found.code} requiere una compra mínima de $${found.minPurchase}. (Subtotal actual: $${subtotal.toFixed(2)})`
+      };
+    }
+    this.appliedPromo = found;
+    StorageService.savePromo(found);
+    this.notify();
+    return {
+      success: true,
+      message: `¡Código ${found.code} aplicado con éxito! (${found.description})`
+    };
+  }
+
+  public removePromo(): void {
+    this.appliedPromo = null;
+    StorageService.savePromo(null);
+    this.notify();
+  }
+
+  public togglePromo(open?: boolean): void {
+    this.isPromoOpen = open !== undefined ? open : !this.isPromoOpen;
+    this.notify();
+  }
+
+  // --- ACCIONES DE USUARIO Y AUTENTICACIÓN ---
+  public login(email: string, name?: string, role: 'USER' | 'ADMIN' = 'USER'): void {
+    const user: User = {
+      id: 'usr-' + Date.now(),
+      email,
+      name: name || email.split('@')[0],
+      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+      role,
+      createdAt: new Date().toISOString()
+    };
+    this.currentUser = user;
+    StorageService.saveUser(user);
+    this.notify();
+  }
+
+  public logout(): void {
+    this.currentUser = null;
+    StorageService.saveUser(null);
+    this.notify();
+  }
+
+  public toggleAuth(open?: boolean): void {
+    this.isAuthOpen = open !== undefined ? open : !this.isAuthOpen;
+    this.notify();
   }
 
   // --- ACCIONES DE FAVORITOS (WISHLIST) ---

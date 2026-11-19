@@ -3398,3 +3398,747 @@
     font-size: 0.68rem;
   }
 }
+
+
+/* ==========================================================================
+   HEADER ACTIONS: BOTÓN DE CUPÓN PROMOCIONAL Y BOTÓN DE USUARIO
+   ========================================================================== */
+
+.action-btn.promo-btn {
+  position: relative;
+}
+
+.action-btn.promo-btn.is-active {
+  color: var(--color-accent-gold, #b8860b);
+}
+
+.promo-badge {
+  font-size: 9px;
+  font-weight: 800;
+  width: 15px;
+  height: 15px;
+  line-height: 15px;
+  background: var(--color-accent-gold, #b8860b);
+  border-radius: var(--radius-full);
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
+.promo-badge.is-visible {
+  display: flex;
+}
+
+.action-btn.user-btn {
+  position: relative;
+}
+
+.user-status-dot {
+  position: absolute;
+  bottom: 3px;
+  right: 3px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: transparent;
+  transition: background-color 0.2s ease;
+}
+
+.user-status-dot.is-online {
+  background-color: #16a34a;
+  box-shadow: 0 0 0 1.5px #ffffff;
+}
+
+.promo-applied-badge-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f0fdf4;
+  border: 1px dashed #86efac;
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  margin-top: 6px;
+  font-size: 0.76rem;
+  color: #166534;
+}
+
+.btn-remove-promo-cart {
+  background: none;
+  border: none;
+  color: #dc2626;
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+/* ==========================================================================
+   MODAL DE CÓDIGOS PROMOCIONALES (PROMO MODAL)
+   ========================================================================== */
+
+.promo-modal-panel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 90%;
+  max-width: 500px;
+  max-height: 85vh;
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--color-border-light);
+}
+
+.promo-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--color-border-light);
+  background: #fafafa;
+}
+
+.promo-header-icon-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.promo-title-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  background: #fef3c7;
+  color: #b45309;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.promo-modal-title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #111111;
+  margin: 0;
+}
+
+.promo-modal-subtitle {
+  font-size: 0.78rem;
+  color: #71717a;
+  margin: 2px 0 0;
+}
+
+.promo-active-banner {
+  margin: 16px 24px 0;
+  padding: 12px 16px;
+  background: #f0fdf4;
+  border: 1px solid #86efac;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.promo-active-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.promo-badge-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: #22c55e;
+  color: #ffffff;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+}
+
+.promo-active-code {
+  font-size: 0.95rem;
+  color: #14532d;
+  letter-spacing: 0.5px;
+}
+
+.promo-active-desc {
+  font-size: 0.75rem;
+  color: #166534;
+  margin: 1px 0;
+}
+
+.promo-discount-calc {
+  font-size: 0.75rem;
+  color: #15803d;
+}
+
+.btn-remove-promo {
+  background: transparent;
+  border: 1px solid #f87171;
+  color: #dc2626;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-remove-promo:hover {
+  background: #fef2f2;
+}
+
+.promo-input-box {
+  padding: 20px 24px;
+}
+
+.promo-input-label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #4b5563;
+  margin-bottom: 8px;
+}
+
+.promo-input-row {
+  display: flex;
+  gap: 10px;
+}
+
+.input-with-icon {
+  position: relative;
+  flex: 1;
+}
+
+.field-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #9ca3af;
+  pointer-events: none;
+}
+
+.promo-text-input {
+  width: 100%;
+  padding: 10px 14px 10px 38px;
+  font-size: 0.92rem;
+  border: 1.5px solid var(--color-border);
+  border-radius: 8px;
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  transition: border-color 0.2s ease;
+}
+
+.promo-text-input:focus {
+  outline: none;
+  border-color: #111111;
+}
+
+.btn-apply-promo {
+  padding: 10px 20px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+
+.promo-available-section {
+  padding: 0 24px 16px;
+  overflow-y: auto;
+  max-height: 250px;
+}
+
+.promo-section-heading {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #6b7280;
+  margin-bottom: 12px;
+}
+
+.promo-coupons-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.promo-coupon-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border: 1px dashed var(--color-border);
+  border-radius: 10px;
+  background: #fbfbfb;
+  transition: all 0.15s ease;
+}
+
+.promo-coupon-card:hover {
+  background: #f7f7f7;
+  border-color: #111111;
+}
+
+.promo-coupon-card.is-selected {
+  border-color: #22c55e;
+  background: #f0fdf4;
+}
+
+.coupon-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.coupon-tag-badge {
+  font-size: 0.76rem;
+  font-weight: 800;
+  background: #111111;
+  color: #ffffff;
+  padding: 4px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.promo-coupon-card.is-selected .coupon-tag-badge {
+  background: #16a34a;
+}
+
+.coupon-code-label {
+  font-size: 0.88rem;
+  color: #111111;
+  display: block;
+}
+
+.coupon-desc {
+  font-size: 0.74rem;
+  color: #6b7280;
+  margin: 1px 0;
+}
+
+.coupon-min {
+  font-size: 0.68rem;
+  color: #9ca3af;
+}
+
+.btn-coupon-claim {
+  padding: 5px 14px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  border-radius: var(--radius-full);
+  background: #111111;
+  color: #ffffff;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-coupon-claim:hover {
+  background: #333333;
+  transform: translateY(-1px);
+}
+
+.coupon-applied-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #16a34a;
+}
+
+.promo-cart-summary-footer {
+  padding: 14px 24px;
+  background: #f9fafb;
+  border-top: 1px solid var(--color-border-light);
+  font-size: 0.82rem;
+}
+
+.summary-line {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.discount-line {
+  color: #16a34a;
+}
+
+.total-line {
+  font-size: 0.95rem;
+  font-weight: 800;
+  padding-top: 6px;
+  border-top: 1px solid #e5e7eb;
+}
+
+/* ==========================================================================
+   MODAL DE AUTENTICACIÓN / USUARIO / PERFIL (AUTH MODAL)
+   ========================================================================== */
+
+.auth-modal-panel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 90%;
+  max-width: 460px;
+  max-height: 85vh;
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--color-border-light);
+}
+
+.auth-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--color-border-light);
+  background: #ffffff;
+}
+
+.auth-header-title-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.auth-header-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: var(--color-bg-subtle, #f4f4f5);
+  color: #111111;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.auth-modal-title {
+  font-size: 1.12rem;
+  font-weight: 800;
+  color: #111111;
+  margin: 0;
+}
+
+.auth-modal-body {
+  padding: 20px 24px 24px;
+  overflow-y: auto;
+}
+
+/* Tabs de Login / Registro */
+.auth-tabs-nav {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: #f4f4f5;
+  border-radius: 10px;
+  margin-bottom: 20px;
+}
+
+.auth-tab-btn {
+  flex: 1;
+  padding: 8px 12px;
+  font-size: 0.84rem;
+  font-weight: 700;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  color: #71717a;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.auth-tab-btn.is-active {
+  background: #ffffff;
+  color: #111111;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.form-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #374151;
+}
+
+.forgot-pass-link {
+  font-size: 0.72rem;
+  color: #6b7280;
+  text-decoration: underline;
+}
+
+.form-input {
+  width: 100%;
+  padding: 10px 14px;
+  font-size: 0.9rem;
+  border: 1.5px solid var(--color-border);
+  border-radius: 8px;
+  transition: border-color 0.15s ease;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #111111;
+}
+
+.btn-auth-submit {
+  width: 100%;
+  padding: 11px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  border-radius: 8px;
+  margin-top: 4px;
+}
+
+.btn-demo-login {
+  width: 100%;
+  padding: 9px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border-radius: 8px;
+  background: #f3f4f6;
+  border: 1px dashed #d1d5db;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-demo-login:hover {
+  background: #e5e7eb;
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin: 18px 0;
+  color: #9ca3af;
+  font-size: 0.75rem;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.auth-divider span {
+  padding: 0 10px;
+}
+
+.auth-social-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.btn-social {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: #ffffff;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #111111;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-social:hover {
+  background: #f9fafb;
+  border-color: #9ca3af;
+}
+
+/* Vista de Usuario Autenticado */
+.user-profile-view {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.user-id-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  background: #f9fafb;
+  border-radius: 12px;
+  border: 1px solid var(--color-border-light);
+}
+
+.user-avatar-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.user-avatar-img {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+}
+
+.user-role-badge {
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #111111;
+  color: #ffffff;
+  font-size: 0.58rem;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  white-space: nowrap;
+}
+
+.user-display-name {
+  font-size: 1.02rem;
+  font-weight: 800;
+  color: #111111;
+  margin: 0;
+}
+
+.user-display-email {
+  font-size: 0.78rem;
+  color: #6b7280;
+  margin: 1px 0 4px;
+}
+
+.user-points-pill {
+  font-size: 0.68rem;
+  font-weight: 700;
+  background: #fef3c7;
+  color: #92400e;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  display: inline-block;
+}
+
+.user-account-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.account-option-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--color-border-light);
+  background: #ffffff;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.account-option-item:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  transform: translateX(2px);
+}
+
+.option-icon-box {
+  font-size: 1.2rem;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.option-content {
+  flex: 1;
+}
+
+.option-content strong {
+  display: block;
+  font-size: 0.86rem;
+  color: #111111;
+}
+
+.option-content p {
+  font-size: 0.72rem;
+  color: #64748b;
+  margin: 0;
+}
+
+.option-status-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  background: #dcfce7;
+  color: #166534;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+}
+
+.option-arrow {
+  color: #94a3b8;
+}
+
+.user-logout-wrap {
+  margin-top: 4px;
+}
+
+.btn-logout {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 8px;
+  font-size: 0.84rem;
+  font-weight: 700;
+  border: 1.5px solid #fecaca;
+  background: #fff5f5;
+  color: #dc2626;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-logout:hover {
+  background: #fee2e2;
+  border-color: #f87171;
+}
