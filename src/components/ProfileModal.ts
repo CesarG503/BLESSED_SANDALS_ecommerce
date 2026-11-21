@@ -135,6 +135,7 @@ export class ProfileModal {
   private isOpen: boolean = false;
   private productsList: any[] = [];
   private isLoadingData: boolean = false;
+  private showUsedCoupons: boolean = false;
 
   constructor(containerId: string) {
     this.store = Store.getInstance();
@@ -531,33 +532,70 @@ export class ProfileModal {
   // --- TAB 2: CUPONES Y PROMOCIONES ---
   private renderCouponsTab(): string {
     const { userCoupons } = this.profileData;
+    const availableCoupons = (userCoupons || []).filter((uc: any) => !uc.isUsed && uc.promoCode?.isActive);
+    const usedCoupons = (userCoupons || []).filter((uc: any) => uc.isUsed);
 
     return `
       <div class="tab-panel">
         <div class="panel-header-row profile-component-pop pop-step-3">
           <div>
             <h2 class="panel-title">Mis Cupones y Promociones</h2>
-            <p class="panel-subtitle">Cupones asociados exclusivamente a tu cuenta personal. Cada cupón cuenta con regla de 1 solo uso por persona.</p>
+            <p class="panel-subtitle"></p>
           </div>
         </div>
 
-        ${userCoupons.length === 0
+        <!-- FORMULARIO PARA AGREGAR CUPONES DESDE EL PERFIL -->
+        <div class="profile-add-coupon-card profile-component-pop pop-step-3">
+          <div class="add-coupon-card-header">
+            <span class="add-coupon-icon">${Icons.ticket('icon-ticket-sm')}</span>
+            <div>
+              <h4 class="add-coupon-heading">¿Tienes un código promocional?</h4>
+              
+            </div>
+          </div>
+          <form id="form-claim-profile-coupon" class="profile-add-coupon-form">
+            <div class="coupon-input-group">
+              <input 
+                type="text" 
+                id="input-claim-profile-code" 
+                class="coupon-profile-input" 
+                placeholder="INGRESA TU CODIGO..." 
+                autocomplete="off" 
+                spellcheck="false"
+                required
+              />
+              <button type="submit" class="btn btn-primary btn-claim-profile-action" id="btn-claim-profile-submit">
+                Agregar cupón
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- SECCIÓN 1: CUPONES DISPONIBLES -->
+        <div class="coupons-section-heading profile-component-pop pop-step-3">
+          <div class="section-title-left">
+            <span class="section-badge-dot"></span>
+            <h3 class="section-group-title">Cupones Disponibles (${availableCoupons.length})</h3>
+          </div>
+        </div>
+
+        ${availableCoupons.length === 0
         ? `
           <div class="empty-state-box profile-component-pop pop-step-4">
             <div class="empty-icon">${Icons.ticket('w-5 h-5')}</div>
-            <h4>No tienes cupones asignados aún</h4>
-            <p>Al registrarte por primera vez recibes tu cupón BIENVENIDA5 (5% de descuento).</p>
+            <h4>No tienes cupones disponibles en este momento</h4>
+            <p>Escribe tu código promocional en el recuadro superior para agregarlo a tu cuenta personal.</p>
           </div>
         `
         : `
           <div class="coupons-cards-grid profile-component-pop pop-step-4">
-            ${userCoupons
+            ${availableCoupons
           .map((uc: any) => {
             const isPercentage = uc.promoCode.discountType === 'PERCENTAGE';
             const discountText = isPercentage ? `${uc.promoCode.discountValue}%` : `$${uc.promoCode.discountValue}`;
 
             return `
-              <div class="coupon-ticket-card ${uc.isUsed ? 'is-spent' : 'is-ready'}">
+              <div class="coupon-ticket-card is-ready">
                 <div class="ticket-left">
                   <div class="ticket-discount-banner">
                     <span class="discount-num">-${discountText}</span>
@@ -586,25 +624,13 @@ export class ProfileModal {
                 </div>
 
                 <div class="ticket-right">
-                  ${uc.isUsed
-                ? `
-                    <div class="ticket-status-used">
-                      <span class="status-badge-used">${Icons.check('w-3 h-3')} Canjeado</span>
-                      <small>Usado el ${new Date(uc.usedAt || uc.claimedAt).toLocaleDateString('es-SV')}</small>
-                    </div>
-                  `
-                : `
-                    <div class="ticket-status-available">
-                      <span class="status-badge-ready">Disponible</span>
-                      <button class="btn-copy-code" data-code="${uc.promoCode.code}" title="Copiar código">
-                        Copiar código
-                      </button>
-                      <button class="btn-use-store btn-use-in-shop" data-code="${uc.promoCode.code}">
-                        Usar en Tienda
-                      </button>
-                    </div>
-                  `
-              }
+                  <div class="ticket-status-available">
+                    
+                    
+                    <button type="button" class="btn-use-store btn-use-in-shop" data-code="${uc.promoCode.code}">
+                      Usar en Tienda
+                    </button>
+                  </div>
                 </div>
               </div>
             `;
@@ -613,6 +639,68 @@ export class ProfileModal {
           </div>
         `
       }
+
+        <!-- SECCIÓN 2: OTRA LISTA NO VISIBLE (SOLO AL HACER CLIC PARA DESPLEGAR) DE CUPONES YA USADOS ANTERIORMENTE -->
+        <div class="used-coupons-section profile-component-pop pop-step-5">
+          <button 
+            type="button" 
+            class="btn-toggle-used-coupons ${this.showUsedCoupons ? 'is-active' : ''}" 
+            id="btn-toggle-used-coupons"
+            aria-expanded="${this.showUsedCoupons ? 'true' : 'false'}"
+          >
+            <div class="toggle-used-left">
+              <span class="toggle-used-icon">${Icons.check('icon-check-sm')}</span>
+              <span class="toggle-used-title">Historial de cupones ya canjeados (${usedCoupons.length})</span>
+            </div>
+            <div class="toggle-used-right">
+              <span class="toggle-used-label">${this.showUsedCoupons ? 'Ocultar historial' : 'Ver historial'}</span>
+              <svg class="chevron-used-icon ${this.showUsedCoupons ? 'is-rotated' : ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </div>
+          </button>
+
+          <div class="used-coupons-drawer ${this.showUsedCoupons ? 'is-open' : ''}" id="used-coupons-drawer">
+            ${usedCoupons.length === 0
+        ? `<div class="used-coupons-empty">Aún no has canjeado ningún cupón en tus compras anteriores.</div>`
+        : `
+              <div class="coupons-cards-grid used-grid">
+                ${usedCoupons.map((uc: any) => {
+          const isPercentage = uc.promoCode.discountType === 'PERCENTAGE';
+          const discountText = isPercentage ? `${uc.promoCode.discountValue}%` : `$${uc.promoCode.discountValue}`;
+          return `
+                    <div class="coupon-ticket-card is-spent">
+                      <div class="ticket-left">
+                        <div class="ticket-discount-banner spent">
+                          <span class="discount-num">-${discountText}</span>
+                          <span class="discount-sub">CANJEADO</span>
+                        </div>
+                      </div>
+                      <div class="ticket-center">
+                        <div class="ticket-code-row">
+                          <strong class="ticket-code spent">${uc.promoCode.code}</strong>
+                          ${uc.promoCode.isWelcomeOnly ? `<span class="badge-welcome">Bienvenida</span>` : ''}
+                        </div>
+                        <p class="ticket-desc">${uc.promoCode.description}</p>
+                        <div class="ticket-meta">
+                          <span>• Estado: <strong style="color: #64748b;">1 solo uso agotado</strong></span>
+                          <span>• Canjeado el: ${new Date(uc.usedAt || uc.claimedAt).toLocaleDateString('es-SV')}</span>
+                        </div>
+                      </div>
+                      <div class="ticket-right">
+                        <div class="ticket-status-used">
+                          <span class="status-badge-used">${Icons.check('icon-check-sm')} Canjeado</span>
+                          <small>Utilizado en compra</small>
+                        </div>
+                      </div>
+                    </div>
+                  `;
+        }).join('')}
+              </div>
+            `
+      }
+          </div>
+        </div>
 
         <!-- BANNER DE GARANTÍA DE CUPONES (POP-IN PASO 5) -->
         <div class="coupons-rules-notice profile-component-pop pop-step-5">
@@ -704,7 +792,7 @@ export class ProfileModal {
                   <div class="order-notes-col">
                     ${order.notes ? `<p class="order-notes-text">Nota: ${order.notes}</p>` : ''}
                     ${order.promoCode
-                ? `<p class="order-promo-used">${Icons.ticket('w-3.5 h-3.5')} Cupón aplicado: <strong>${order.promoCode.code}</strong> (-$${order.discount.toFixed(2)})</p>`
+                ? `<p class="order-promo-used">${Icons.ticket('icon-ticket-sm')} Cupón aplicado: <strong>${order.promoCode.code}</strong> (-$${order.discount.toFixed(2)})</p>`
                 : ''
               }
                   </div>
@@ -1286,6 +1374,75 @@ export class ProfileModal {
           this.store.toggleCart(true);
         }
       });
+    });
+
+    // Agregar cupón directamente a la cuenta desde el perfil
+    const formClaim = this.container.querySelector('#form-claim-profile-coupon');
+    formClaim?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const input = this.container.querySelector('#input-claim-profile-code') as HTMLInputElement | null;
+      const code = input?.value.trim().toUpperCase();
+      if (!code) {
+        Toast.show('Por favor ingresa un código promocional.', 'Cupón', 'warning');
+        return;
+      }
+
+      const submitBtn = this.container.querySelector('#btn-claim-profile-submit') as HTMLButtonElement | null;
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Verificando...';
+      }
+
+      try {
+        const res = await this.store.claimPromoToAccount(code);
+        if (res.success) {
+          if (input) input.value = '';
+          confetti({
+            particleCount: 50,
+            spread: 60,
+            origin: { y: 0.25 }
+          });
+          Toast.show(res.message || `¡Cupón ${code} agregado con éxito!`, 'Cupón Agregado', 'success');
+          await this.fetchProfileData();
+          const mainArea = this.container.querySelector('.profile-main-content') as HTMLElement | null;
+          if (mainArea) {
+            mainArea.innerHTML = this.renderActiveTabContent();
+            this.setupTabInnerEvents();
+          }
+          const couponsNavBadge = this.container.querySelector('[data-tab="coupons"] .nav-badge');
+          const availableCount = (this.profileData?.userCoupons || []).filter((c: any) => !c.isUsed).length;
+          if (couponsNavBadge) {
+            couponsNavBadge.textContent = String(availableCount);
+          }
+        } else {
+          Toast.show(res.message || `No se pudo agregar el cupón ${code}.`, 'Cupón', 'warning');
+        }
+      } catch (err) {
+        console.error('Error al agregar cupón:', err);
+        Toast.show('Ocurrió un error al verificar el cupón.', 'Error', 'warning');
+      } finally {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Agregar cupón';
+        }
+      }
+    });
+
+    // Toggle desplegable para mostrar/ocultar historial de cupones canjeados
+    const toggleUsedBtn = this.container.querySelector('#btn-toggle-used-coupons');
+    toggleUsedBtn?.addEventListener('click', () => {
+      this.showUsedCoupons = !this.showUsedCoupons;
+      const drawer = this.container.querySelector('#used-coupons-drawer');
+      const chevron = this.container.querySelector('.chevron-used-icon');
+      const label = this.container.querySelector('.toggle-used-label');
+
+      toggleUsedBtn.classList.toggle('is-active', this.showUsedCoupons);
+      toggleUsedBtn.setAttribute('aria-expanded', this.showUsedCoupons ? 'true' : 'false');
+      drawer?.classList.toggle('is-open', this.showUsedCoupons);
+      chevron?.classList.toggle('is-rotated', this.showUsedCoupons);
+      if (label) {
+        label.textContent = this.showUsedCoupons ? 'Ocultar historial' : 'Ver historial';
+      }
     });
 
     // Actualizar información personal

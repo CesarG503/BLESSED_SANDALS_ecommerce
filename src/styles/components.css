@@ -6756,3 +6756,274 @@ body.profile-page-body {
   align-items: center;
   gap: 10px;
 }
+
+/* ==========================================================================
+   ESTILOS DE CUPONES EN PERFIL Y POPOVER DE LA TIENDA
+   ========================================================================== */
+
+/* Estado vacío en Popover de Cupones */
+.promo-empty-coupons {
+  text-align: center;
+  padding: 16px 12px;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+}
+
+.promo-empty-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  margin-bottom: 6px;
+}
+
+.promo-empty-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #334155;
+  margin: 0 0 3px 0;
+}
+
+.promo-empty-desc {
+  font-size: 0.72rem;
+  color: #64748b;
+  margin: 0;
+  line-height: 1.35;
+}
+
+/* Card para agregar cupón desde el Perfil */
+.profile-add-coupon-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 22px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.add-coupon-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.add-coupon-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: #ecfdf5;
+  color: #0d643d;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.add-coupon-heading {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+.add-coupon-subheading {
+  font-size: 0.8rem;
+  color: #64748b;
+  margin: 2px 0 0 0;
+}
+
+.profile-add-coupon-form {
+  margin: 0;
+}
+
+.coupon-input-group {
+  display: flex;
+  gap: 10px;
+}
+
+.coupon-profile-input {
+  flex: 1;
+  height: 42px;
+  padding: 0 14px;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #0f172a;
+  background: #f8fafc;
+  transition: border-color 0.2s, background-color 0.2s, box-shadow 0.2s;
+}
+
+.coupon-profile-input:focus {
+  outline: none;
+  background: #ffffff;
+  border-color: #0B3B24;
+  box-shadow: 0 0 0 3px rgba(11, 59, 36, 0.12);
+}
+
+.btn-claim-profile-action {
+  height: 42px;
+  padding: 0 20px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  border-radius: 8px;
+  background: #0B3B24;
+  color: #ffffff;
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.2s ease, transform 0.15s ease;
+}
+
+.btn-claim-profile-action:hover:not(:disabled) {
+  background: #082919;
+  transform: translateY(-1px);
+}
+
+.btn-claim-profile-action:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Encabezado de sección de cupones */
+.coupons-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.section-title-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.section-badge-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+}
+
+.section-group-title {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #1e293b;
+  margin: 0;
+}
+
+/* Sección de cupones usados / canjeados (acordeón desplegable) */
+.used-coupons-section {
+  margin-top: 26px;
+  margin-bottom: 20px;
+}
+
+.btn-toggle-used-coupons {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s;
+  text-align: left;
+}
+
+.btn-toggle-used-coupons:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.btn-toggle-used-coupons.is-active {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+  border-bottom-left-radius: 4px;
+  border-bottom-right-radius: 4px;
+}
+
+.toggle-used-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toggle-used-icon {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #e2e8f0;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.toggle-used-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #475569;
+}
+
+.toggle-used-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.toggle-used-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.chevron-used-icon {
+  width: 16px;
+  height: 16px;
+  color: #64748b;
+  transition: transform 0.25s ease;
+}
+
+.chevron-used-icon.is-rotated {
+  transform: rotate(180deg);
+}
+
+.used-coupons-drawer {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height 0.35s ease, opacity 0.25s ease, margin 0.25s ease;
+}
+
+.used-coupons-drawer.is-open {
+  max-height: 2000px;
+  opacity: 1;
+  margin-top: 12px;
+}
+
+.used-coupons-empty {
+  padding: 16px;
+  background: #ffffff;
+  border: 1px dashed #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  color: #64748b;
+  text-align: center;
+}
+
+.ticket-discount-banner.spent {
+  opacity: 0.75;
+}
+
+.ticket-code.spent {
+  text-decoration: line-through;
+  color: #64748b;
+}

@@ -356,6 +356,11 @@ export class Store {
       };
     }
 
+    if ((res as any).codeAdded) {
+      await this.loadUserCoupons();
+      this.notify();
+    }
+
     return {
       success: false,
       message: res.message || `No se pudo aplicar el cupón "${code}".`

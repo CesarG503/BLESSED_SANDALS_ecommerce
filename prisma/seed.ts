@@ -139,7 +139,7 @@ async function main() {
     createdPromos[promo.code] = cp.id;
   }
 
-  // Asignar cupón de bienvenida BIENVENIDA5 y BLESSED10 a la cuenta del usuario demo
+  // Asignar únicamente cupón de bienvenida BIENVENIDA5 a la cuenta del usuario demo
   if (createdPromos['BIENVENIDA5']) {
     await prisma.userCoupon.create({
       data: {
@@ -149,17 +149,8 @@ async function main() {
       }
     });
   }
-  if (createdPromos['BLESSED10']) {
-    await prisma.userCoupon.create({
-      data: {
-        userId: user.id,
-        promoCodeId: createdPromos['BLESSED10'],
-        isUsed: false
-      }
-    });
-  }
 
-  console.log(`✅ ${promos.length} Códigos promocionales creados y asociados a la cuenta demo.`);
+  console.log(`✅ ${promos.length} Códigos promocionales creados. Cupón de bienvenida BIENVENIDA5 asociado a la cuenta demo.`);
 
   // 5. Crear Productos con Colores y Tallas
   for (const prod of MOCK_PRODUCTS) {

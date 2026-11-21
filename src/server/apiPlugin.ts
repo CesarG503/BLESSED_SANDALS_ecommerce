@@ -794,9 +794,25 @@ export function apiPlugin(): Plugin {
 
             // Compra mínima
             if (promo.minPurchase && subtotal > 0 && subtotal < promo.minPurchase) {
+              // Aseguramos que quede agregado a la cuenta del usuario para que lo tenga disponible
+              await prisma.userCoupon.upsert({
+                where: {
+                  userId_promoCodeId: {
+                    userId,
+                    promoCodeId: promo.id
+                  }
+                },
+                create: {
+                  userId,
+                  promoCodeId: promo.id,
+                  isUsed: false
+                },
+                update: {}
+              });
               return sendJson(res, 400, {
                 success: false,
-                message: `El código ${promo.code} requiere una compra mínima de $${promo.minPurchase}. (Subtotal actual: $${subtotal.toFixed(2)})`
+                codeAdded: true,
+                message: `El cupón ${promo.code} se agregó a tu cuenta personal, pero requiere una compra mínima de $${promo.minPurchase}. (Subtotal actual: $${subtotal.toFixed(2)})`
               });
             }
 

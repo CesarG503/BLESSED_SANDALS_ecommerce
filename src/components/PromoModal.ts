@@ -51,13 +51,10 @@ export class PromoModal {
 
     this.container.classList.add('is-open');
 
-    // Mapeo de cupones personales del usuario logueado
-    const userCouponsMap: Record<string, boolean> = {};
-    if (user && user.userCoupons) {
-      user.userCoupons.forEach((uc) => {
-        userCouponsMap[uc.promoCode.code] = uc.isUsed;
-      });
-    }
+    // Filtrar únicamente los cupones agregados a la cuenta personal que sigan disponibles (no canjeados)
+    const availableCoupons = (user && user.userCoupons)
+      ? user.userCoupons.filter((uc) => !uc.isUsed && uc.promoCode && uc.promoCode.isActive)
+      : [];
 
     this.container.innerHTML = `
       <!-- FONDO TRANSPARENTE PARA CERRAR AL HACER CLIC AFUERA (SIN BLUR, SIN OSCURECER LA WEB) -->
@@ -76,9 +73,8 @@ export class PromoModal {
         </div>
 
         <!-- CUPÓN ACTIVO (SI YA HAY UNO APLICADO) -->
-        ${
-          applied
-            ? `
+        ${applied
+        ? `
           <div class="promo-popover-active-row">
             <div class="promo-active-left">
               <span class="promo-active-icon">${Icons.check('w-3 h-3')}</span>
@@ -92,8 +88,8 @@ export class PromoModal {
             </button>
           </div>
         `
-            : ''
-        }
+        : ''
+      }
 
         <!-- FORMULARIO ULTRA-COMPACTO DE CUPÓN CON LÍNEA FINA -->
         <div class="promo-popover-input-area">
@@ -118,37 +114,34 @@ export class PromoModal {
         <!-- SECCIÓN DE "MIS CUPONES" -->
         <div class="promo-popover-chips-area">
           <div class="promo-section-title-row">
-            <span class="promo-chips-title">${user ? 'Mis Cupones Personales' : 'Cupones de Descuento'}</span>
-            ${
-              user
-                ? `<span class="promo-user-active-badge">${user.name}</span>`
-                : `<span class="promo-user-active-badge" style="background:#f3f4f6; color:#6b7280;">Requiere cuenta</span>`
-            }
+            <span class="promo-chips-title">${user ? 'Mis Cupones Disponibles' : 'Cupones de Descuento'}</span>
+            ${user
+        ? `<span class="promo-user-active-badge">${availableCoupons.length} disponible${availableCoupons.length === 1 ? '' : 's'}</span>`
+        : `<span class="promo-user-active-badge" style="background:#f3f4f6; color:#6b7280;">Requiere cuenta</span>`
+      }
           </div>
 
-          ${
-            user
-              ? `
-            <!-- SI EL USUARIO TIENE CUENTA: SE MUESTRAN SUS CUPONES CON TEXTO EXPANDIBLE AL CLIC -->
+          ${user
+        ? (availableCoupons.length > 0
+          ? `
+            <!-- SI EL USUARIO TIENE CUENTA: SE MUESTRAN EXCLUSIVAMENTE SUS CUPONES AGREGADOS Y NO CANJEADOS -->
             <div class="promo-coupons-stack">
-              ${this.store.promoCodes
-                .map((p) => {
-                  const isCurrent = applied?.code === p.code;
-                  const isUsed = userCouponsMap[p.code] ?? (p.isUsedByUser ?? false);
-                  const valueText = p.discountType === 'PERCENTAGE' ? `${p.discountValue}%` : `$${p.discountValue}`;
-                  const isExpanded = this.expandedCodes.has(p.code);
+              ${availableCoupons
+            .map((uc) => {
+              const p = uc.promoCode;
+              const isCurrent = applied?.code === p.code;
+              const valueText = p.discountType === 'PERCENTAGE' ? `${p.discountValue}%` : `$${p.discountValue}`;
+              const isExpanded = this.expandedCodes.has(p.code);
 
-                  let actionBtnHtml = '';
-                  if (isCurrent) {
-                    actionBtnHtml = `<span class="coupon-status-applied">${Icons.check('w-3 h-3')} Activo</span>`;
-                  } else if (isUsed) {
-                    actionBtnHtml = `<span class="coupon-status-used" title="Ya utilizado por tu cuenta">Canjeado</span>`;
-                  } else {
-                    actionBtnHtml = `<button type="button" class="btn-claim-coupon" data-code="${p.code}">Usar</button>`;
-                  }
+              let actionBtnHtml = '';
+              if (isCurrent) {
+                actionBtnHtml = `<span class="coupon-status-applied">${Icons.check('w-3 h-3')} Activo</span>`;
+              } else {
+                actionBtnHtml = `<button type="button" class="btn-claim-coupon" data-code="${p.code}">Usar</button>`;
+              }
 
-                  return `
-                <div class="promo-coupon-item ${isExpanded ? 'is-expanded' : ''} ${isUsed ? 'is-redeemed-opacity' : ''}" data-coupon="${p.code}">
+              return `
+                <div class="promo-coupon-item ${isExpanded ? 'is-expanded' : ''}" data-coupon="${p.code}">
                   <div class="promo-coupon-main">
                     <div class="promo-coupon-left" data-action="toggle-info" data-code="${p.code}">
                       <strong class="promo-coupon-code">${p.code}</strong>
@@ -168,16 +161,23 @@ export class PromoModal {
                       ${p.description}
                       ${p.minPurchase ? `<span class="promo-min-text">• Compra mínima: $${p.minPurchase}</span>` : ''}
                       ${p.onePerUser ? `<span class="promo-min-text" style="color: #0d643d;">• 1 solo uso por persona</span>` : ''}
-                      ${isUsed ? `<span class="promo-min-text" style="color: #dc2626; font-weight: 600;">(Ya fue canjeado en tu cuenta)</span>` : ''}
                     </p>
                   </div>
                 </div>
               `;
-                })
-                .join('')}
+            })
+            .join('')}
             </div>
           `
-              : `
+          : `
+            <div class="promo-empty-coupons">
+              <span class="promo-empty-icon">${Icons.ticket('icon-ticket-sm')}</span>
+              <p class="promo-empty-title">Sin cupones disponibles</p>
+              <p class="promo-empty-desc">Escribe un código en el campo de arriba para agregarlo.</p>
+            </div>
+          `
+        )
+        : `
             <!-- SI NO TIENE CUENTA: SE MUESTRA EL CUPÓN DE BIENVENIDA5 Y AL DAR CLIC LO MANDA AL LOGIN / REGISTER -->
             <div class="promo-coupons-stack">
               <div class="promo-coupon-item ${this.expandedCodes.has('BIENVENIDA5') ? 'is-expanded' : ''}" data-coupon="BIENVENIDA5">
@@ -215,7 +215,7 @@ export class PromoModal {
               </button>
             </div>
           `
-          }
+      }
         </div>
       </div>
     `;
