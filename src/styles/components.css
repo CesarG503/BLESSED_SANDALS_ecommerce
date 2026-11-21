@@ -3937,14 +3937,14 @@
 }
 
 /* ==========================================================================
-   VISTA DE AUTENTICACIÓN DIVIDIDA: ISOLOGO REAL GIGANTE + LIQUID GLASS + HUMO 3D
+   VISTA DE AUTENTICACIÓN DIVIDIDA: TRANSICIÓN CORTINAS + POP + LIQUID GLASS
    ========================================================================== */
 
 #auth-modal-app.is-fullscreen-auth {
   padding: 0 !important;
   align-items: stretch !important;
   justify-content: stretch !important;
-  background: #ffffff !important;
+  background: transparent !important;
   z-index: 1300;
 }
 
@@ -3958,13 +3958,126 @@
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  background: radial-gradient(circle at 25% 45%, #f4fbf7 0%, #fbf9f4 45%, #ffffff 90%);
+  background: transparent;
   color: #111111;
   font-family: var(--font-sans);
   overflow: hidden;
+  perspective: 1200px;
+  transition: background 0.3s ease;
 }
 
-/* Canvas de Humo 3D y Nube de Partículas Verde y Dorada sobre fondo blanco */
+/* Fondo unificado continuo una vez abierto: cero cortes, cero líneas */
+.split-auth-view.content-revealed {
+  background: radial-gradient(circle at 25% 45%, #f4fbf7 0%, #fbf9f4 45%, #ffffff 90%);
+}
+
+.split-auth-view.is-closing {
+  background: transparent;
+}
+
+/* Paneles deslizantes que se dividen y se juntan al centro */
+.split-curtain {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 50.5vw;
+  height: 100vh;
+  z-index: 1;
+  pointer-events: none;
+  will-change: transform, opacity;
+  transition: transform 0.42s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.split-curtain-left {
+  left: 0;
+  background: #fbfbf9;
+  border-right: 1.5px solid rgba(210, 181, 136, 0.45);
+  box-shadow: 15px 0 35px -5px rgba(0, 0, 0, 0.12), inset -2px 0 4px rgba(255, 255, 255, 0.9);
+  transform: translateX(-100%);
+}
+
+.split-curtain-right {
+  right: 0;
+  background: #fbfbf9;
+  border-left: 1.5px solid rgba(210, 181, 136, 0.45);
+  box-shadow: -15px 0 35px -5px rgba(0, 0, 0, 0.12), inset 2px 0 4px rgba(255, 255, 255, 0.9);
+  transform: translateX(100%);
+}
+
+/* Estado: Se juntan al centro */
+.split-auth-view.doors-joined .split-curtain-left {
+  transform: translateX(0);
+}
+
+.split-auth-view.doors-joined .split-curtain-right {
+  transform: translateX(0);
+}
+
+/* Una vez abierto y revelado el formulario: CERO RAYAS, BORDES O SOMBRAS CENTRALES */
+.split-auth-view.content-revealed .split-curtain {
+  opacity: 0;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.split-auth-view.content-revealed .split-seam-flash {
+  display: none !important;
+}
+
+/* Estado: Al cerrar, las cortinas recuperan su borde y se separan hacia los lados */
+.split-auth-view.is-closing .split-curtain-left,
+.split-auth-view.doors-parting .split-curtain-left {
+  opacity: 1;
+  border-right: 1.5px solid rgba(210, 181, 136, 0.45);
+  box-shadow: 15px 0 35px -5px rgba(0, 0, 0, 0.12);
+  transform: translateX(-100%);
+  transition: transform 0.4s cubic-bezier(0.7, 0, 0.84, 0);
+}
+
+.split-auth-view.is-closing .split-curtain-right,
+.split-auth-view.doors-parting .split-curtain-right {
+  opacity: 1;
+  border-left: 1.5px solid rgba(210, 181, 136, 0.45);
+  box-shadow: -15px 0 35px -5px rgba(0, 0, 0, 0.12);
+  transform: translateX(100%);
+  transition: transform 0.4s cubic-bezier(0.7, 0, 0.84, 0);
+}
+
+/* Destello en la costura de unión central (solo durante la animación de entrada) */
+.split-seam-flash {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 4px;
+  transform: translateX(-50%) scaleY(0.3);
+  background: linear-gradient(180deg, transparent 0%, rgba(210, 181, 136, 0.85) 25%, #ffffff 50%, rgba(13, 100, 61, 0.75) 75%, transparent 100%);
+  box-shadow: 0 0 25px 5px rgba(210, 181, 136, 0.85), 0 0 45px 10px rgba(13, 100, 61, 0.45);
+  z-index: 4;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.split-seam-flash.is-flashing {
+  animation: seamFlashPulse 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes seamFlashPulse {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) scaleY(0.3);
+  }
+  40% {
+    opacity: 1;
+    transform: translateX(-50%) scaleY(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) scaleY(1.35);
+  }
+}
+
+/* Canvas de Humo 3D y Nube de Partículas Verde y Dorada */
 .split-smoke-canvas {
   position: absolute;
   inset: 0;
@@ -3972,6 +4085,17 @@
   height: 100%;
   pointer-events: none;
   z-index: 2;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+.split-auth-view.content-revealed .split-smoke-canvas {
+  opacity: 1;
+}
+
+.split-auth-view.is-closing .split-smoke-canvas {
+  opacity: 0;
+  transition: opacity 0.2s ease;
 }
 
 /* Botón de cierre discreto estilo liquid glass */
@@ -3980,6 +4104,20 @@
   top: 24px;
   right: 28px;
   z-index: 30;
+  opacity: 0;
+  transform: scale(0.85);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.split-auth-view.content-revealed .split-auth-topbar {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.split-auth-view.is-closing .split-auth-topbar {
+  opacity: 0;
+  transform: scale(0.8);
+  transition: all 0.18s ease;
 }
 
 .split-topbar-close-btn {
@@ -4025,7 +4163,7 @@
   box-sizing: border-box;
 }
 
-/* --- COLUMNA IZQUIERDA: ISOLOGO REAL GIGANTE (SIN CÍRCULOS NI ANILLOS EXTERNOS) --- */
+/* --- COLUMNA IZQUIERDA: ISOLOGO REAL GIGANTE (CON WRAPPER DE POP DE ENTRADA Y SALIDA) --- */
 .split-isologo-col {
   display: flex;
   flex-direction: column;
@@ -4034,6 +4172,54 @@
   text-align: center;
   position: relative;
   user-select: none;
+}
+
+.isologo-pop-wrap {
+  position: relative;
+  opacity: 0;
+  transform: scale(0.6) translateY(38px);
+  will-change: transform, opacity;
+}
+
+.split-auth-view.content-revealed .isologo-pop-wrap {
+  animation: isologoPopIn 0.58s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.split-auth-view.is-closing .isologo-pop-wrap {
+  animation: isologoPopOut 0.22s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes isologoPopIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.6) translateY(38px);
+    filter: blur(6px);
+  }
+  65% {
+    opacity: 1;
+    transform: scale(1.06) translateY(-8px);
+    filter: blur(0);
+  }
+  85% {
+    transform: scale(0.98) translateY(3px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes isologoPopOut {
+  0% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    filter: blur(0);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.7) translateY(28px);
+    filter: blur(6px);
+  }
 }
 
 .isologo-interactive-stage {
@@ -4045,7 +4231,6 @@
   justify-content: center;
   transform-style: preserve-3d;
   transition: transform 0.1s cubic-bezier(0.16, 1, 0.3, 1);
-  /* Sin bordes, sin halos ni círculos añadidos */
 }
 
 /* Imagen real nítida con sus colores reales y tamaño aumentado */
@@ -4074,6 +4259,58 @@
   align-items: center;
   justify-content: center;
   position: relative;
+}
+
+.form-card-pop-wrap {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transform: scale(0.7) translateY(45px);
+  will-change: transform, opacity;
+}
+
+.split-auth-view.content-revealed .form-card-pop-wrap {
+  animation: formCardPopIn 0.58s cubic-bezier(0.34, 1.45, 0.7, 1) 0.05s forwards;
+}
+
+.split-auth-view.is-closing .form-card-pop-wrap {
+  animation: formCardPopOut 0.22s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes formCardPopIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.7) translateY(45px);
+    filter: blur(8px);
+  }
+  65% {
+    opacity: 1;
+    transform: scale(1.04) translateY(-6px);
+    filter: blur(0);
+  }
+  85% {
+    transform: scale(0.99) translateY(2px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes formCardPopOut {
+  0% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    filter: blur(0);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.75) translateY(32px);
+    filter: blur(8px);
+  }
 }
 
 /* Tarjeta Liquid Glass Ultra Realista y Brillante */

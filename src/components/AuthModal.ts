@@ -44,6 +44,10 @@ export class AuthModal {
   private regPass: string = '';
   private forgotEmail: string = '';
 
+  // Transition states
+  private isClosing: boolean = false;
+  private isOpening: boolean = false;
+
   // Parallax animation state
   private targetX: number = 0;
   private targetY: number = 0;
@@ -71,9 +75,9 @@ export class AuthModal {
   }
 
   private setupGlobalListeners(): void {
-    // Tecla ESC para cerrar
+    // Tecla ESC para cerrar con transición fluida
     window.addEventListener('keydown', (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && this.store.isAuthOpen) {
+      if (e.key === 'Escape' && this.store.isAuthOpen && !this.isClosing) {
         this.closeView();
       }
     });
@@ -87,6 +91,10 @@ export class AuthModal {
       } else if (hash === '#register') {
         this.switchTab('register');
         if (!this.store.isAuthOpen) this.store.toggleAuth(true);
+      } else {
+        if (this.store.isAuthOpen && !this.isClosing) {
+          this.closeView();
+        }
       }
     });
 
@@ -108,11 +116,16 @@ export class AuthModal {
     const user = this.store.currentUser;
 
     if (!isOpen) {
-      this.container.classList.remove('is-open', 'is-fullscreen-auth');
-      document.body.style.overflow = '';
-      this.stopAnimationSystem();
-      this.syncUrlHash(false);
-      this.container.innerHTML = '';
+      if (this.isClosing) {
+        return;
+      }
+      const splitView = this.container.querySelector('#split-auth-view');
+      if (splitView) {
+        this.closeView();
+        return;
+      }
+
+      this.finishClose();
       return;
     }
 
@@ -129,11 +142,12 @@ export class AuthModal {
 
       const splitView = this.container.querySelector('#split-auth-view');
       if (!splitView) {
-        // Primera carga: se monta el escenario y el canvas
+        // Primera carga: se monta el escenario dividido, cortinas y canvas
         this.renderSplitAuthView();
         this.startAnimationSystem();
         this.setupOuterEvents();
         this.setupFormEvents();
+        this.playOpenTransition();
       } else {
         // Ya está montado: solo se actualiza el formulario sin tocar el fondo ni reiniciar el canvas
         this.updateFormCardOnly();
@@ -142,21 +156,28 @@ export class AuthModal {
   }
 
   /**
-   * Vista Dividida:
-   * - Fondo: Blanco aperlado con neblina y partículas 3D en verde y dorado continuas.
-   * - Izquierda: Isologo gigante oficial sin círculos ni anillos alrededor.
-   * - Derecha: Formulario con tarjeta Liquid Glass ultra realista y brillante.
+   * Vista Dividida con Cortinas Deslizantes y Animación Pop:
+   * - Cortinas: Se deslizan desde los extremos izquierdo y derecho y se juntan al centro.
+   * - Destello: Luz dorada en la costura de unión al cerrarse.
+   * - Pop: El isologo y la tarjeta Liquid Glass aparecen con un rebote elástico cinematográfico.
    */
   private renderSplitAuthView(): void {
     this.container.innerHTML = `
       <div class="split-auth-view" id="split-auth-view" role="dialog" aria-modal="true" aria-label="Acceso a Blessed Sandals">
         
+        <!-- PANELES DE TRANSICIÓN DIVIDIDOS (CORTINAS QUE SE JUNTAN Y SE SEPARAN) -->
+        <div class="split-curtain split-curtain-left" id="split-curtain-left"></div>
+        <div class="split-curtain split-curtain-right" id="split-curtain-right"></div>
+
+        <!-- DESTELLO LUMINOSO EN LA UNIÓN CENTRAL -->
+        <div class="split-seam-flash" id="split-seam-flash"></div>
+
         <!-- CANVAS 3D PARA EL HUMO Y NUBE DE PARTÍCULAS EN VERDE Y DORADO -->
         <canvas id="split-smoke-canvas" class="split-smoke-canvas"></canvas>
 
         <!-- BOTÓN DE CERRAR DISCRETO ESTILO LIQUID GLASS -->
-        <header class="split-auth-topbar">
-          <button class="split-topbar-close-btn" id="btn-auth-view-close" aria-label="Cerrar vista">
+        <header class="split-auth-topbar" id="split-auth-topbar">
+          <button class="split-topbar-close-btn" id="btn-auth-view-close" aria-label="Cerrar vista y volver a la tienda">
             ${Icons.close('w-5 h-5')}
           </button>
         </header>
@@ -164,49 +185,130 @@ export class AuthModal {
         <!-- CONTENEDOR PRINCIPAL: DISTRIBUCIÓN DIVIDIDA (ISOLOGO IZQUIERDA / FORMULARIO DERECHA) -->
         <div class="split-auth-main-wrap">
           
-          <!-- COLUMNA IZQUIERDA: ISOLOGO EN COLOR REAL Y MÁS GRANDE (SIN CÍRCULOS NI TEXTO ALREDEDOR) -->
+          <!-- COLUMNA IZQUIERDA: ISOLOGO EN COLOR REAL Y MÁS GRANDE (CON WRAPPER PARA POP) -->
           <div class="split-isologo-col" id="split-isologo-col">
-            <div class="isologo-interactive-stage" id="isologo-interactive-stage">
-              <!-- ISOLOGO OFICIAL LIMPIO SIN CÍRCULOS EXTERNOS -->
-              <img 
-                src="/assets/logo/Isologo.png" 
-                alt="Blessed Sandals Isologo Oficial" 
-                class="isologo-real-vivid-img" 
-                id="isologo-real-vivid-img" 
-                loading="eager" 
-              />
+            <div class="isologo-pop-wrap" id="isologo-pop-wrap">
+              <div class="isologo-interactive-stage" id="isologo-interactive-stage">
+                <!-- ISOLOGO OFICIAL LIMPIO SIN CÍRCULOS EXTERNOS -->
+                <img 
+                  src="/assets/logo/Isologo.png" 
+                  alt="Blessed Sandals Isologo Oficial" 
+                  class="isologo-real-vivid-img" 
+                  id="isologo-real-vivid-img" 
+                  loading="eager" 
+                />
+              </div>
             </div>
           </div>
 
           <!-- COLUMNA DERECHA: FORMULARIO MINIMALISTA CON TARJETA LIQUID GLASS -->
-          <div class="split-form-col">
-            <div class="split-form-card liquid-glass animate-scale-up" id="split-form-card">
-              
-              <!-- DESTELLO ESPECULAR Y BISEL SUPERIOR -->
-              <div class="liquid-glass-flare"></div>
+          <div class="split-form-col" id="split-form-col">
+            <div class="form-card-pop-wrap" id="form-card-pop-wrap">
+              <div class="split-form-card liquid-glass" id="split-form-card">
+                
+                <!-- DESTELLO ESPECULAR Y BISEL SUPERIOR -->
+                <div class="liquid-glass-flare"></div>
 
-              <!-- LOGO MINIMALISTA SUPERIOR -->
-              <div class="card-minimal-logo-wrap">
-                <img src="/assets/logo/IsotipoDark.png" alt="Blessed" class="card-minimal-logo-img" />
+                <!-- LOGO MINIMALISTA SUPERIOR -->
+                <div class="card-minimal-logo-wrap">
+                  <img src="/assets/logo/IsotipoDark.png" alt="Blessed" class="card-minimal-logo-img" />
+                </div>
+
+                <!-- CONTENEDOR DINÁMICO DEL FORMULARIO (CAMBIA SUAVEMENTE SIN CORTES DE FONDO) -->
+                <div class="card-form-dynamic-wrap" id="card-form-dynamic-wrap">
+                  ${
+                    this.viewMode === 'forgot'
+                      ? this.renderForgotPasswordForm()
+                      : this.activeTab === 'register'
+                      ? this.renderRegisterForm()
+                      : this.renderLoginForm()
+                  }
+                </div>
+
               </div>
-
-              <!-- CONTENEDOR DINÁMICO DEL FORMULARIO (CAMBIA SUAVEMENTE SIN CORTES DE FONDO) -->
-              <div class="card-form-dynamic-wrap" id="card-form-dynamic-wrap">
-                ${
-                  this.viewMode === 'forgot'
-                    ? this.renderForgotPasswordForm()
-                    : this.activeTab === 'register'
-                    ? this.renderRegisterForm()
-                    : this.renderLoginForm()
-                }
-              </div>
-
             </div>
           </div>
 
         </div>
       </div>
     `;
+  }
+
+  /**
+   * Ejecuta la secuencia cinemática de apertura:
+   * 1. Las dos cortinas se cierran deslizándose desde los lados hacia el centro.
+   * 2. Destello dorado en la costura central.
+   * 3. Pop elástico del isologo y de la tarjeta Liquid Glass.
+   */
+  private playOpenTransition(): void {
+    const splitView = this.container.querySelector('#split-auth-view') as HTMLElement | null;
+    if (!splitView) return;
+
+    this.isOpening = true;
+
+    // Próximo cuadro de animación: cerrar las dos cortinas hacia el centro
+    requestAnimationFrame(() => {
+      splitView.classList.add('doors-joined');
+    });
+
+    // A los 320ms: destello luminoso en la costura de unión
+    setTimeout(() => {
+      const flash = splitView.querySelector('#split-seam-flash') as HTMLElement | null;
+      if (flash) flash.classList.add('is-flashing');
+    }, 320);
+
+    // A los 360ms: Pop in del isologo y formulario
+    setTimeout(() => {
+      splitView.classList.add('content-revealed');
+      setTimeout(() => {
+        this.isOpening = false;
+      }, 550);
+    }, 360);
+  }
+
+  /**
+   * Ejecuta la secuencia cinemática de cierre hacia la tienda:
+   * 1. El isologo y el formulario hacen un "pop out" suave encogiéndose y desvaneciéndose.
+   * 2. Las dos cortinas se dividen por la mitad y se abren deslizándose a los lados.
+   * 3. La tienda queda completamente al descubierto.
+   */
+  private closeView(): void {
+    if (this.isClosing) return;
+    this.isClosing = true;
+
+    const splitView = this.container.querySelector('#split-auth-view') as HTMLElement | null;
+    if (!splitView) {
+      this.finishClose();
+      return;
+    }
+
+    // 1. Pop out del contenido
+    splitView.classList.remove('content-revealed');
+    splitView.classList.add('is-closing');
+
+    // 2. A los 180ms: Las dos cortinas se dividen y se abren hacia los lados
+    setTimeout(() => {
+      splitView.classList.remove('doors-joined');
+      splitView.classList.add('doors-parting');
+    }, 180);
+
+    // 3. A los 560ms: Las cortinas han salido de la pantalla y la tienda está visible
+    setTimeout(() => {
+      this.finishClose();
+    }, 560);
+  }
+
+  private finishClose(): void {
+    this.container.classList.remove('is-open', 'is-fullscreen-auth');
+    document.body.style.overflow = '';
+    this.stopAnimationSystem();
+    this.syncUrlHash(false);
+    this.container.innerHTML = '';
+    this.isClosing = false;
+    this.isOpening = false;
+    if (this.store.isAuthOpen) {
+      this.store.toggleAuth(false);
+    }
   }
 
   /**
@@ -577,10 +679,6 @@ export class AuthModal {
     this.closeView();
   }
 
-  private closeView(): void {
-    this.store.toggleAuth(false);
-  }
-
   private syncUrlHash(isOpen: boolean): void {
     if (isOpen) {
       const targetHash = `#${this.activeTab}`;
@@ -702,7 +800,7 @@ export class AuthModal {
       this.currentY += (this.targetY - this.currentY) * 0.05;
 
       // Seguimiento 3D del isologo a la izquierda
-      if (isologoStage) {
+      if (isologoStage && !this.isClosing && !this.isOpening) {
         const transX = this.currentX * 28;
         const transY = this.currentY * 24;
         const rotY = this.currentX * 12;
@@ -711,7 +809,7 @@ export class AuthModal {
       }
 
       // Micro-reacción de la tarjeta Liquid Glass
-      if (formCard) {
+      if (formCard && !this.isClosing && !this.isOpening) {
         const cardX = this.currentX * -10;
         const cardY = this.currentY * -8;
         formCard.style.transform = `translate3d(${cardX.toFixed(2)}px, ${cardY.toFixed(2)}px, 0)`;
