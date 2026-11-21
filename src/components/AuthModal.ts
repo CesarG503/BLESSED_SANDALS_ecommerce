@@ -347,9 +347,22 @@ export class AuthModal {
    * Formulario de Registro minimalista (Exactamente como la imagen del usuario)
    */
   private renderRegisterForm(): string {
+    const pendingCode = this.store.pendingPromoCode;
+
     return `
       <form class="min-auth-form" id="form-register">
         
+        ${
+          pendingCode
+            ? `
+          <div style="background: rgba(13, 100, 61, 0.08); border: 1px solid rgba(13, 100, 61, 0.2); border-radius: 12px; padding: 10px 14px; margin-bottom: 16px; font-size: 13px; color: #0d643d; text-align: center;">
+            🎟️ <strong>¡Regístrate para activar ${pendingCode}!</strong>
+            <span style="display:block; font-size:11px; opacity:0.85; margin-top:2px;">Se agregará a tu cuenta personal con 1 solo uso garantizado.</span>
+          </div>
+        `
+            : ''
+        }
+
         <!-- Fila de Nombre y Apellido (Pill Inputs lado a lado) -->
         <div class="min-form-row">
           <input 
@@ -403,8 +416,8 @@ export class AuthModal {
         </div>
 
         <!-- Botón principal pill negro -->
-        <button type="submit" class="min-pill-submit-btn">
-          Crear cuenta
+        <button type="submit" class="min-pill-submit-btn" id="btn-submit-register">
+          Crear cuenta y desbloquear cupón
         </button>
 
         <!-- Texto legal -->
@@ -427,9 +440,21 @@ export class AuthModal {
    * Formulario de Inicio de Sesión minimalista (Exactamente como la imagen del usuario)
    */
   private renderLoginForm(): string {
+    const pendingCode = this.store.pendingPromoCode;
+
     return `
       <form class="min-auth-form" id="form-login">
         
+        ${
+          pendingCode
+            ? `
+          <div style="background: rgba(13, 100, 61, 0.08); border: 1px solid rgba(13, 100, 61, 0.2); border-radius: 12px; padding: 10px 14px; margin-bottom: 16px; font-size: 13px; color: #0d643d; text-align: center;">
+            🎟️ Inicia sesión para activar tu cupón <strong>${pendingCode}</strong>
+          </div>
+        `
+            : ''
+        }
+
         <!-- Fila de Correo -->
         <div class="min-form-group">
           <input 
@@ -460,7 +485,7 @@ export class AuthModal {
         </div>
 
         <!-- Botón principal pill negro -->
-        <button type="submit" class="min-pill-submit-btn">
+        <button type="submit" class="min-pill-submit-btn" id="btn-submit-login">
           Iniciar sesión
         </button>
 
@@ -554,12 +579,44 @@ export class AuthModal {
 
               <div class="account-option-item" id="btn-open-promos-from-user">
                 <div class="option-content">
-                  <strong>Cupones y Descuentos</strong>
-                  <p>${this.store.appliedPromo ? `Cupón activo: ${this.store.appliedPromo.code}` : 'Ver códigos promocionales'}</p>
+                  <strong>Mis Cupones Personales</strong>
+                  <p>${this.store.appliedPromo ? `Cupón activo: ${this.store.appliedPromo.code}` : 'Gestionar códigos de descuento en tu cuenta'}</p>
                 </div>
                 <span class="option-arrow">${Icons.chevronRight('w-4 h-4')}</span>
               </div>
             </div>
+
+            <!-- LISTADO DE CUPONES PERSONALES VINCULADOS A LA CUENTA -->
+            ${
+              user.userCoupons && user.userCoupons.length > 0
+                ? `
+              <div style="margin-top: 18px; padding-top: 14px; border-top: 1px solid rgba(0,0,0,0.06); text-align: left;">
+                <h5 style="font-size: 13px; font-weight: 700; color: #111; margin-bottom: 8px;">Cupones asignados a tu cuenta:</h5>
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                  ${user.userCoupons
+                    .map(
+                      (uc: any) => `
+                    <div style="display: flex; align-items: center; justify-content: space-between; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 12px; font-size: 12px;">
+                      <div>
+                        <strong style="color: #0d643d; font-size: 13px;">${uc.promoCode?.code || 'CUPÓN'}</strong>
+                        <span style="display: block; font-size: 11px; color: #64748b;">${uc.promoCode?.description || 'Descuento especial'}</span>
+                      </div>
+                      <div>
+                        ${
+                          uc.isUsed
+                            ? `<span style="background: #fee2e2; color: #b91c1c; font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 999px;">Ya canjeado (1 uso)</span>`
+                            : `<span style="background: #dcfce7; color: #15803d; font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 999px;">Disponible</span>`
+                        }
+                      </div>
+                    </div>
+                  `
+                    )
+                    .join('')}
+                </div>
+              </div>
+            `
+                : ''
+            }
 
             <div class="user-logout-wrap">
               <button class="btn btn-outline-danger btn-logout" id="btn-auth-logout">
@@ -651,32 +708,57 @@ export class AuthModal {
 
     // Submit Login
     const formLogin = this.container.querySelector('#form-login');
-    formLogin?.addEventListener('submit', (e) => {
+    formLogin?.addEventListener('submit', async (e) => {
       e.preventDefault();
       const emailInput = this.container.querySelector('#login-email') as HTMLInputElement | null;
-      const email = emailInput?.value.trim() || 'cliente@blessed.com';
-      this.handleAuthSuccess(email, 'Cliente');
+      const email = emailInput?.value.trim() || '';
+
+      if (!email) {
+        Toast.show('Por favor ingresa tu correo electrónico.', 'Iniciar Sesión', 'warning');
+        return;
+      }
+
+      const res = await this.store.login(email);
+      if (res.success) {
+        Toast.show(res.message, 'Sesión Iniciada', 'success');
+        this.closeView();
+      } else if (res.requireRegister) {
+        Toast.show(res.message, 'Regístrate', 'info', 5000);
+        this.regEmail = email;
+        this.switchTab('register');
+      } else {
+        Toast.show(res.message, 'Error', 'warning');
+      }
     });
 
     // Submit Register
     const formRegister = this.container.querySelector('#form-register');
-    formRegister?.addEventListener('submit', (e) => {
+    formRegister?.addEventListener('submit', async (e) => {
       e.preventDefault();
       const firstInput = this.container.querySelector('#reg-first-name') as HTMLInputElement | null;
       const lastInput = this.container.querySelector('#reg-last-name') as HTMLInputElement | null;
       const emailInput = this.container.querySelector('#reg-email') as HTMLInputElement | null;
-      const firstName = firstInput?.value.trim() || 'Nuevo';
-      const lastName = lastInput?.value.trim() || 'Cliente';
-      const fullName = `${firstName} ${lastName}`.trim();
-      const email = emailInput?.value.trim() || 'cliente@blessed.com';
-      this.handleAuthSuccess(email, fullName);
-    });
-  }
+      const firstName = firstInput?.value.trim() || '';
+      const lastName = lastInput?.value.trim() || '';
+      const email = emailInput?.value.trim() || '';
 
-  private handleAuthSuccess(email: string, name: string, role: 'USER' | 'ADMIN' = 'USER'): void {
-    this.store.login(email, name, role);
-    Toast.show(`¡Bienvenido, ${name}!`);
-    this.closeView();
+      if (!firstName || !email) {
+        Toast.show('Por favor completa tu nombre y correo.', 'Registro', 'warning');
+        return;
+      }
+
+      const res = await this.store.register(firstName, lastName, email);
+      if (res.success) {
+        Toast.show(res.message, '¡Bienvenido a Blessed Sandals!', 'success', 6000);
+        this.closeView();
+      } else if (res.requireLogin) {
+        Toast.show(res.message, 'Ya registrado', 'info');
+        this.loginEmail = email;
+        this.switchTab('login');
+      } else {
+        Toast.show(res.message, 'Error al registrar', 'warning');
+      }
+    });
   }
 
   private syncUrlHash(isOpen: boolean): void {

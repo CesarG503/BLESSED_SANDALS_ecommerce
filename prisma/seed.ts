@@ -11,6 +11,7 @@ async function main() {
   await prisma.wishlist.deleteMany();
   await prisma.orderItem.deleteMany();
   await prisma.order.deleteMany();
+  await prisma.userCoupon.deleteMany();
   await prisma.promoUsage.deleteMany();
   await prisma.promoCode.deleteMany();
   await prisma.productSize.deleteMany();
@@ -70,44 +71,84 @@ async function main() {
   // 4. Crear Códigos Promocionales
   const promos = [
     {
+      code: 'BIENVENIDA5',
+      description: '5% de descuento exclusivo para cuenta nueva (1 solo uso)',
+      discountType: 'PERCENTAGE' as const,
+      discountValue: 5,
+      minPurchase: 0,
+      onePerUser: true,
+      isWelcomeOnly: true,
+      isActive: true
+    },
+    {
       code: 'BLESSED10',
-      description: '10% de descuento en toda la tienda',
+      description: '10% de descuento en toda la tienda (1 uso por persona)',
       discountType: 'PERCENTAGE' as const,
       discountValue: 10,
       minPurchase: 30,
+      onePerUser: true,
+      isWelcomeOnly: false,
       isActive: true
     },
     {
       code: 'BLESSED20',
-      description: '20% de descuento para miembros VIP',
+      description: '20% de descuento para miembros VIP (1 uso por persona)',
       discountType: 'PERCENTAGE' as const,
       discountValue: 20,
       minPurchase: 100,
+      onePerUser: true,
+      isWelcomeOnly: false,
       isActive: true
     },
     {
       code: 'WILD15',
-      description: '15% de descuento en colección Blessed Wild',
+      description: '15% de descuento en colección Blessed Wild (1 uso por persona)',
       discountType: 'PERCENTAGE' as const,
       discountValue: 15,
       minPurchase: 50,
+      onePerUser: true,
+      isWelcomeOnly: false,
       isActive: true
     },
     {
       code: 'VERANO25',
-      description: '$25 de descuento en compras superiores a $120',
+      description: '$25 de descuento en compras superiores a $120 (1 uso por persona)',
       discountType: 'FIXED' as const,
       discountValue: 25,
       minPurchase: 120,
+      onePerUser: true,
+      isWelcomeOnly: false,
       isActive: true
     }
   ];
 
+  const createdPromos: Record<string, string> = {};
   for (const promo of promos) {
-    await prisma.promoCode.create({ data: promo });
+    const cp = await prisma.promoCode.create({ data: promo });
+    createdPromos[promo.code] = cp.id;
   }
 
-  console.log(`✅ ${promos.length} Códigos promocionales creados.`);
+  // Asignar cupón de bienvenida BIENVENIDA5 y BLESSED10 a la cuenta del usuario demo
+  if (createdPromos['BIENVENIDA5']) {
+    await prisma.userCoupon.create({
+      data: {
+        userId: user.id,
+        promoCodeId: createdPromos['BIENVENIDA5'],
+        isUsed: false
+      }
+    });
+  }
+  if (createdPromos['BLESSED10']) {
+    await prisma.userCoupon.create({
+      data: {
+        userId: user.id,
+        promoCodeId: createdPromos['BLESSED10'],
+        isUsed: false
+      }
+    });
+  }
+
+  console.log(`✅ ${promos.length} Códigos promocionales creados y asociados a la cuenta demo.`);
 
   // 5. Crear Productos con Colores y Tallas
   for (const prod of MOCK_PRODUCTS) {

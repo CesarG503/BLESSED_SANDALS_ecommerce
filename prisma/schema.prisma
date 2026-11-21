@@ -53,6 +53,7 @@ model User {
   reviews      Review[]
   wishlist     Wishlist[]
   promoUsages  PromoUsage[]
+  userCoupons  UserCoupon[]
 
   @@map("users")
 }
@@ -161,6 +162,8 @@ model PromoCode {
   maxDiscount   Float?
   usageLimit    Int?
   timesUsed     Int          @default(0)
+  onePerUser    Boolean      @default(true)
+  isWelcomeOnly Boolean      @default(false)
   isActive      Boolean      @default(true)
   startsAt      DateTime     @default(now())
   expiresAt     DateTime?
@@ -169,8 +172,24 @@ model PromoCode {
 
   orders        Order[]
   usages        PromoUsage[]
+  userCoupons   UserCoupon[]
 
   @@map("promo_codes")
+}
+
+model UserCoupon {
+  id          String     @id @default(uuid())
+  userId      String
+  promoCodeId String
+  isUsed      Boolean    @default(false)
+  usedAt      DateTime?
+  claimedAt   DateTime   @default(now())
+
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  promoCode   PromoCode  @relation(fields: [promoCodeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, promoCodeId])
+  @@map("user_coupons")
 }
 
 model PromoUsage {

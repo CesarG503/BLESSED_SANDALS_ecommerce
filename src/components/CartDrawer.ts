@@ -221,15 +221,15 @@ export class CartDrawer {
     });
 
     // Cupón promocional
-    this.container.querySelector('#btn-apply-promo')?.addEventListener('click', () => {
+    this.container.querySelector('#btn-apply-promo')?.addEventListener('click', async () => {
       const input = this.container.querySelector('#promo-input') as HTMLInputElement | null;
       const code = input?.value.trim().toUpperCase();
       if (code) {
-        const res = this.store.applyPromo(code);
+        const res = await this.store.applyPromo(code);
         if (res.success) {
           Toast.show(res.message, 'Cupón Aplicado', 'success');
         } else {
-          Toast.show(res.message, 'Cupón no válido', 'warning');
+          Toast.show(res.message, 'Cupón', 'warning');
         }
       } else {
         this.store.togglePromo(true);
@@ -241,28 +241,34 @@ export class CartDrawer {
       Toast.show('Cupón removido');
     });
 
-    // Checkout simulación con fuegos artificiales de confeti
-    this.container.querySelector('#btn-checkout')?.addEventListener('click', () => {
-      this.triggerCheckoutCelebration();
+    // Checkout conectado a PostgreSQL
+    this.container.querySelector('#btn-checkout')?.addEventListener('click', async () => {
+      await this.handleCheckout();
     });
   }
 
-  private triggerCheckoutCelebration(): void {
+  private async handleCheckout(): Promise<void> {
     const total = this.store.getCartTotal();
-    
-    // Disparo de confetti
-    confetti({
-      particleCount: 120,
-      spread: 70,
-      origin: { y: 0.6 },
-      colors: ['#0B3B24', '#d2b588', '#ffffff', '#cf2228']
-    });
+    const res = await this.store.checkout();
 
-    // Modal de confirmación rápida
-    this.store.toggleCart(false);
-    this.store.clearCart();
+    if (res.success) {
+      // Disparo de confetti festivo
+      confetti({
+        particleCount: 120,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ['#0B3B24', '#d2b588', '#ffffff', '#cf2228']
+      });
 
-    const orderId = 'BLS-' + Math.floor(100000 + Math.random() * 900000);
-    Toast.show(`¡Pedido ${orderId} por $${total.toFixed(2)} confirmado con éxito! Gracias por elegir Blessed Sandals.`, '¡Compra Exitosa!', 'success', 6000);
+      this.store.toggleCart(false);
+      Toast.show(
+        `¡Pedido ${res.orderNumber} por $${total.toFixed(2)} registrado con éxito! Tu cupón ha sido procesado en la base de datos.`,
+        '¡Compra Exitosa!',
+        'success',
+        6000
+      );
+    } else {
+      Toast.show(res.message, 'Atención', 'warning');
+    }
   }
 }

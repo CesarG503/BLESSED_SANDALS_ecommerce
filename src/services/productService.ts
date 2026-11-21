@@ -15,19 +15,23 @@ import { MOCK_PRODUCTS } from '../data/mockProducts';
  */
 export class ProductService {
   /**
-   * Obtiene todos los productos (simula una consulta asíncrona a BD)
+   * Obtiene todos los productos consultando la base de datos PostgreSQL mediante /api/products
    */
   static async getProducts(): Promise<Product[]> {
-    // SIMULACIÓN DE LATENCIA DE RED/BD (300ms para mostrar animaciones de carga fluidas)
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    try {
+      const response = await fetch('/api/products');
+      if (response.ok) {
+        const json = await response.json();
+        if (json.success && Array.isArray(json.products) && json.products.length > 0) {
+          return json.products;
+        }
+      }
+    } catch (e) {
+      console.warn('Conectando a base de datos de respaldo local:', e);
+    }
 
-    // =========================================================================
-    // EJEMPLO DE CÓDIGO PARA TU BASE DE DATOS REAL:
-    // const response = await fetch('/api/products');
-    // if (!response.ok) throw new Error('Error al cargar productos de la BD');
-    // return await response.json();
-    // =========================================================================
-
+    // Fallback con simulación de latencia fluida
+    await new Promise((resolve) => setTimeout(resolve, 200));
     return [...MOCK_PRODUCTS];
   }
 
