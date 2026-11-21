@@ -3936,150 +3936,436 @@
   overflow-y: auto;
 }
 
-/* Tabs de Login / Registro */
-.auth-tabs-nav {
-  display: flex;
-  gap: 4px;
-  padding: 4px;
-  background: #f4f4f5;
-  border-radius: 10px;
-  margin-bottom: 20px;
+/* ==========================================================================
+   VISTA DE AUTENTICACIÓN DIVIDIDA: ISOLOGO REAL GIGANTE + LIQUID GLASS + HUMO 3D
+   ========================================================================== */
+
+#auth-modal-app.is-fullscreen-auth {
+  padding: 0 !important;
+  align-items: stretch !important;
+  justify-content: stretch !important;
+  background: #ffffff !important;
+  z-index: 1300;
 }
 
-.auth-tab-btn {
-  flex: 1;
-  padding: 8px 12px;
-  font-size: 0.84rem;
-  font-weight: 700;
-  border: none;
-  background: transparent;
-  border-radius: 8px;
-  color: #71717a;
+.split-auth-view {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  max-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background: radial-gradient(circle at 25% 45%, #f4fbf7 0%, #fbf9f4 45%, #ffffff 90%);
+  color: #111111;
+  font-family: var(--font-sans);
+  overflow: hidden;
+}
+
+/* Canvas de Humo 3D y Nube de Partículas Verde y Dorada sobre fondo blanco */
+.split-smoke-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Botón de cierre discreto estilo liquid glass */
+.split-auth-topbar {
+  position: absolute;
+  top: 24px;
+  right: 28px;
+  z-index: 30;
+}
+
+.split-topbar-close-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  color: #111111;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
   transition: all 0.2s ease;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06), inset 0 1px 2px #ffffff;
 }
 
-.auth-tab-btn.is-active {
+.split-topbar-close-btn:hover {
+  background: #ffffff;
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.35);
+  transform: scale(1.06);
+  box-shadow: 0 6px 18px rgba(239, 68, 68, 0.16);
+}
+
+/* Contenedor dividido en 2 columnas: Isologo a la Izquierda, Formulario a la Derecha */
+.split-auth-main-wrap {
+  position: relative;
+  z-index: 10;
+  width: 100%;
+  max-width: 1220px;
+  height: 100%;
+  max-height: 100vh;
+  margin: 0 auto;
+  padding: 16px 48px;
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  align-items: center;
+  justify-content: center;
+  gap: 48px;
+  box-sizing: border-box;
+}
+
+/* --- COLUMNA IZQUIERDA: ISOLOGO REAL GIGANTE (SIN CÍRCULOS NI ANILLOS EXTERNOS) --- */
+.split-isologo-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  position: relative;
+  user-select: none;
+}
+
+.isologo-interactive-stage {
+  position: relative;
+  width: clamp(470px, 47vw, 620px);
+  height: clamp(470px, 47vw, 620px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform-style: preserve-3d;
+  transition: transform 0.1s cubic-bezier(0.16, 1, 0.3, 1);
+  /* Sin bordes, sin halos ni círculos añadidos */
+}
+
+/* Imagen real nítida con sus colores reales y tamaño aumentado */
+.isologo-real-vivid-img {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 1; /* 100% Color real y vivo */
+  filter: 
+    drop-shadow(0 24px 50px rgba(13, 100, 61, 0.18)) 
+    drop-shadow(0 8px 18px rgba(0, 0, 0, 0.05));
+  will-change: transform;
+  animation: isologoVividFloat 10s ease-in-out infinite alternate;
+}
+
+@keyframes isologoVividFloat {
+  0% { transform: scale(0.98) translateY(0); }
+  50% { transform: scale(1.02) translateY(-8px); }
+  100% { transform: scale(0.99) translateY(6px); }
+}
+
+/* --- COLUMNA DERECHA: FORMULARIO MINIMALISTA CON EFECTO LIQUID GLASS REALISTA Y BRILLANTE --- */
+.split-form-col {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+/* Tarjeta Liquid Glass Ultra Realista y Brillante */
+.split-form-card.liquid-glass {
+  position: relative;
+  z-index: 10;
+  width: 100%;
+  max-width: 385px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.88) 0%, rgba(255, 255, 255, 0.58) 50%, rgba(255, 255, 255, 0.78) 100%);
+  backdrop-filter: blur(40px) saturate(220%) brightness(112%);
+  -webkit-backdrop-filter: blur(40px) saturate(220%) brightness(112%);
+  border: 1.5px solid rgba(255, 255, 255, 0.95);
+  border-radius: 34px;
+  box-shadow: 
+    0 35px 85px -15px rgba(13, 100, 61, 0.15),
+    0 20px 45px -10px rgba(210, 181, 136, 0.22),
+    0 4px 12px rgba(0, 0, 0, 0.04),
+    inset 0 2px 2px 0 rgba(255, 255, 255, 1),
+    inset 1.5px 0 2px 0 rgba(255, 255, 255, 0.8),
+    inset -1px 0 2px 0 rgba(255, 255, 255, 0.6),
+    inset 0 -2.5px 3px 0 rgba(210, 181, 136, 0.32);
+  padding: 34px 30px 26px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: transform 0.12s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+/* Destello especular y bisel superior de Liquid Glass */
+.liquid-glass-flare {
+  position: absolute;
+  top: 1px;
+  left: 18%;
+  right: 18%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.4) 20%, #ffffff 50%, rgba(255, 255, 255, 0.4) 80%, transparent 100%);
+  filter: drop-shadow(0 0 5px rgba(255, 255, 255, 1));
+  border-radius: 9999px;
+  pointer-events: none;
+  z-index: 3;
+}
+
+/* Reflejo de curvatura líquida de cristal */
+.split-form-card.liquid-glass::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 52%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.75) 0%, rgba(255, 255, 255, 0.08) 75%, transparent 100%);
+  border-radius: 34px 34px 120px 120px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Logo minimalista superior */
+.card-minimal-logo-wrap {
+  position: relative;
+  z-index: 2;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.card-minimal-logo-img {
+  height: 36px;
+  width: auto;
+  object-fit: contain;
+  filter: brightness(0.1);
+}
+
+/* Contenedor dinámico del formulario (transición suave sin tocar el fondo) */
+.card-form-dynamic-wrap {
+  width: 100%;
+  position: relative;
+  z-index: 2;
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+
+.card-form-dynamic-wrap.is-switching {
+  opacity: 0;
+  transform: scale(0.97) translateY(4px);
+}
+
+/* Formulario minimalista */
+.min-auth-form {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+
+.min-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  width: 100%;
+}
+
+.min-form-group {
+  width: 100%;
+}
+
+/* Inputs estilo Pill translúcidos sobre Liquid Glass */
+.min-pill-input {
+  width: 100%;
+  padding: 13px 18px;
+  font-size: 0.92rem;
+  font-family: var(--font-sans);
+  background: rgba(246, 246, 248, 0.88);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: 9999px;
+  color: #111111;
+  outline: none;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-sizing: border-box;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.02), 0 2px 6px rgba(0, 0, 0, 0.02);
+}
+
+.min-pill-input::placeholder {
+  color: #8e8e93;
+  font-weight: 400;
+}
+
+.min-pill-input:focus {
+  background: #ffffff;
+  border-color: #111111;
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.07), 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+/* Fila de Contraseña con botón de ojo pill separado */
+.min-password-row {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.min-pass-input {
+  flex: 1;
+}
+
+.min-pill-eye-btn {
+  width: 52px;
+  height: 46px;
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: 9999px;
+  background: rgba(246, 246, 248, 0.88);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  color: #52525b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  padding: 0;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.02), 0 2px 6px rgba(0, 0, 0, 0.02);
+}
+
+.min-pill-eye-btn:hover {
   background: #ffffff;
   color: #111111;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-}
-
-.auth-form {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.form-label-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.form-label {
-  font-size: 0.78rem;
-  font-weight: 700;
-  color: #374151;
-}
-
-.forgot-pass-link {
-  font-size: 0.72rem;
-  color: #6b7280;
-  text-decoration: underline;
-}
-
-.form-input {
-  width: 100%;
-  padding: 10px 14px;
-  font-size: 0.9rem;
-  border: 1.5px solid var(--color-border);
-  border-radius: 8px;
-  transition: border-color 0.15s ease;
-}
-
-.form-input:focus {
-  outline: none;
   border-color: #111111;
 }
 
-.btn-auth-submit {
+/* Botón principal Pill negro */
+.min-pill-submit-btn {
   width: 100%;
-  padding: 11px;
-  font-size: 0.88rem;
-  font-weight: 700;
-  border-radius: 8px;
+  padding: 14px 20px;
   margin-top: 4px;
-}
-
-.btn-demo-login {
-  width: 100%;
-  padding: 9px;
-  font-size: 0.82rem;
-  font-weight: 600;
-  border-radius: 8px;
-  background: #f3f4f6;
-  border: 1px dashed #d1d5db;
-  color: #374151;
+  background: #000000;
+  color: #ffffff;
+  border: none;
+  border-radius: 9999px;
+  font-size: 0.94rem;
+  font-weight: 700;
+  font-family: var(--font-sans);
   cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.btn-demo-login:hover {
-  background: #e5e7eb;
-}
-
-.auth-divider {
-  display: flex;
-  align-items: center;
+  transition: all 0.2s ease;
   text-align: center;
-  margin: 18px 0;
-  color: #9ca3af;
-  font-size: 0.75rem;
+  box-shadow: 0 5px 16px rgba(0, 0, 0, 0.20);
 }
 
-.auth-divider::before,
-.auth-divider::after {
-  content: '';
-  flex: 1;
-  border-bottom: 1px solid #e5e7eb;
+.min-pill-submit-btn:hover {
+  background: #27272a;
+  transform: translateY(-1px);
+  box-shadow: 0 7px 20px rgba(0, 0, 0, 0.26);
 }
 
-.auth-divider span {
-  padding: 0 10px;
+.min-pill-submit-btn:active {
+  transform: translateY(0);
 }
 
-.auth-social-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
+/* Texto legal */
+.min-legal-text {
+  font-size: 0.74rem;
+  color: #71717a;
+  line-height: 1.45;
+  margin: 10px 0 2px 0;
+  text-align: center;
 }
 
-.btn-social {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 9px 12px;
-  border-radius: 8px;
-  border: 1px solid var(--color-border);
-  background: #ffffff;
-  font-size: 0.82rem;
-  font-weight: 600;
+.min-legal-link {
   color: #111111;
-  cursor: pointer;
-  transition: all 0.15s ease;
+  text-decoration: underline;
+  transition: color 0.15s ease;
 }
 
-.btn-social:hover {
-  background: #f9fafb;
-  border-color: #9ca3af;
+.min-legal-link:hover {
+  color: #52525b;
+}
+
+/* Enlaces de cambio de pestaña */
+.min-switch-text {
+  font-size: 0.82rem;
+  color: #111111;
+  margin-top: 4px;
+  text-align: center;
+  font-weight: 500;
+}
+
+.min-switch-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #111111;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 0.82rem;
+  transition: color 0.15s ease;
+}
+
+.min-switch-link:hover {
+  color: #71717a;
+}
+
+/* Olvidó contraseña */
+.min-forgot-wrap {
+  margin-top: -2px;
+  margin-bottom: 2px;
+  text-align: center;
+}
+
+.min-forgot-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.78rem;
+  color: #71717a;
+  text-decoration: underline;
+  cursor: pointer;
+  font-family: var(--font-sans);
+}
+
+.min-forgot-link:hover {
+  color: #111111;
+}
+
+/* Responsive para dispositivos móviles y tablets */
+@media (max-width: 900px) {
+  .split-auth-view {
+    overflow-y: auto;
+  }
+
+  .split-auth-main-wrap {
+    grid-template-columns: 1fr;
+    gap: 20px;
+    padding: 30px 16px;
+    height: auto;
+    min-height: 100vh;
+  }
+
+  .isologo-interactive-stage {
+    width: 170px;
+    height: 170px;
+  }
+
+  .split-form-card.liquid-glass {
+    padding: 26px 20px 22px;
+    max-width: 350px;
+  }
 }
 
 /* Vista de Usuario Autenticado */
