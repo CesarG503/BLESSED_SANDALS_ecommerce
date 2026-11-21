@@ -292,4 +292,48 @@ export class ApiService {
       return { success: false, message: 'Error al publicar reseña.' };
     }
   }
+
+  /**
+   * Consulta la lista de deseos de un usuario desde la BD
+   */
+  static async getWishlist(userId: string): Promise<ApiResponse<{ wishlist: any[] }>> {
+    try {
+      const res = await fetch(`/api/user/wishlist?userId=${encodeURIComponent(userId)}`);
+      return await res.json();
+    } catch {
+      return { success: false, message: 'Error al obtener lista de deseos.' };
+    }
+  }
+
+  /**
+   * Agrega o quita un producto de la lista de deseos en la BD
+   */
+  static async toggleWishlist(userId: string, productId: string): Promise<ApiResponse<{ isAdded: boolean; wishlist: any[] }>> {
+    try {
+      const res = await fetch('/api/user/wishlist/toggle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, productId })
+      });
+      return await res.json();
+    } catch {
+      return { success: false, message: 'Error al actualizar lista de deseos.' };
+    }
+  }
+
+  /**
+   * Sincroniza la lista de deseos local con la cuenta del usuario en PostgreSQL
+   */
+  static async syncWishlist(userId: string, productIds: string[]): Promise<ApiResponse<{ wishlist: any[] }>> {
+    try {
+      const res = await fetch('/api/user/wishlist/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, productIds })
+      });
+      return await res.json();
+    } catch {
+      return { success: false, message: 'Error al sincronizar lista de deseos.' };
+    }
+  }
 }

@@ -124,6 +124,7 @@ export class Store {
     this.loadPromos();
     if (this.currentUser) {
       this.loadUserCoupons();
+      this.loadWishlist();
     }
   }
 
@@ -175,6 +176,52 @@ export class Store {
       }
     } catch (e) {
       console.warn('Error cargando cupones de usuario:', e);
+    }
+  }
+
+  // --- CARGA Y SINCRONIZACIÓN DE LISTA DE DESEOS CON LA CUENTA ---
+  public async loadWishlist(): Promise<void> {
+    if (!this.currentUser) return;
+    try {
+      const res = await ApiService.getWishlist(this.currentUser.id);
+      const rawList = res.data?.wishlist || (res as any).wishlist;
+      if (res.success && rawList) {
+        this.wishlist = rawList.map((w: any) => {
+          const fullProd = this.products.find((p) => p.id === w.productId);
+          return {
+            productId: w.productId,
+            product: fullProd || w.product,
+            addedAt: w.addedAt
+          };
+        });
+        StorageService.saveWishlist(this.wishlist);
+        this.notify();
+      }
+    } catch (e) {
+      console.warn('Error cargando lista de deseos de usuario:', e);
+    }
+  }
+
+  public async syncWishlistWithAccount(): Promise<void> {
+    if (!this.currentUser) return;
+    try {
+      const localIds = this.wishlist.map((w) => w.productId);
+      const res = await ApiService.syncWishlist(this.currentUser.id, localIds);
+      const rawList = res.data?.wishlist || (res as any).wishlist;
+      if (res.success && rawList) {
+        this.wishlist = rawList.map((w: any) => {
+          const fullProd = this.products.find((p) => p.id === w.productId);
+          return {
+            productId: w.productId,
+            product: fullProd || w.product,
+            addedAt: w.addedAt
+          };
+        });
+        StorageService.saveWishlist(this.wishlist);
+        this.notify();
+      }
+    } catch (e) {
+      console.warn('Error sincronizando lista de deseos con la cuenta:', e);
     }
   }
 
@@ -424,6 +471,7 @@ export class Store {
       StorageService.saveUser(res.user);
       await this.loadPromos();
       await this.loadUserCoupons();
+      await this.syncWishlistWithAccount();
 
       // Si había un cupón pendiente que intentó aplicar antes del login, aplicarlo automáticamente
       if (this.pendingPromoCode) {
@@ -461,6 +509,7 @@ export class Store {
       StorageService.saveUser(res.user);
       await this.loadPromos();
       await this.loadUserCoupons();
+      await this.syncWishlistWithAccount();
 
       // Si había un cupón pendiente (o por defecto el de bienvenida BIENVENIDA5), activarlo
       const targetCode = this.pendingPromoCode || 'BIENVENIDA5';
@@ -486,11 +535,14 @@ export class Store {
     this.appliedPromo = null;
     this.pendingPromoCode = null;
     this.isProfileOpen = false;
+    this.wishlist = [];
     StorageService.saveUser(null);
     StorageService.savePromo(null);
+    StorageService.saveWishlist([]);
     try {
       localStorage.removeItem('blessed_sandals_user_v1');
       localStorage.removeItem('blessed_sandals_promo_v1');
+      localStorage.removeItem('blessed_sandals_wishlist_v1');
     } catch (e) {
       console.error('Error clearing storage', e);
     }
@@ -559,7 +611,7 @@ export class Store {
     };
   }
 
-  // --- ACCIONES DE FAVORITOS (WISHLIST) ---
+  // --- ACCIONES DE FAVORITOS (WISHLIST VINCULADOS A CUENTA) ---
   public toggleWishlist(product: Product): boolean {
     const index = this.wishlist.findIndex((w) => w.productId === product.id);
     let isAdded = false;
@@ -578,6 +630,14 @@ export class Store {
 
     StorageService.saveWishlist(this.wishlist);
     this.notify();
+
+    // Sincronizar en segundo plano con PostgreSQL si el usuario tiene sesión iniciada
+    if (this.currentUser) {
+      ApiService.toggleWishlist(this.currentUser.id, product.id).catch((e) => {
+        console.warn('Error al persistir favorito en BD:', e);
+      });
+    }
+
     return isAdded;
   }
 

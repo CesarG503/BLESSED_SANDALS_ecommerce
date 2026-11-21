@@ -6,6 +6,8 @@ import confetti from 'canvas-confetti';
 export class CartDrawer {
   private container: HTMLElement;
   private store: Store;
+  private isClosing: boolean = false;
+  private wasOpen: boolean = false;
 
   constructor(containerId: string) {
     this.store = Store.getInstance();
@@ -14,6 +16,30 @@ export class CartDrawer {
     this.container = el;
 
     this.store.subscribe(() => this.render());
+    this.setupGlobalListeners();
+  }
+
+  private setupGlobalListeners(): void {
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && this.store.isCartOpen && !this.isClosing) {
+        this.closeDrawer();
+      }
+    });
+  }
+
+  public closeDrawer(): void {
+    if (this.isClosing) return;
+    this.isClosing = true;
+    this.container.classList.remove('is-open');
+    this.container.classList.add('is-closing');
+
+    setTimeout(() => {
+      this.isClosing = false;
+      this.wasOpen = false;
+      this.container.classList.remove('is-closing');
+      document.body.style.overflow = '';
+      this.store.toggleCart(false);
+    }, 280);
   }
 
   public render(): void {
@@ -30,17 +56,27 @@ export class CartDrawer {
     const amountLeftForFreeShipping = Math.max(0, freeShippingThreshold - subtotal);
 
     if (isOpen) {
+      this.wasOpen = true;
+      this.isClosing = false;
+      this.container.classList.remove('is-closing');
       this.container.classList.add('is-open');
       document.body.style.overflow = 'hidden';
     } else {
-      this.container.classList.remove('is-open');
-      document.body.style.overflow = '';
+      if (this.wasOpen && !this.isClosing) {
+        this.closeDrawer();
+        return;
+      }
+      if (!this.isClosing) {
+        this.container.classList.remove('is-open', 'is-closing');
+        document.body.style.overflow = '';
+        return;
+      }
       return;
     }
 
     this.container.innerHTML = `
       <div class="drawer-backdrop" id="cart-drawer-backdrop"></div>
-      <aside class="drawer-panel animate-slide-in-right" role="dialog" aria-modal="true">
+      <aside class="drawer-panel" role="dialog" aria-modal="true">
         <!-- CABECERA DEL CARRITO -->
         <div class="drawer-header">
           <div class="drawer-title-row">
@@ -185,14 +221,15 @@ export class CartDrawer {
     // Cerrar Carrito
     const closeBtn = this.container.querySelector('#cart-drawer-close');
     const backdrop = this.container.querySelector('#cart-drawer-backdrop');
-    const close = () => this.store.toggleCart(false);
 
-    closeBtn?.addEventListener('click', close);
-    backdrop?.addEventListener('click', close);
+    closeBtn?.addEventListener('click', () => this.closeDrawer());
+    backdrop?.addEventListener('click', () => this.closeDrawer());
 
     this.container.querySelector('#btn-cart-continue')?.addEventListener('click', () => {
-      this.store.toggleCart(false);
-      document.getElementById('catalog-section')?.scrollIntoView({ behavior: 'smooth' });
+      this.closeDrawer();
+      setTimeout(() => {
+        document.getElementById('catalog-section')?.scrollIntoView({ behavior: 'smooth' });
+      }, 300);
     });
 
     // Control de cantidades y eliminación

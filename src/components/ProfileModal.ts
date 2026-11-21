@@ -341,7 +341,7 @@ export class ProfileModal {
       return;
     }
 
-    const { addresses, paymentCards, orders, reviews, wishlist, userCoupons } = this.profileData;
+    const { addresses, paymentCards, orders, reviews, userCoupons } = this.profileData;
     const availableCouponsCount = userCoupons.filter((c: any) => !c.isUsed).length;
 
     this.container.innerHTML = `
@@ -432,14 +432,12 @@ export class ProfileModal {
                 <button class="profile-nav-item ${this.activeTab === 'wishlist' ? 'is-active' : ''}" data-tab="wishlist">
                   <span class="nav-icon">${Icons.heart('w-4 h-4')}</span>
                   <span class="nav-label">Lista de Deseos</span>
-                  ${wishlist.length > 0 ? `<span class="nav-badge neutral">${wishlist.length}</span>` : ''}
+                  ${this.store.wishlist.length > 0 ? `<span class="nav-badge neutral">${this.store.wishlist.length}</span>` : ''}
                 </button>
               </nav>
 
               <div class="profile-sidebar-footer">
-                <button class="btn-sidebar-shop" id="btn-sidebar-go-shop">
-                  Volver a la Tienda
-                </button>
+                
               </div>
             </aside>
 
@@ -1222,16 +1220,16 @@ export class ProfileModal {
     `;
   }
 
-  // --- TAB 7: LISTA DE DESEOS (WISHLIST) ---
+  // --- TAB 7: LISTA DE DESEOS (WISHLIST VINCULADO A CUENTA) ---
   private renderWishlistTab(): string {
-    const { wishlist } = this.profileData;
+    const wishlist = this.store.wishlist;
 
     return `
       <div class="tab-panel">
         <div class="panel-header-row profile-component-pop pop-step-3">
           <div>
             <h2 class="panel-title">Lista de Deseos</h2>
-            <p class="panel-subtitle">Tus modelos favoritos guardados para comprar cuando desees.</p>
+            <p class="panel-subtitle">Tus modelos favoritos sincronizados con tu cuenta personal para comprar cuando desees.</p>
           </div>
         </div>
 
@@ -1240,27 +1238,42 @@ export class ProfileModal {
           <div class="empty-state-box profile-component-pop pop-step-4">
             <div class="empty-icon">${Icons.heart('w-5 h-5')}</div>
             <h4>Tu lista de deseos está vacía</h4>
-            <p>Marca con el corazón los modelos que más te gusten en el catálogo.</p>
-            <button class="btn btn-primary btn-go-shop" style="margin-top:16px;">Ver Catálogo</button>
+            <p>Guarda tus modelos favoritos en la tienda para verlos aquí sincronizados en tu cuenta.</p>
+            <button class="btn btn-primary btn-go-shop" style="margin-top:16px;">Explorar Catálogo</button>
           </div>
         `
         : `
           <div class="wishlist-profile-grid profile-component-pop pop-step-4">
             ${wishlist
-          .map(
-            (w: any) => `
-              <div class="wishlist-prod-card">
-                <img src="${w.product.image}" alt="${w.product.name}" class="wish-img" />
-                <div class="wish-info">
-                  <h5>${w.product.name}</h5>
-                  <span class="wish-price">$${w.product.price.toFixed(2)}</span>
+          .map((w: any) => {
+            const prod = w.product;
+            return `
+              <div class="wishlist-prod-card" data-product-id="${prod.id}">
+                <div class="wish-card-img-wrap" data-action="wishlist-quick-view" data-product-id="${prod.id}">
+                  <img src="${prod.image}" alt="${prod.name}" class="wish-img" loading="lazy" />
+                  ${prod.badge ? `<span class="wish-badge">${prod.badge}</span>` : ''}
+                  <button type="button" class="btn-wish-remove-item" data-action="remove-wishlist" data-product-id="${prod.id}" title="Quitar de favoritos" aria-label="Quitar de favoritos">
+                    ${Icons.trash('w-3.5 h-3.5')}
+                  </button>
                 </div>
-                <button class="btn btn-primary btn-sm btn-wish-buy btn-go-shop">
-                  Ver en Tienda
-                </button>
+                <div class="wish-info">
+                  <h4 class="wish-prod-title" data-action="wishlist-quick-view" data-product-id="${prod.id}">${prod.name}</h4>
+                  <div class="wish-price-row">
+                    <span class="wish-price">$${prod.price.toFixed(2)}</span>
+                    ${prod.originalPrice ? `<span class="wish-original-price">$${prod.originalPrice.toFixed(2)}</span>` : ''}
+                  </div>
+                </div>
+                <div class="wish-card-actions">
+                  <button type="button" class="btn btn-primary btn-sm btn-wish-add-cart" data-action="wishlist-add-cart" data-product-id="${prod.id}">
+                    ${Icons.bag('w-3.5 h-3.5')} Agregar
+                  </button>
+                  <button type="button" class="btn btn-secondary btn-sm btn-wish-view-details" data-action="wishlist-quick-view" data-product-id="${prod.id}">
+                    Ver Detalles
+                  </button>
+                </div>
               </div>
-            `
-          )
+            `;
+          })
           .join('')}
           </div>
         `
@@ -1443,6 +1456,61 @@ export class ProfileModal {
       if (label) {
         label.textContent = this.showUsedCoupons ? 'Ocultar historial' : 'Ver historial';
       }
+    });
+
+    // Quitar producto de lista de deseos desde el perfil
+    this.container.querySelectorAll('[data-action="remove-wishlist"]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const pId = (btn as HTMLElement).dataset.productId;
+        if (!pId) return;
+        const prod = this.store.products.find((p) => p.id === pId) || this.store.wishlist.find((w) => w.productId === pId)?.product;
+        if (prod) {
+          this.store.toggleWishlist(prod);
+          Toast.show(`"${prod.name}" fue retirado de tu lista de deseos.`, 'Lista de Deseos', 'info');
+          const mainArea = this.container.querySelector('.profile-main-content') as HTMLElement | null;
+          if (mainArea) {
+            mainArea.innerHTML = this.renderActiveTabContent();
+            this.setupTabInnerEvents();
+          }
+          const wishNavBadge = this.container.querySelector('[data-tab="wishlist"] .nav-badge');
+          if (wishNavBadge) {
+            wishNavBadge.textContent = String(this.store.wishlist.length);
+          }
+        }
+      });
+    });
+
+    // Agregar producto a la bolsa desde lista de deseos
+    this.container.querySelectorAll('[data-action="wishlist-add-cart"]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const pId = (btn as HTMLElement).dataset.productId;
+        if (!pId) return;
+        const prod = this.store.products.find((p) => p.id === pId) || this.store.wishlist.find((w) => w.productId === pId)?.product;
+        if (prod) {
+          const defaultColor = prod.colors?.[0] || { name: 'Original', hex: '#8B5A2B', image: prod.image };
+          this.store.addToCart(prod, 9, defaultColor.name);
+          Toast.show(`¡${prod.name} agregado a tu bolsa de compras!`, 'Bolsa de Compras', 'success');
+        }
+      });
+    });
+
+    // Vista rápida de producto desde lista de deseos
+    this.container.querySelectorAll('[data-action="wishlist-quick-view"]').forEach((el) => {
+      el.addEventListener('click', (e) => {
+        const target = e.target as HTMLElement;
+        if (target.closest('[data-action="remove-wishlist"]') || target.closest('[data-action="wishlist-add-cart"]')) {
+          return;
+        }
+        const pId = (el as HTMLElement).dataset.productId;
+        if (!pId) return;
+        const prod = this.store.products.find((p) => p.id === pId) || this.store.wishlist.find((w) => w.productId === pId)?.product;
+        if (prod) {
+          this.closeView(false);
+          this.store.openQuickView(prod);
+        }
+      });
     });
 
     // Actualizar información personal

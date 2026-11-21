@@ -592,6 +592,151 @@ export function apiPlugin(): Plugin {
           }
 
           // ==================================================================
+          // RUTAS DE LISTA DE DESEOS / FAVORITOS (VINCULADOS A CUENTA)
+          // ==================================================================
+
+          // GET /api/user/wishlist (Consultar lista de deseos del usuario)
+          if (pathname === '/api/user/wishlist' && req.method === 'GET') {
+            const userId = parsedUrl.searchParams.get('userId');
+            if (!userId) {
+              return sendJson(res, 400, { success: false, message: 'Usuario no especificado.' });
+            }
+
+            const items = await prisma.wishlist.findMany({
+              where: { userId },
+              include: { product: true },
+              orderBy: { addedAt: 'desc' }
+            });
+
+            return sendJson(res, 200, {
+              success: true,
+              wishlist: items.map((w) => ({
+                productId: w.productId,
+                product: {
+                  id: w.product.id,
+                  name: w.product.name,
+                  slug: w.product.slug,
+                  subtitle: w.product.subtitle || '',
+                  price: w.product.price,
+                  originalPrice: w.product.originalPrice,
+                  badge: w.product.badge,
+                  gender: w.product.gender,
+                  image: w.product.image,
+                  inStock: w.product.inStock
+                },
+                addedAt: w.addedAt.toISOString()
+              }))
+            });
+          }
+
+          // POST /api/user/wishlist/toggle (Agregar o quitar de lista de deseos)
+          if (pathname === '/api/user/wishlist/toggle' && req.method === 'POST') {
+            const body = await parseBody(req);
+            const { userId, productId } = body;
+
+            if (!userId || !productId) {
+              return sendJson(res, 400, { success: false, message: 'userId y productId son requeridos.' });
+            }
+
+            const existing = await prisma.wishlist.findUnique({
+              where: {
+                userId_productId: { userId, productId }
+              }
+            });
+
+            let isAdded = false;
+            if (existing) {
+              await prisma.wishlist.delete({
+                where: { id: existing.id }
+              });
+              isAdded = false;
+            } else {
+              await prisma.wishlist.create({
+                data: { userId, productId }
+              });
+              isAdded = true;
+            }
+
+            const updated = await prisma.wishlist.findMany({
+              where: { userId },
+              include: { product: true },
+              orderBy: { addedAt: 'desc' }
+            });
+
+            return sendJson(res, 200, {
+              success: true,
+              isAdded,
+              message: isAdded ? 'Producto agregado a tus favoritos' : 'Producto retirado de tus favoritos',
+              wishlist: updated.map((w) => ({
+                productId: w.productId,
+                product: {
+                  id: w.product.id,
+                  name: w.product.name,
+                  slug: w.product.slug,
+                  subtitle: w.product.subtitle || '',
+                  price: w.product.price,
+                  originalPrice: w.product.originalPrice,
+                  badge: w.product.badge,
+                  gender: w.product.gender,
+                  image: w.product.image,
+                  inStock: w.product.inStock
+                },
+                addedAt: w.addedAt.toISOString()
+              }))
+            });
+          }
+
+          // POST /api/user/wishlist/sync (Sincronizar items locales a la cuenta de usuario)
+          if (pathname === '/api/user/wishlist/sync' && req.method === 'POST') {
+            const body = await parseBody(req);
+            const { userId, productIds = [] } = body;
+
+            if (!userId) {
+              return sendJson(res, 400, { success: false, message: 'Usuario no especificado.' });
+            }
+
+            for (const pId of productIds) {
+              try {
+                await prisma.wishlist.upsert({
+                  where: {
+                    userId_productId: { userId, productId: pId }
+                  },
+                  create: { userId, productId: pId },
+                  update: {}
+                });
+              } catch {
+                // Si el producto no existe o hay error, continuar
+              }
+            }
+
+            const updated = await prisma.wishlist.findMany({
+              where: { userId },
+              include: { product: true },
+              orderBy: { addedAt: 'desc' }
+            });
+
+            return sendJson(res, 200, {
+              success: true,
+              wishlist: updated.map((w) => ({
+                productId: w.productId,
+                product: {
+                  id: w.product.id,
+                  name: w.product.name,
+                  slug: w.product.slug,
+                  subtitle: w.product.subtitle || '',
+                  price: w.product.price,
+                  originalPrice: w.product.originalPrice,
+                  badge: w.product.badge,
+                  gender: w.product.gender,
+                  image: w.product.image,
+                  inStock: w.product.inStock
+                },
+                addedAt: w.addedAt.toISOString()
+              }))
+            });
+          }
+
+          // ==================================================================
           // RUTAS DE CUPONES Y DESCUENTOS
           // ==================================================================
 
