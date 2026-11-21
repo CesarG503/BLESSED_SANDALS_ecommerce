@@ -549,6 +549,12 @@ export class AuthModal {
 
         <div class="auth-modal-body">
           <div class="user-profile-view">
+            <!-- BOTÓN DESTACADO PARA ABRIR EL PANEL COMPLETO EN LA MISMA PÁGINA -->
+            <button class="btn btn-primary" id="btn-open-profile-spa" style="display:flex; align-items:center; justify-content:center; gap:8px; width:100%; margin-bottom:16px; padding:12px; border-radius:12px; font-weight:800; font-size:0.9rem; background:#0d643d; color:#fff; box-shadow: 0 4px 12px rgba(13,100,61,0.25); cursor:pointer;">
+              <span>Ver Mi Perfil Completo y Cupones</span>
+              <span style="font-size:1.1rem;">→</span>
+            </button>
+
             <div class="user-id-card">
               <div class="user-avatar-wrap">
                 <img src="${user.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'}" alt="${user.name}" class="user-avatar-img" />
@@ -629,6 +635,11 @@ export class AuthModal {
     `;
 
     // Eventos del Perfil
+    this.container.querySelector('#btn-open-profile-spa')?.addEventListener('click', () => {
+      this.closeView();
+      this.store.toggleProfile(true);
+    });
+
     this.container.querySelector('#auth-modal-backdrop')?.addEventListener('click', () => {
       this.store.toggleAuth(false);
     });

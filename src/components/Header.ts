@@ -147,7 +147,12 @@ export class Header {
 
     // Usuario / Login / Perfil (al final)
     this.container.querySelector('#header-user-btn')?.addEventListener('click', () => {
-      this.store.toggleAuth(true);
+      if (this.store.currentUser) {
+        // Abrir panel completo en la misma página con animación cinemática
+        this.store.toggleProfile(true);
+      } else {
+        this.store.toggleAuth(true);
+      }
     });
 
     // Filtros de navegación

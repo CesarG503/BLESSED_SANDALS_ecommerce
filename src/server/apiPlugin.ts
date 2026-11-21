@@ -247,6 +247,350 @@ export function apiPlugin(): Plugin {
           }
 
           // ==================================================================
+          // RUTAS DE PERFIL INTEGRAL, DIRECCIONES (EL SALVADOR), TARJETAS, ETC.
+          // ==================================================================
+
+          // GET /api/user/profile (Información completa de cuenta, órdenes, cupones, tarjetas, direcciones)
+          if (pathname === '/api/user/profile' && req.method === 'GET') {
+            const userId = parsedUrl.searchParams.get('userId');
+            if (!userId) {
+              return sendJson(res, 401, { success: false, message: 'Usuario no especificado.' });
+            }
+
+            const user = await prisma.user.findUnique({
+              where: { id: userId },
+              include: {
+                addresses: { orderBy: { createdAt: 'desc' } },
+                paymentCards: { orderBy: { createdAt: 'desc' } },
+                orders: {
+                  include: {
+                    items: {
+                      include: { product: true }
+                    },
+                    promoCode: true
+                  },
+                  orderBy: { createdAt: 'desc' }
+                },
+                reviews: {
+                  include: { product: true },
+                  orderBy: { createdAt: 'desc' }
+                },
+                wishlist: {
+                  include: { product: true },
+                  orderBy: { addedAt: 'desc' }
+                },
+                userCoupons: {
+                  include: { promoCode: true },
+                  orderBy: { claimedAt: 'desc' }
+                }
+              }
+            });
+
+            if (!user) {
+              return sendJson(res, 404, { success: false, message: 'Perfil de usuario no encontrado.' });
+            }
+
+            return sendJson(res, 200, {
+              success: true,
+              data: {
+                user: {
+                  id: user.id,
+                  name: user.name,
+                  email: user.email,
+                  phone: user.phone,
+                  avatar: user.avatar,
+                  role: user.role,
+                  createdAt: user.createdAt.toISOString()
+                },
+                addresses: user.addresses.map((a) => ({
+                  id: a.id,
+                  fullName: a.fullName,
+                  phone: a.phone,
+                  street: a.street,
+                  city: a.city,
+                  state: a.state,
+                  postalCode: a.postalCode,
+                  country: a.country,
+                  isDefault: a.isDefault,
+                  createdAt: a.createdAt.toISOString()
+                })),
+                paymentCards: user.paymentCards.map((c) => ({
+                  id: c.id,
+                  cardHolder: c.cardHolder,
+                  brand: c.brand,
+                  last4: c.last4,
+                  expMonth: c.expMonth,
+                  expYear: c.expYear,
+                  isDefault: c.isDefault,
+                  createdAt: c.createdAt.toISOString()
+                })),
+                orders: user.orders.map((o) => ({
+                  id: o.id,
+                  orderNumber: o.orderNumber,
+                  status: o.status,
+                  subtotal: o.subtotal,
+                  discount: o.discount,
+                  shipping: o.shipping,
+                  total: o.total,
+                  notes: o.notes,
+                  createdAt: o.createdAt.toISOString(),
+                  promoCode: o.promoCode ? { code: o.promoCode.code, discountValue: o.promoCode.discountValue, discountType: o.promoCode.discountType } : null,
+                  items: o.items.map((it) => ({
+                    id: it.id,
+                    productId: it.productId,
+                    productName: it.product.name,
+                    productImage: it.product.image,
+                    size: it.size,
+                    color: it.color,
+                    quantity: it.quantity,
+                    unitPrice: it.unitPrice,
+                    total: it.total
+                  }))
+                })),
+                reviews: user.reviews.map((r) => ({
+                  id: r.id,
+                  productId: r.productId,
+                  productName: r.product.name,
+                  productImage: r.product.image,
+                  rating: r.rating,
+                  comment: r.comment,
+                  createdAt: r.createdAt.toISOString()
+                })),
+                wishlist: user.wishlist.map((w) => ({
+                  id: w.id,
+                  productId: w.productId,
+                  product: {
+                    id: w.product.id,
+                    name: w.product.name,
+                    price: w.product.price,
+                    image: w.product.image,
+                    badge: w.product.badge
+                  },
+                  addedAt: w.addedAt.toISOString()
+                })),
+                userCoupons: user.userCoupons.map((uc) => ({
+                  id: uc.id,
+                  userId: uc.userId,
+                  promoCodeId: uc.promoCodeId,
+                  isUsed: uc.isUsed,
+                  usedAt: uc.usedAt?.toISOString(),
+                  claimedAt: uc.claimedAt.toISOString(),
+                  promoCode: uc.promoCode
+                }))
+              }
+            });
+          }
+
+          // POST /api/user/update-info (Actualizar datos personales)
+          if (pathname === '/api/user/update-info' && req.method === 'POST') {
+            const body = await parseBody(req);
+            const { userId, name, phone } = body;
+
+            if (!userId) {
+              return sendJson(res, 401, { success: false, message: 'Usuario no autenticado.' });
+            }
+
+            const updated = await prisma.user.update({
+              where: { id: userId },
+              data: {
+                name: name ? name.trim() : undefined,
+                phone: phone ? phone.trim() : undefined
+              }
+            });
+
+            return sendJson(res, 200, {
+              success: true,
+              user: {
+                id: updated.id,
+                name: updated.name,
+                email: updated.email,
+                phone: updated.phone,
+                avatar: updated.avatar,
+                role: updated.role,
+                createdAt: updated.createdAt.toISOString()
+              },
+              message: 'Información personal actualizada correctamente.'
+            });
+          }
+
+          // POST /api/user/addresses (Guardar dirección centrada en El Salvador)
+          if (pathname === '/api/user/addresses' && req.method === 'POST') {
+            const body = await parseBody(req);
+            const { userId, fullName, phone, street, city, state, postalCode = '1101', isDefault = false } = body;
+
+            if (!userId) {
+              return sendJson(res, 401, { success: false, message: 'Usuario no autenticado.' });
+            }
+            if (!fullName || !phone || !street || !city || !state) {
+              return sendJson(res, 400, { success: false, message: 'Por favor completa todos los campos requeridos de la dirección.' });
+            }
+
+            // Si es default, marcar las anteriores como false
+            if (isDefault) {
+              await prisma.address.updateMany({
+                where: { userId },
+                data: { isDefault: false }
+              });
+            }
+
+            // Si es la primera dirección del usuario, marcar automáticamente como default
+            const addressCount = await prisma.address.count({ where: { userId } });
+            const setAsDefault = isDefault || addressCount === 0;
+
+            const address = await prisma.address.create({
+              data: {
+                userId,
+                fullName: fullName.trim(),
+                phone: phone.trim(),
+                street: street.trim(),
+                city: city.trim(),
+                state: state.trim(),
+                postalCode: postalCode.trim(),
+                country: 'SV',
+                isDefault: setAsDefault
+              }
+            });
+
+            return sendJson(res, 201, {
+              success: true,
+              address,
+              message: '¡Dirección de envío en El Salvador guardada exitosamente!'
+            });
+          }
+
+          // DELETE /api/user/addresses (Eliminar dirección)
+          if (pathname === '/api/user/addresses' && req.method === 'DELETE') {
+            const addressId = parsedUrl.searchParams.get('addressId');
+            const userId = parsedUrl.searchParams.get('userId');
+
+            if (!addressId || !userId) {
+              return sendJson(res, 400, { success: false, message: 'ID de dirección y usuario requeridos.' });
+            }
+
+            await prisma.address.deleteMany({
+              where: { id: addressId, userId }
+            });
+
+            return sendJson(res, 200, { success: true, message: 'Dirección eliminada correctamente.' });
+          }
+
+          // PUT /api/user/addresses/default (Establecer como dirección predeterminada)
+          if (pathname === '/api/user/addresses/default' && req.method === 'PUT') {
+            const body = await parseBody(req);
+            const { userId, addressId } = body;
+
+            if (!userId || !addressId) {
+              return sendJson(res, 400, { success: false, message: 'ID de usuario y dirección requeridos.' });
+            }
+
+            await prisma.address.updateMany({
+              where: { userId },
+              data: { isDefault: false }
+            });
+
+            await prisma.address.updateMany({
+              where: { id: addressId, userId },
+              data: { isDefault: true }
+            });
+
+            return sendJson(res, 200, { success: true, message: 'Dirección predeterminada actualizada.' });
+          }
+
+          // POST /api/user/cards (Agregar tarjeta de crédito / débito)
+          if (pathname === '/api/user/cards' && req.method === 'POST') {
+            const body = await parseBody(req);
+            const { userId, cardHolder, cardNumber, expMonth, expYear, isDefault = false } = body;
+
+            if (!userId) {
+              return sendJson(res, 401, { success: false, message: 'Usuario no autenticado.' });
+            }
+            if (!cardHolder || !cardNumber || !expMonth || !expYear) {
+              return sendJson(res, 400, { success: false, message: 'Todos los datos de la tarjeta son obligatorios.' });
+            }
+
+            const cleanNumber = cardNumber.replace(/\D/g, '');
+            const last4 = cleanNumber.slice(-4) || '1234';
+
+            // Detección de marca
+            let brand = 'VISA';
+            if (cleanNumber.startsWith('5')) brand = 'MASTERCARD';
+            else if (cleanNumber.startsWith('3')) brand = 'AMEX';
+
+            if (isDefault) {
+              await prisma.paymentCard.updateMany({
+                where: { userId },
+                data: { isDefault: false }
+              });
+            }
+
+            const cardCount = await prisma.paymentCard.count({ where: { userId } });
+            const setAsDefault = isDefault || cardCount === 0;
+
+            const newCard = await prisma.paymentCard.create({
+              data: {
+                userId,
+                cardHolder: cardHolder.trim().toUpperCase(),
+                brand,
+                last4,
+                expMonth: Number(expMonth),
+                expYear: Number(expYear),
+                isDefault: setAsDefault
+              }
+            });
+
+            return sendJson(res, 201, {
+              success: true,
+              card: newCard,
+              message: `Tarjeta ${brand} terminada en ${last4} guardada exitosamente.`
+            });
+          }
+
+          // DELETE /api/user/cards (Eliminar tarjeta)
+          if (pathname === '/api/user/cards' && req.method === 'DELETE') {
+            const cardId = parsedUrl.searchParams.get('cardId');
+            const userId = parsedUrl.searchParams.get('userId');
+
+            if (!cardId || !userId) {
+              return sendJson(res, 400, { success: false, message: 'ID de tarjeta y usuario requeridos.' });
+            }
+
+            await prisma.paymentCard.deleteMany({
+              where: { id: cardId, userId }
+            });
+
+            return sendJson(res, 200, { success: true, message: 'Tarjeta eliminada con éxito.' });
+          }
+
+          // POST /api/user/reviews (Agregar reseña de producto)
+          if (pathname === '/api/user/reviews' && req.method === 'POST') {
+            const body = await parseBody(req);
+            const { userId, productId, rating = 5, comment } = body;
+
+            if (!userId) {
+              return sendJson(res, 401, { success: false, message: 'Usuario no autenticado.' });
+            }
+            if (!productId) {
+              return sendJson(res, 400, { success: false, message: 'ID de producto requerido.' });
+            }
+
+            const review = await prisma.review.create({
+              data: {
+                userId,
+                productId,
+                rating: Number(rating) || 5,
+                comment: comment ? comment.trim() : null
+              },
+              include: { product: true }
+            });
+
+            return sendJson(res, 201, {
+              success: true,
+              review,
+              message: '¡Gracias por tu reseña! Ha sido publicada con éxito.'
+            });
+          }
+
+          // ==================================================================
           // RUTAS DE CUPONES Y DESCUENTOS
           // ==================================================================
 

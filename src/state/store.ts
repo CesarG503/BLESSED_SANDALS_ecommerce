@@ -33,6 +33,7 @@ export class Store {
   // Usuario y Autenticación conectada a PostgreSQL
   public currentUser: User | null = null;
   public isAuthOpen: boolean = false;
+  public isProfileOpen: boolean = false;
 
   // Promociones y Descuentos conectados a BD
   public isPromoOpen: boolean = false;
@@ -473,14 +474,26 @@ export class Store {
     this.currentUser = null;
     this.appliedPromo = null;
     this.pendingPromoCode = null;
+    this.isProfileOpen = false;
     StorageService.saveUser(null);
     StorageService.savePromo(null);
+    try {
+      localStorage.removeItem('blessed_sandals_user_v1');
+      localStorage.removeItem('blessed_sandals_promo_v1');
+    } catch (e) {
+      console.error('Error clearing storage', e);
+    }
     this.loadPromos();
     this.notify();
   }
 
   public toggleAuth(open?: boolean): void {
     this.isAuthOpen = open !== undefined ? open : !this.isAuthOpen;
+    this.notify();
+  }
+
+  public toggleProfile(open?: boolean): void {
+    this.isProfileOpen = open !== undefined ? open : !this.isProfileOpen;
     this.notify();
   }
 

@@ -149,4 +149,147 @@ export class ApiService {
       return { success: false, message: 'Error al procesar la compra.' };
     }
   }
+
+  /**
+   * Carga todo el perfil integral del usuario: órdenes, cupones, tarjetas, reseñas, wishlist y direcciones
+   */
+  static async getUserProfile(userId: string): Promise<ApiResponse<any>> {
+    try {
+      const res = await fetch(`/api/user/profile?userId=${encodeURIComponent(userId)}`);
+      return await res.json();
+    } catch {
+      return { success: false, message: 'Error al cargar perfil de usuario.' };
+    }
+  }
+
+  /**
+   * Actualiza información básica del perfil
+   */
+  static async updateUserInfo(userId: string, name: string, phone?: string): Promise<ApiResponse> {
+    try {
+      const res = await fetch('/api/user/update-info', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, name, phone })
+      });
+      return await res.json();
+    } catch {
+      return { success: false, message: 'Error al actualizar información.' };
+    }
+  }
+
+  /**
+   * Guarda una dirección de envío en El Salvador
+   */
+  static async addAddress(payload: {
+    userId: string;
+    fullName: string;
+    phone: string;
+    street: string;
+    city: string;
+    state: string;
+    postalCode?: string;
+    isDefault?: boolean;
+  }): Promise<ApiResponse> {
+    try {
+      const res = await fetch('/api/user/addresses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      return await res.json();
+    } catch {
+      return { success: false, message: 'Error al guardar dirección.' };
+    }
+  }
+
+  /**
+   * Elimina una dirección de envío
+   */
+  static async deleteAddress(userId: string, addressId: string): Promise<ApiResponse> {
+    try {
+      const res = await fetch(
+        `/api/user/addresses?userId=${encodeURIComponent(userId)}&addressId=${encodeURIComponent(addressId)}`,
+        { method: 'DELETE' }
+      );
+      return await res.json();
+    } catch {
+      return { success: false, message: 'Error al eliminar dirección.' };
+    }
+  }
+
+  /**
+   * Establece una dirección como predeterminada
+   */
+  static async setDefaultAddress(userId: string, addressId: string): Promise<ApiResponse> {
+    try {
+      const res = await fetch('/api/user/addresses/default', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, addressId })
+      });
+      return await res.json();
+    } catch {
+      return { success: false, message: 'Error al establecer dirección predeterminada.' };
+    }
+  }
+
+  /**
+   * Agrega una tarjeta de crédito o débito
+   */
+  static async addPaymentCard(payload: {
+    userId: string;
+    cardHolder: string;
+    cardNumber: string;
+    expMonth: number;
+    expYear: number;
+    isDefault?: boolean;
+  }): Promise<ApiResponse> {
+    try {
+      const res = await fetch('/api/user/cards', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      return await res.json();
+    } catch {
+      return { success: false, message: 'Error al registrar tarjeta.' };
+    }
+  }
+
+  /**
+   * Elimina una tarjeta guardada
+   */
+  static async deletePaymentCard(userId: string, cardId: string): Promise<ApiResponse> {
+    try {
+      const res = await fetch(
+        `/api/user/cards?userId=${encodeURIComponent(userId)}&cardId=${encodeURIComponent(cardId)}`,
+        { method: 'DELETE' }
+      );
+      return await res.json();
+    } catch {
+      return { success: false, message: 'Error al eliminar tarjeta.' };
+    }
+  }
+
+  /**
+   * Publica una reseña sobre un producto
+   */
+  static async addReview(payload: {
+    userId: string;
+    productId: string;
+    rating: number;
+    comment?: string;
+  }): Promise<ApiResponse> {
+    try {
+      const res = await fetch('/api/user/reviews', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      return await res.json();
+    } catch {
+      return { success: false, message: 'Error al publicar reseña.' };
+    }
+  }
 }

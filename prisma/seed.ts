@@ -11,6 +11,7 @@ async function main() {
   await prisma.wishlist.deleteMany();
   await prisma.orderItem.deleteMany();
   await prisma.order.deleteMany();
+  await prisma.paymentCard.deleteMany();
   await prisma.userCoupon.deleteMany();
   await prisma.promoUsage.deleteMany();
   await prisma.promoCode.deleteMany();
@@ -60,6 +61,16 @@ async function main() {
           state: 'San Salvador',
           postalCode: '1101',
           country: 'SV',
+          isDefault: true
+        }
+      },
+      paymentCards: {
+        create: {
+          cardHolder: 'Alexander Garay',
+          brand: 'VISA',
+          last4: '4242',
+          expMonth: 12,
+          expYear: 2028,
           isDefault: true
         }
       }
@@ -188,6 +199,50 @@ async function main() {
   }
 
   console.log(`✅ ${MOCK_PRODUCTS.length} Productos importados con relaciones.`);
+
+  // 6. Crear Orden Demo y Reseña para el Usuario
+  const firstProd = MOCK_PRODUCTS[0];
+  const demoOrder = await prisma.order.create({
+    data: {
+      orderNumber: 'BLS-2026-94812',
+      userId: user.id,
+      status: 'DELIVERED',
+      subtotal: 139.99,
+      discount: 14.0,
+      shipping: 0,
+      total: 125.99,
+      promoCodeId: createdPromos['BLESSED10'] || null,
+      notes: 'Entregar en caseta de seguridad, Residencial Las Palmas',
+      items: {
+        create: {
+          productId: firstProd.id,
+          size: 9.0,
+          color: 'Blanco Puro',
+          quantity: 1,
+          unitPrice: 139.99,
+          total: 139.99
+        }
+      }
+    }
+  });
+
+  await prisma.review.create({
+    data: {
+      userId: user.id,
+      productId: firstProd.id,
+      rating: 5,
+      comment: 'Calidad inmejorable, la espuma ergonómica es comodísima. Llegó rápido a San Salvador.'
+    }
+  });
+
+  await prisma.wishlist.create({
+    data: {
+      userId: user.id,
+      productId: MOCK_PRODUCTS[1].id
+    }
+  });
+
+  console.log(`✅ Orden demo y reseña creadas: ${demoOrder.orderNumber}`);
   console.log('🎉 Seed completado exitosamente.');
 }
 
