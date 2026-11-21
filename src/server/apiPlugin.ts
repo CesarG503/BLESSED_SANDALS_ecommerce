@@ -341,6 +341,7 @@ export function apiPlugin(): Plugin {
                     productId: it.productId,
                     productName: it.product.name,
                     productImage: it.product.image,
+                    productSubtitle: it.product.subtitle || '',
                     size: it.size,
                     color: it.color,
                     quantity: it.quantity,
@@ -572,6 +573,21 @@ export function apiPlugin(): Plugin {
             }
             if (!productId) {
               return sendJson(res, 400, { success: false, message: 'ID de producto requerido.' });
+            }
+
+            // Validar que el usuario haya adquirido este producto en al menos un pedido realizado
+            const hasPurchased = await prisma.orderItem.findFirst({
+              where: {
+                productId,
+                order: { userId }
+              }
+            });
+
+            if (!hasPurchased) {
+              return sendJson(res, 403, {
+                success: false,
+                message: 'Solo puedes calificar productos que hayas adquirido previamente en un pedido.'
+              });
             }
 
             const review = await prisma.review.create({

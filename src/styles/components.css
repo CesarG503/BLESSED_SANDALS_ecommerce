@@ -6277,6 +6277,273 @@ body.profile-page-body {
   color: #94a3b8;
 }
 
+/* ==========================================================================
+   FORMULARIO INTERACTIVO DE RESEÑAS DE PEDIDOS REALIZADOS
+   ========================================================================== */
+.review-form-subtitle {
+  margin: 3px 0 0 0;
+  font-size: 0.82rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.form-label-bold {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.review-order-select {
+  width: 100%;
+  padding: 10px 14px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #0f172a;
+  background: #ffffff;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 10px;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.review-order-select:focus {
+  border-color: #0d643d;
+  box-shadow: 0 0 0 3px rgba(13, 100, 61, 0.12);
+}
+
+/* Listado de Productos Minimalista (Estilo Fila con Imagen Cuadrada y Separador) */
+.review-product-picker-stack {
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+}
+
+.review-product-pick-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 18px;
+  cursor: pointer;
+  background: #ffffff;
+  transition: all 0.15s ease;
+  position: relative;
+  user-select: none;
+}
+
+.review-product-pick-card:hover {
+  background: #f8fafc;
+}
+
+.review-product-pick-card.is-selected {
+  background: #f0fdf4;
+  border-left: 4px solid #0d643d;
+}
+
+.pick-card-img-wrap {
+  width: 62px;
+  height: 62px;
+  min-width: 62px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pick-card-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transition: transform 0.2s ease;
+}
+
+.review-product-pick-card:hover .pick-card-img {
+  transform: scale(1.06);
+}
+
+.pick-card-details {
+  flex: 1;
+  text-align: left;
+}
+
+.pick-card-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 3px 0;
+  line-height: 1.3;
+}
+
+.pick-card-subtitle {
+  font-size: 0.8rem;
+  color: #64748b;
+  margin: 0 0 6px 0;
+  line-height: 1.25;
+  font-weight: 500;
+}
+
+.pick-card-price {
+  font-size: 0.98rem;
+  font-weight: 800;
+  color: #0f172a;
+  display: block;
+}
+
+.pick-card-action {
+  display: flex;
+  align-items: center;
+}
+
+.btn-select-product-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 7px 14px;
+  border-radius: 20px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.btn-select-product-pill:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+
+.btn-select-product-pill.is-active {
+  background: #0d643d;
+  color: #ffffff;
+  border-color: #0d643d;
+  font-weight: 700;
+  box-shadow: 0 2px 6px rgba(13, 100, 61, 0.25);
+}
+
+.pick-card-divider {
+  height: 1px;
+  background: #f1f5f9;
+  margin: 0 16px;
+}
+
+/* Selector Interactivo de Estrellas Amarillas (+ / -) */
+.review-stars-stepper-widget {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.stars-interactive-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.stars-track {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.star-rating-btn {
+  background: transparent;
+  border: none;
+  font-size: 2.1rem;
+  line-height: 1;
+  color: #cbd5e1;
+  cursor: pointer;
+  padding: 0 2px;
+  transition: color 0.15s ease, transform 0.15s ease;
+  outline: none;
+  user-select: none;
+}
+
+.star-rating-btn:hover,
+.star-rating-btn.is-hover {
+  color: #f59e0b !important;
+  transform: scale(1.18);
+}
+
+.star-rating-btn.is-active {
+  color: #eab308;
+  text-shadow: 0 1px 4px rgba(234, 179, 8, 0.35);
+}
+
+.star-stepper-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-star-step {
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #334155;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  padding: 0;
+}
+
+.btn-star-step:hover {
+  background: #0d643d;
+  color: #ffffff;
+  border-color: #0d643d;
+  transform: scale(1.08);
+}
+
+.btn-star-step:active {
+  transform: scale(0.95);
+}
+
+.star-rating-caption-label {
+  font-size: 0.83rem;
+  font-weight: 700;
+  color: #0d643d;
+  background: #ecfdf5;
+  padding: 4px 12px;
+  border-radius: 6px;
+  display: inline-block;
+  border: 1px solid #a7f3d0;
+  align-self: flex-start;
+}
+
+.review-no-orders-box {
+  text-align: center;
+  padding: 32px 16px;
+  background: #ffffff;
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+}
+
 /* Wishlist en perfil */
 .wishlist-profile-grid {
   display: grid;

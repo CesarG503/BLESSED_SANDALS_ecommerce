@@ -136,6 +136,9 @@ export class ProfileModal {
   private productsList: any[] = [];
   private isLoadingData: boolean = false;
   private showUsedCoupons: boolean = false;
+  private selectedReviewOrderId: string = '';
+  private selectedReviewProductId: string = '';
+  private currentReviewRating: number = 5;
 
   constructor(containerId: string) {
     this.store = Store.getInstance();
@@ -1127,15 +1130,31 @@ export class ProfileModal {
   }
 
   // --- TAB 6: RESEÑAS / REVIEWS ---
+  // --- TAB 6: RESEÑAS / REVIEWS ---
   private renderReviewsTab(): string {
-    const { reviews } = this.profileData;
+    const { reviews = [], orders = [] } = this.profileData;
+    const hasOrders = orders.length > 0;
+
+    // Si hay pedidos y aún no hay pedido seleccionado, preseleccionar el primero
+    if (hasOrders && !this.selectedReviewOrderId) {
+      this.selectedReviewOrderId = orders[0].id;
+    }
+    const activeOrder = orders.find((o: any) => o.id === this.selectedReviewOrderId) || (hasOrders ? orders[0] : null);
+
+    // Si hay pedido activo, verificar si el producto seleccionado pertenece a este pedido
+    if (activeOrder && activeOrder.items.length > 0) {
+      const exists = activeOrder.items.some((i: any) => i.productId === this.selectedReviewProductId);
+      if (!exists) {
+        this.selectedReviewProductId = activeOrder.items[0].productId;
+      }
+    }
 
     return `
       <div class="tab-panel">
         <div class="panel-header-row profile-component-pop pop-step-3">
           <div>
             <h2 class="panel-title">Mis Reseñas de Productos</h2>
-            <p class="panel-subtitle">Comparte tu opinión sobre el calzado y sandalias que has probado.</p>
+            <p class="panel-subtitle">Comparte tu opinión sobre el calzado y sandalias adquiridos en tus compras.</p>
           </div>
           <button class="btn btn-primary" id="btn-toggle-new-review">
             + Escribir Reseña
@@ -1145,42 +1164,94 @@ export class ProfileModal {
         <!-- FORMULARIO DE NUEVA RESEÑA (DESPLEGABLE) -->
         <div class="review-form-box is-hidden profile-component-pop pop-step-5" id="box-new-review">
           <div class="address-form-header">
-            <h3>Calificar un Producto de Blessed Sandals</h3>
+            <div>
+              <h3>Calificar un Producto de tus Pedidos</h3>
+              <p class="review-form-subtitle">Selecciona tu pedido previo y el modelo específico que deseas evaluar.</p>
+            </div>
             <button type="button" class="btn-close-form" id="btn-cancel-new-review">${Icons.close('w-4 h-4')}</button>
           </div>
 
-          <form id="form-add-review" class="address-form">
-            <div class="input-field">
-              <label for="review-product-select">Selecciona el Calzado o Sandalia *</label>
-              <select id="review-product-select" required>
-                <option value="">Elige un producto...</option>
-                ${this.productsList
-        .map((p) => `<option value="${p.id}">${p.name} ($${p.price.toFixed(2)})</option>`)
-        .join('')}
-              </select>
+          ${!hasOrders
+        ? `
+            <div class="review-no-orders-box">
+              <div class="empty-icon">${Icons.bag('w-5 h-5')}</div>
+              <h4>No tienes pedidos completados</h4>
+              <p>Para escribir una reseña debes haber realizado al menos un pedido previo en Blessed Sandals.</p>
+              <button type="button" class="btn btn-primary btn-go-shop" style="margin-top: 14px;">Explorar Catálogo</button>
             </div>
+          `
+        : `
+            <form id="form-add-review" class="address-form review-interactive-form">
+              <!-- PASO 1: SELECCIONAR PEDIDO REALIZADO -->
+              <div class="input-field">
+                <label for="review-order-select" class="form-label-bold">1. Selecciona el Pedido Realizado *</label>
+                <select id="review-order-select" class="review-order-select" required>
+                  ${orders
+            .map(
+              (o: any) => `
+                    <option value="${o.id}" ${this.selectedReviewOrderId === o.id ? 'selected' : ''}>
+                      Pedido #${o.orderNumber} • ${new Date(o.createdAt).toLocaleDateString('es-SV')} • $${o.total.toFixed(2)} (${o.items.length} ${o.items.length === 1 ? 'producto' : 'productos'})
+                    </option>
+                  `
+            )
+            .join('')}
+                </select>
+              </div>
 
-            <div class="input-field">
-              <label for="review-rating-select">Calificación (Estrellas) *</label>
-              <select id="review-rating-select" required>
-                <option value="5">5 Estrellas - Excelente</option>
-                <option value="4">4 Estrellas - Muy Bueno</option>
-                <option value="3">3 Estrellas - Bueno</option>
-                <option value="2">2 Estrellas - Regular</option>
-                <option value="1">1 Estrella - Malo</option>
-              </select>
-            </div>
+              <!-- PASO 2: SELECCIONAR PRODUCTO ESPECÍFICO DEL PEDIDO (DISEÑO MINIMALISTA DE LA IMAGEN) -->
+              <div class="input-field">
+                <label class="form-label-bold">2. Selecciona el Producto del Pedido a Calificar *</label>
+                <div class="review-order-products-container" id="review-order-products-container">
+                  ${this.renderOrderProductsList(activeOrder)}
+                </div>
+                <input type="hidden" id="review-selected-product-id" value="${this.selectedReviewProductId}" required />
+              </div>
 
-            <div class="input-field">
-              <label for="review-comment">Tu Comentario / Experiencia de Confort *</label>
-              <textarea id="review-comment" rows="3" placeholder="¿Cómo sentiste la amortiguación, la talla y los materiales?" required></textarea>
-            </div>
+              <!-- PASO 3: CALIFICACIÓN DE ESTRELLAS AMARILLAS QUE SE PUEDEN AUMENTAR O QUITAR -->
+              <div class="input-field">
+                <label class="form-label-bold">3. Calificación (Estrellas) *</label>
+                <div class="review-stars-stepper-widget">
+                  <div class="stars-interactive-row">
+                    <div class="stars-track" id="review-stars-track" role="radiogroup" aria-label="Calificación de 1 a 5 estrellas">
+                      ${[1, 2, 3, 4, 5]
+            .map(
+              (val) => `
+                        <button type="button" class="star-rating-btn ${val <= this.currentReviewRating ? 'is-active' : ''}" data-value="${val}" aria-label="${val} estrellas">
+                          ★
+                        </button>
+                      `
+            )
+            .join('')}
+                    </div>
+                    <div class="star-stepper-actions">
+                      <button type="button" class="btn-star-step" id="btn-star-minus" title="Quitar una estrella" aria-label="Quitar una estrella">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                      </button>
+                      <button type="button" class="btn-star-step" id="btn-star-plus" title="Aumentar una estrella" aria-label="Aumentar una estrella">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="star-rating-caption-label" id="star-rating-caption">
+                    ${this.getRatingLabel(this.currentReviewRating)}
+                  </div>
+                  <input type="hidden" id="review-rating-value" value="${this.currentReviewRating}" />
+                </div>
+              </div>
 
-            <div class="form-actions-row">
-              <button type="button" class="btn btn-outline" id="btn-cancel-review-bottom">Cancelar</button>
-              <button type="submit" class="btn btn-primary" id="btn-submit-review">Publicar Reseña en la Tienda</button>
-            </div>
-          </form>
+              <!-- PASO 4: COMENTARIO (SE DEJA IGUAL) -->
+              <div class="input-field">
+                <label for="review-comment">Tu Comentario / Experiencia de Confort *</label>
+                <textarea id="review-comment" rows="3" placeholder="¿Cómo sentiste la amortiguación, la talla y los materiales?" required></textarea>
+              </div>
+
+              <div class="form-actions-row">
+                <button type="button" class="btn btn-outline" id="btn-cancel-review-bottom">Cancelar</button>
+                <button type="submit" class="btn btn-primary" id="btn-submit-review">Publicar Reseña en la Tienda</button>
+              </div>
+            </form>
+          `
+      }
         </div>
 
         <!-- LISTADO DE RESEÑAS (POP-IN PASO 4) -->
@@ -1189,7 +1260,7 @@ export class ProfileModal {
           <div class="empty-state-box profile-component-pop pop-step-4">
             <div class="empty-icon">${Icons.star('w-5 h-5')}</div>
             <h4>No has publicado reseñas todavía</h4>
-            <p>Cuéntanos qué te han parecido tus pares favoritos.</p>
+            <p>Cuéntanos qué te han parecido tus pares favoritos adquiridos.</p>
           </div>
         `
         : `
@@ -1218,6 +1289,65 @@ export class ProfileModal {
       }
       </div>
     `;
+  }
+
+  /**
+   * Renderiza el listado visual minimalista de productos de un pedido
+   */
+  private renderOrderProductsList(order: any): string {
+    if (!order || !order.items || order.items.length === 0) {
+      return `<p class="text-muted" style="font-size: 0.85rem; padding: 12px 0;">No hay productos registrados en este pedido.</p>`;
+    }
+
+    return `
+      <div class="review-product-picker-stack">
+        ${order.items
+        .map((item: any, idx: number) => {
+          const isSelected = item.productId === this.selectedReviewProductId;
+          const isLast = idx === order.items.length - 1;
+
+          return `
+            <div class="review-product-pick-card ${isSelected ? 'is-selected' : ''}" data-product-id="${item.productId}">
+              <div class="pick-card-img-wrap">
+                <img src="${item.productImage || '/assets/logo/Isotipo.png'}" alt="${item.productName}" class="pick-card-img" />
+              </div>
+              <div class="pick-card-details">
+                <h4 class="pick-card-title">${item.productName}</h4>
+                <p class="pick-card-subtitle">${item.productSubtitle || `Talla ${item.size} • Color ${item.color || 'Original'}`}</p>
+                <span class="pick-card-price">$${Number(item.unitPrice).toFixed(2)}</span>
+              </div>
+              <div class="pick-card-action">
+                <button type="button" class="btn-select-product-pill ${isSelected ? 'is-active' : ''}" data-product-id="${item.productId}">
+                  ${isSelected ? '✓ Seleccionado' : '+ Seleccionar'}
+                </button>
+              </div>
+            </div>
+            ${!isLast ? `<div class="pick-card-divider"></div>` : ''}
+          `;
+        })
+        .join('')}
+      </div>
+    `;
+  }
+
+  /**
+   * Helper de etiquetas descriptivas de calificación
+   */
+  private getRatingLabel(rating: number): string {
+    switch (rating) {
+      case 5:
+        return '5 de 5 estrellas • ¡Excelente experiencia!';
+      case 4:
+        return '4 de 5 estrellas • Muy Bueno';
+      case 3:
+        return '3 de 5 estrellas • Bueno / Conforme';
+      case 2:
+        return '2 de 5 estrellas • Regular';
+      case 1:
+        return '1 de 5 estrellas • Malo / Insatisfecho';
+      default:
+        return `${rating} de 5 estrellas`;
+    }
   }
 
   // --- TAB 7: LISTA DE DESEOS (WISHLIST VINCULADO A CUENTA) ---
@@ -1806,34 +1936,199 @@ export class ProfileModal {
       boxReview?.classList.add('is-hidden');
     });
 
-    // Submit nueva reseña
+    // 1. Selector de Pedido para Reseñas
+    const orderSelect = this.container.querySelector('#review-order-select') as HTMLSelectElement | null;
+    orderSelect?.addEventListener('change', () => {
+      this.selectedReviewOrderId = orderSelect.value;
+      const { orders = [] } = this.profileData || {};
+      const newOrder = orders.find((o: any) => o.id === this.selectedReviewOrderId);
+
+      if (newOrder && newOrder.items.length > 0) {
+        this.selectedReviewProductId = newOrder.items[0].productId;
+      } else {
+        this.selectedReviewProductId = '';
+      }
+
+      const prodContainer = this.container.querySelector('#review-order-products-container');
+      if (prodContainer) {
+        prodContainer.innerHTML = this.renderOrderProductsList(newOrder);
+        this.setupReviewProductPickerEvents();
+      }
+
+      const hiddenProdInput = this.container.querySelector('#review-selected-product-id') as HTMLInputElement | null;
+      if (hiddenProdInput) {
+        hiddenProdInput.value = this.selectedReviewProductId;
+      }
+    });
+
+    // 2. Selección de Producto en las tarjetas minimalistas
+    this.setupReviewProductPickerEvents();
+
+    // 3. Estrellas Interactivas (Hover, Click, Botones + y -)
+    this.setupInteractiveStarsEvents();
+
+    // 4. Submit nueva reseña
     const formReview = this.container.querySelector('#form-add-review');
     formReview?.addEventListener('submit', async (e) => {
       e.preventDefault();
       if (!this.store.currentUser) return;
 
-      const productId = (this.container.querySelector('#review-product-select') as HTMLSelectElement | null)?.value || '';
-      const rating = Number((this.container.querySelector('#review-rating-select') as HTMLSelectElement | null)?.value) || 5;
+      const productId =
+        this.selectedReviewProductId ||
+        (this.container.querySelector('#review-selected-product-id') as HTMLInputElement | null)?.value ||
+        '';
+
+      if (!productId) {
+        Toast.show('Por favor selecciona el producto de tu pedido que deseas calificar.', 'Producto Requerido', 'warning');
+        return;
+      }
+
+      const rating =
+        this.currentReviewRating ||
+        Number((this.container.querySelector('#review-rating-value') as HTMLInputElement | null)?.value) ||
+        5;
+
       const comment = (this.container.querySelector('#review-comment') as HTMLTextAreaElement | null)?.value.trim() || '';
 
-      const res = await ApiService.addReview({
-        userId: this.store.currentUser.id,
-        productId,
-        rating,
-        comment
+      const submitBtn = this.container.querySelector('#btn-submit-review') as HTMLButtonElement | null;
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Publicando...';
+      }
+
+      try {
+        const res = await ApiService.addReview({
+          userId: this.store.currentUser.id,
+          productId,
+          rating,
+          comment
+        });
+
+        if (res.success) {
+          confetti({ particleCount: 50, spread: 70, origin: { y: 0.2 } });
+          Toast.show(res.message || '¡Reseña publicada con éxito en la tienda!', 'Reseña Registrada', 'success');
+
+          // Reset rating y comentario
+          this.currentReviewRating = 5;
+
+          // Cerrar formulario
+          boxReview?.classList.add('is-hidden');
+
+          await this.fetchProfileData();
+          const mainArea = this.container.querySelector('.profile-main-content');
+          if (mainArea) {
+            mainArea.innerHTML = this.renderActiveTabContent();
+            this.setupTabInnerEvents();
+          }
+        } else {
+          Toast.show(res.message || 'Error al publicar reseña.', 'Atención', 'warning');
+        }
+      } catch (err) {
+        console.error('Error al registrar reseña:', err);
+        Toast.show('Ocurrió un error al registrar la reseña.', 'Error', 'warning');
+      } finally {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Publicar Reseña en la Tienda';
+        }
+      }
+    });
+  }
+
+  /**
+   * Manejador de eventos para selección de producto en tarjeta minimalista
+   */
+  private setupReviewProductPickerEvents(): void {
+    const cards = this.container.querySelectorAll('.review-product-pick-card');
+    cards.forEach((card) => {
+      card.addEventListener('click', () => {
+        const pId = (card as HTMLElement).dataset.productId;
+        if (!pId) return;
+
+        this.selectedReviewProductId = pId;
+
+        // Actualizar visualmente todas las tarjetas
+        cards.forEach((c) => {
+          const el = c as HTMLElement;
+          const isThis = el.dataset.productId === pId;
+          el.classList.toggle('is-selected', isThis);
+          const btn = el.querySelector('.btn-select-product-pill');
+          if (btn) {
+            btn.classList.toggle('is-active', isThis);
+            btn.textContent = isThis ? '✓ Seleccionado' : '+ Seleccionar';
+          }
+        });
+
+        const hiddenProdInput = this.container.querySelector('#review-selected-product-id') as HTMLInputElement | null;
+        if (hiddenProdInput) {
+          hiddenProdInput.value = pId;
+        }
+      });
+    });
+  }
+
+  /**
+   * Manejador de eventos para calificación interactiva de estrellas amarillas (+ y -)
+   */
+  private setupInteractiveStarsEvents(): void {
+    const starsTrack = this.container.querySelector('#review-stars-track');
+    const starBtns = this.container.querySelectorAll('.star-rating-btn');
+    const captionEl = this.container.querySelector('#star-rating-caption');
+    const hiddenVal = this.container.querySelector('#review-rating-value') as HTMLInputElement | null;
+    const btnMinus = this.container.querySelector('#btn-star-minus');
+    const btnPlus = this.container.querySelector('#btn-star-plus');
+
+    const updateStarsVisual = (rating: number, isHover = false) => {
+      starBtns.forEach((btn) => {
+        const val = Number((btn as HTMLElement).dataset.value) || 1;
+        if (isHover) {
+          btn.classList.toggle('is-hover', val <= rating);
+        } else {
+          btn.classList.toggle('is-active', val <= rating);
+          btn.classList.remove('is-hover');
+        }
       });
 
-      if (res.success) {
-        confetti({ particleCount: 50, spread: 70, origin: { y: 0.2 } });
-        Toast.show(res.message || '¡Reseña publicada con éxito!', 'Reseña Registrada', 'success');
-        await this.fetchProfileData();
-        const mainArea = this.container.querySelector('.profile-main-content');
-        if (mainArea) {
-          mainArea.innerHTML = this.renderActiveTabContent();
-          this.setupTabInnerEvents();
-        }
-      } else {
-        Toast.show(res.message || 'Error al publicar reseña.', 'Atención', 'warning');
+      if (captionEl) {
+        captionEl.textContent = this.getRatingLabel(rating);
+      }
+
+      if (!isHover && hiddenVal) {
+        hiddenVal.value = String(rating);
+      }
+    };
+
+    starBtns.forEach((btn) => {
+      const val = Number((btn as HTMLElement).dataset.value) || 1;
+
+      btn.addEventListener('mouseenter', () => {
+        updateStarsVisual(val, true);
+      });
+
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.currentReviewRating = val;
+        updateStarsVisual(this.currentReviewRating, false);
+      });
+    });
+
+    starsTrack?.addEventListener('mouseleave', () => {
+      updateStarsVisual(this.currentReviewRating, false);
+    });
+
+    btnMinus?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (this.currentReviewRating > 1) {
+        this.currentReviewRating -= 1;
+        updateStarsVisual(this.currentReviewRating, false);
+      }
+    });
+
+    btnPlus?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (this.currentReviewRating < 5) {
+        this.currentReviewRating += 1;
+        updateStarsVisual(this.currentReviewRating, false);
       }
     });
   }
