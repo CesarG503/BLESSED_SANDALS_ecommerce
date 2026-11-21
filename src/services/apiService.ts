@@ -336,4 +336,91 @@ export class ApiService {
       return { success: false, message: 'Error al sincronizar lista de deseos.' };
     }
   }
+
+  /**
+   * Obtiene la bolsa de compras guardada de la cuenta en PostgreSQL
+   */
+  static async getCart(userId: string): Promise<ApiResponse<{ cart: any[] }>> {
+    try {
+      const res = await fetch(`/api/cart?userId=${encodeURIComponent(userId)}`);
+      return await res.json();
+    } catch {
+      return { success: false, message: 'Error al obtener la bolsa de compras.' };
+    }
+  }
+
+  /**
+   * Guarda o actualiza un item de la bolsa en PostgreSQL
+   */
+  static async saveCartItem(payload: {
+    userId: string;
+    productId: string;
+    size: number;
+    color: any;
+    quantity: number;
+  }): Promise<ApiResponse> {
+    try {
+      const res = await fetch('/api/cart/item', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      return await res.json();
+    } catch {
+      return { success: false, message: 'Error al guardar item en la bolsa.' };
+    }
+  }
+
+  /**
+   * Remueve un item de la bolsa en PostgreSQL
+   */
+  static async removeCartItem(payload: {
+    userId: string;
+    productId: string;
+    size?: number;
+    colorName?: string;
+  }): Promise<ApiResponse> {
+    try {
+      const res = await fetch('/api/cart/item', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      return await res.json();
+    } catch {
+      return { success: false, message: 'Error al remover item de la bolsa.' };
+    }
+  }
+
+  /**
+   * Vacía toda la bolsa del usuario en PostgreSQL
+   */
+  static async clearCart(userId: string): Promise<ApiResponse> {
+    try {
+      const res = await fetch('/api/cart/clear', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId })
+      });
+      return await res.json();
+    } catch {
+      return { success: false, message: 'Error al vaciar la bolsa.' };
+    }
+  }
+
+  /**
+   * Sincroniza y fusiona la bolsa local con la cuenta de usuario en PostgreSQL
+   */
+  static async syncCart(userId: string, items: any[]): Promise<ApiResponse<{ cart: any[] }>> {
+    try {
+      const res = await fetch('/api/cart/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, items })
+      });
+      return await res.json();
+    } catch {
+      return { success: false, message: 'Error al sincronizar la bolsa.' };
+    }
+  }
 }

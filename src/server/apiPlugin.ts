@@ -737,6 +737,215 @@ export function apiPlugin(): Plugin {
           }
 
           // ==================================================================
+          // RUTAS DE CARRITO / BOLSA DE COMPRAS (PERSISTENCIA POR USUARIO)
+          // ==================================================================
+
+          // GET /api/cart (Obtener la bolsa de compras guardada del usuario)
+          if (pathname === '/api/cart' && req.method === 'GET') {
+            const userId = parsedUrl.searchParams.get('userId');
+            if (!userId) {
+              return sendJson(res, 400, { success: false, message: 'Usuario no especificado.' });
+            }
+
+            const items = await prisma.cartItem.findMany({
+              where: { userId },
+              include: { product: true },
+              orderBy: { createdAt: 'asc' }
+            });
+
+            return sendJson(res, 200, {
+              success: true,
+              cart: items.map((ci) => ({
+                id: `${ci.productId}-${ci.size}-${ci.colorName}`,
+                productId: ci.productId,
+                size: ci.size,
+                quantity: ci.quantity,
+                color: {
+                  name: ci.colorName,
+                  hex: ci.colorHex || '#000000',
+                  image: ci.colorImage || ci.product.image
+                },
+                product: {
+                  id: ci.product.id,
+                  name: ci.product.name,
+                  price: ci.product.price,
+                  originalPrice: ci.product.originalPrice,
+                  image: ci.product.image,
+                  badge: ci.product.badge
+                }
+              }))
+            });
+          }
+
+          // POST /api/cart/item (Guardar o actualizar un item en la bolsa del usuario)
+          if (pathname === '/api/cart/item' && req.method === 'POST') {
+            const body = await parseBody(req);
+            const { userId, productId, size = 9, color = {}, quantity = 1 } = body;
+
+            if (!userId || !productId) {
+              return sendJson(res, 400, { success: false, message: 'userId y productId son requeridos.' });
+            }
+
+            const colorName = color.name || body.colorName || 'Original';
+            const colorHex = color.hex || body.colorHex || '#000000';
+            const colorImage = color.image || body.colorImage || null;
+
+            if (quantity <= 0) {
+              await prisma.cartItem.deleteMany({
+                where: {
+                  userId,
+                  productId,
+                  size: Number(size),
+                  colorName
+                }
+              });
+            } else {
+              await prisma.cartItem.upsert({
+                where: {
+                  userId_productId_size_colorName: {
+                    userId,
+                    productId,
+                    size: Number(size),
+                    colorName
+                  }
+                },
+                create: {
+                  userId,
+                  productId,
+                  size: Number(size),
+                  colorName,
+                  colorHex,
+                  colorImage,
+                  quantity: Number(quantity)
+                },
+                update: {
+                  quantity: Number(quantity),
+                  colorHex,
+                  colorImage
+                }
+              });
+            }
+
+            return sendJson(res, 200, { success: true, message: 'Bolsa de compras actualizada en la BD.' });
+          }
+
+          // DELETE /api/cart/item (Remover un item de la bolsa del usuario)
+          if (pathname === '/api/cart/item' && req.method === 'DELETE') {
+            const body = await parseBody(req);
+            const { userId, productId, size } = body;
+            const colorName = body.colorName || body.color?.name;
+
+            if (userId && productId) {
+              await prisma.cartItem.deleteMany({
+                where: {
+                  userId,
+                  productId,
+                  ...(size !== undefined ? { size: Number(size) } : {}),
+                  ...(colorName ? { colorName } : {})
+                }
+              });
+            }
+
+            return sendJson(res, 200, { success: true, message: 'Item eliminado de la bolsa en la BD.' });
+          }
+
+          // DELETE /api/cart/clear (Vaciar bolsa del usuario)
+          if (pathname === '/api/cart/clear' && (req.method === 'DELETE' || req.method === 'POST')) {
+            const body = await parseBody(req);
+            const userId = body.userId || parsedUrl.searchParams.get('userId');
+
+            if (userId) {
+              await prisma.cartItem.deleteMany({ where: { userId } });
+            }
+
+            return sendJson(res, 200, { success: true, message: 'Bolsa vaciada en la BD.' });
+          }
+
+          // POST /api/cart/sync (Sincronizar y fusionar bolsa local con la cuenta)
+          if (pathname === '/api/cart/sync' && req.method === 'POST') {
+            const body = await parseBody(req);
+            const { userId, items = [] } = body;
+
+            if (!userId) {
+              return sendJson(res, 400, { success: false, message: 'Usuario no especificado.' });
+            }
+
+            // Para cada item local, lo guardamos o sumamos a la BD
+            for (const item of items) {
+              const pId = item.productId || item.product?.id;
+              if (!pId) continue;
+              const size = Number(item.size) || 9;
+              const colorName = item.color?.name || 'Original';
+              const colorHex = item.color?.hex || '#000000';
+              const colorImage = item.color?.image || item.product?.image || null;
+              const quantity = Number(item.quantity) || 1;
+
+              try {
+                const existing = await prisma.cartItem.findUnique({
+                  where: {
+                    userId_productId_size_colorName: {
+                      userId,
+                      productId: pId,
+                      size,
+                      colorName
+                    }
+                  }
+                });
+
+                if (existing) {
+                  await prisma.cartItem.update({
+                    where: { id: existing.id },
+                    data: { quantity: Math.max(existing.quantity, quantity) }
+                  });
+                } else {
+                  await prisma.cartItem.create({
+                    data: {
+                      userId,
+                      productId: pId,
+                      size,
+                      colorName,
+                      colorHex,
+                      colorImage,
+                      quantity
+                    }
+                  });
+                }
+              } catch {
+                // Continuar con los demás
+              }
+            }
+
+            const allItems = await prisma.cartItem.findMany({
+              where: { userId },
+              include: { product: true },
+              orderBy: { createdAt: 'asc' }
+            });
+
+            return sendJson(res, 200, {
+              success: true,
+              cart: allItems.map((ci) => ({
+                id: `${ci.productId}-${ci.size}-${ci.colorName}`,
+                productId: ci.productId,
+                size: ci.size,
+                quantity: ci.quantity,
+                color: {
+                  name: ci.colorName,
+                  hex: ci.colorHex || '#000000',
+                  image: ci.colorImage || ci.product.image
+                },
+                product: {
+                  id: ci.product.id,
+                  name: ci.product.name,
+                  price: ci.product.price,
+                  originalPrice: ci.product.originalPrice,
+                  image: ci.product.image,
+                  badge: ci.product.badge
+                }
+              }))
+            });
+          }
+
+          // ==================================================================
           // RUTAS DE CUPONES Y DESCUENTOS
           // ==================================================================
 
@@ -1103,6 +1312,9 @@ export function apiPlugin(): Plugin {
                 data: { timesUsed: { increment: 1 } }
               });
             }
+
+            // Vaciar la bolsa de compras guardada del usuario en la base de datos
+            await prisma.cartItem.deleteMany({ where: { userId } });
 
             return sendJson(res, 201, {
               success: true,

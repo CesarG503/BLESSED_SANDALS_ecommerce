@@ -125,6 +125,7 @@ export class Store {
     if (this.currentUser) {
       this.loadUserCoupons();
       this.loadWishlist();
+      this.loadCart();
     }
   }
 
@@ -225,6 +226,57 @@ export class Store {
     }
   }
 
+  // --- CARGA Y SINCRONIZACIÓN DE BOLSA DE COMPRAS (CARRITO) CON LA CUENTA ---
+  public async loadCart(): Promise<void> {
+    if (!this.currentUser) return;
+    try {
+      const res = await ApiService.getCart(this.currentUser.id);
+      const rawCart = res.data?.cart || (res as any).cart;
+      if (res.success && rawCart) {
+        this.cart = rawCart.map((ci: any) => {
+          const fullProd = this.products.find((p) => p.id === ci.productId);
+          return {
+            id: ci.id || `${ci.productId}-${ci.size}-${ci.color?.name || 'Original'}`,
+            productId: ci.productId,
+            product: fullProd || ci.product,
+            size: ci.size,
+            color: ci.color || { name: 'Original', hex: '#8B5A2B', image: ci.product?.image },
+            quantity: ci.quantity
+          };
+        });
+        StorageService.saveCart(this.cart);
+        this.notify();
+      }
+    } catch (e) {
+      console.warn('Error cargando bolsa de la BD:', e);
+    }
+  }
+
+  public async syncCartWithAccount(): Promise<void> {
+    if (!this.currentUser) return;
+    try {
+      const res = await ApiService.syncCart(this.currentUser.id, this.cart);
+      const rawCart = res.data?.cart || (res as any).cart;
+      if (res.success && rawCart) {
+        this.cart = rawCart.map((ci: any) => {
+          const fullProd = this.products.find((p) => p.id === ci.productId);
+          return {
+            id: ci.id || `${ci.productId}-${ci.size}-${ci.color?.name || 'Original'}`,
+            productId: ci.productId,
+            product: fullProd || ci.product,
+            size: ci.size,
+            color: ci.color || { name: 'Original', hex: '#8B5A2B', image: ci.product?.image },
+            quantity: ci.quantity
+          };
+        });
+        StorageService.saveCart(this.cart);
+        this.notify();
+      }
+    } catch (e) {
+      console.warn('Error sincronizando bolsa con la cuenta:', e);
+    }
+  }
+
   // --- ACCIONES DE PRODUCTOS ---
   public async loadProducts(): Promise<void> {
     this.loading = true;
@@ -270,7 +322,7 @@ export class Store {
     );
   }
 
-  // --- ACCIONES DEL CARRITO ---
+  // --- ACCIONES DEL CARRITO (PERSISTENCIA CON LA CUENTA) ---
   public addToCart(product: Product, size: number, colorName?: string): void {
     const selectedColor = colorName
       ? product.colors.find((c) => c.name === colorName) || product.colors[0]
@@ -294,30 +346,80 @@ export class Store {
 
     StorageService.saveCart(this.cart);
     this.notify();
+
+    // Sincronizar en segundo plano con PostgreSQL si hay sesión iniciada
+    if (this.currentUser) {
+      const currentItem = this.cart.find((i) => i.id === itemId);
+      if (currentItem) {
+        ApiService.saveCartItem({
+          userId: this.currentUser.id,
+          productId: currentItem.productId,
+          size: currentItem.size,
+          color: currentItem.color,
+          quantity: currentItem.quantity
+        }).catch((e) => console.warn('Error guardando item de bolsa en BD:', e));
+      }
+    }
   }
 
   public updateCartQuantity(itemId: string, delta: number): void {
     const itemIndex = this.cart.findIndex((item) => item.id === itemId);
     if (itemIndex > -1) {
       this.cart[itemIndex].quantity += delta;
+      const targetItem = { ...this.cart[itemIndex] };
       if (this.cart[itemIndex].quantity <= 0) {
         this.cart.splice(itemIndex, 1);
       }
       StorageService.saveCart(this.cart);
       this.notify();
+
+      if (this.currentUser) {
+        if (targetItem.quantity <= 0) {
+          ApiService.removeCartItem({
+            userId: this.currentUser.id,
+            productId: targetItem.productId,
+            size: targetItem.size,
+            colorName: targetItem.color.name
+          }).catch((e) => console.warn('Error eliminando item de bolsa en BD:', e));
+        } else {
+          ApiService.saveCartItem({
+            userId: this.currentUser.id,
+            productId: targetItem.productId,
+            size: targetItem.size,
+            color: targetItem.color,
+            quantity: targetItem.quantity
+          }).catch((e) => console.warn('Error actualizando cantidad en BD:', e));
+        }
+      }
     }
   }
 
   public removeFromCart(itemId: string): void {
-    this.cart = this.cart.filter((item) => item.id !== itemId);
+    const item = this.cart.find((i) => i.id === itemId);
+    this.cart = this.cart.filter((i) => i.id !== itemId);
     StorageService.saveCart(this.cart);
     this.notify();
+
+    if (this.currentUser && item) {
+      ApiService.removeCartItem({
+        userId: this.currentUser.id,
+        productId: item.productId,
+        size: item.size,
+        colorName: item.color.name
+      }).catch((e) => console.warn('Error retirando item de bolsa en BD:', e));
+    }
   }
 
   public clearCart(): void {
     this.cart = [];
     StorageService.saveCart(this.cart);
     this.notify();
+
+    if (this.currentUser) {
+      ApiService.clearCart(this.currentUser.id).catch((e) =>
+        console.warn('Error vaciando bolsa en BD:', e)
+      );
+    }
   }
 
   public getCartSubtotal(): number {
@@ -472,6 +574,7 @@ export class Store {
       await this.loadPromos();
       await this.loadUserCoupons();
       await this.syncWishlistWithAccount();
+      await this.syncCartWithAccount();
 
       // Si había un cupón pendiente que intentó aplicar antes del login, aplicarlo automáticamente
       if (this.pendingPromoCode) {
@@ -510,6 +613,7 @@ export class Store {
       await this.loadPromos();
       await this.loadUserCoupons();
       await this.syncWishlistWithAccount();
+      await this.syncCartWithAccount();
 
       // Si había un cupón pendiente (o por defecto el de bienvenida BIENVENIDA5), activarlo
       const targetCode = this.pendingPromoCode || 'BIENVENIDA5';
@@ -536,13 +640,16 @@ export class Store {
     this.pendingPromoCode = null;
     this.isProfileOpen = false;
     this.wishlist = [];
+    this.cart = [];
     StorageService.saveUser(null);
     StorageService.savePromo(null);
     StorageService.saveWishlist([]);
+    StorageService.saveCart([]);
     try {
       localStorage.removeItem('blessed_sandals_user_v1');
       localStorage.removeItem('blessed_sandals_promo_v1');
       localStorage.removeItem('blessed_sandals_wishlist_v1');
+      localStorage.removeItem('blessed_sandals_cart_v1');
     } catch (e) {
       console.error('Error clearing storage', e);
     }

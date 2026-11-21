@@ -6340,28 +6340,39 @@ body.profile-page-body {
 
 .btn-wish-remove-item {
   position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 30px;
-  height: 30px;
+  top: 7px;
+  right: 7px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid #e2e8f0;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(226, 232, 240, 0.9);
   color: #64748b;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
-  transition: all 0.2s ease;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  transition: all 0.15s ease;
   z-index: 2;
+  padding: 0;
 }
 
 .btn-wish-remove-item:hover {
   background: #fee2e2;
-  color: #dc2626;
+  color: #ef4444;
   border-color: #fca5a5;
-  transform: scale(1.1);
+  transform: scale(1.08);
+}
+
+.btn-wish-remove-item svg,
+.btn-wish-remove-item .icon-remove-wish {
+  width: 12px !important;
+  height: 12px !important;
+  min-width: 12px !important;
+  min-height: 12px !important;
+  stroke: currentColor;
+  flex-shrink: 0;
 }
 
 .wish-info {
@@ -6428,6 +6439,16 @@ body.profile-page-body {
 
 .btn-wish-add-cart:hover {
   background: #082919;
+}
+
+.btn-wish-add-cart svg,
+.btn-wish-add-cart .icon-wish-cart {
+  width: 13px !important;
+  height: 13px !important;
+  min-width: 13px !important;
+  min-height: 13px !important;
+  stroke: currentColor;
+  flex-shrink: 0;
 }
 
 .btn-wish-view-details {
