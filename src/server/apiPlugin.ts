@@ -1,5 +1,6 @@
 import type { Plugin, ViteDevServer } from 'vite';
 import { prisma } from '../lib/prisma';
+import { MOCK_PRODUCTS } from '../data/mockProducts';
 import type { IncomingMessage, ServerResponse } from 'http';
 import { URL } from 'url';
 
@@ -970,27 +971,49 @@ export function apiPlugin(): Plugin {
                   ? p.reviews.reduce((acc, r) => acc + r.rating, 0) / p.reviews.length
                   : 4.8;
 
+              // Buscar si existe en MOCK_PRODUCTS para complementar datos enriquecidos (gallery, specs)
+              const mockMatch = MOCK_PRODUCTS.find(
+                (mp) => mp.id === p.id || mp.name.toLowerCase() === p.name.toLowerCase()
+              );
+
+              const colorImages = p.colors
+                .map((c) => c.image)
+                .filter((img): img is string => Boolean(img));
+              
+              const defaultGallery = Array.from(new Set([p.image, ...colorImages]));
+              const gallery = mockMatch?.gallery && mockMatch.gallery.length > 0
+                ? mockMatch.gallery
+                : (defaultGallery.length > 0 ? defaultGallery : [p.image]);
+
               return {
                 id: p.id,
                 name: p.name,
-                subtitle: p.subtitle || '',
-                description: p.description || '',
+                subtitle: p.subtitle || mockMatch?.subtitle || '',
+                description: p.description || mockMatch?.description || '',
                 price: p.price,
-                originalPrice: p.originalPrice || undefined,
-                badge: p.badge || undefined,
-                gender: (p.gender as any) || 'Unisex',
-                height: (p.height as any) || undefined,
-                category: (p.category.slug as any) || 'sandals',
+                originalPrice: p.originalPrice || mockMatch?.originalPrice || undefined,
+                badge: p.badge || mockMatch?.badge || undefined,
+                gender: (p.gender as any) || mockMatch?.gender || 'Unisex',
+                height: (p.height as any) || mockMatch?.height || undefined,
+                category: (p.category.slug as any) || mockMatch?.category || 'sandals',
                 image: p.image,
-                model3dUrl: p.model3dUrl || undefined,
-                colors: p.colors.map((c) => ({
-                  name: c.name,
-                  hex: c.hex,
-                  image: c.image || undefined
-                })),
-                sizes: p.sizes.map((s) => s.size),
+                gallery,
+                model3dUrl: p.model3dUrl || mockMatch?.model3dUrl || undefined,
+                has3DModel: Boolean(p.model3dUrl || mockMatch?.has3DModel),
+                colors: p.colors.length > 0
+                  ? p.colors.map((c) => ({
+                      name: c.name,
+                      hex: c.hex,
+                      image: c.image || undefined
+                    }))
+                  : (mockMatch?.colors || [{ name: 'Original', hex: '#111827', image: p.image }]),
+                sizes: p.sizes.length > 0
+                  ? p.sizes.map((s) => s.size)
+                  : (mockMatch?.sizes || [38, 39, 40, 41, 42, 43, 44]),
+                technology: mockMatch?.technology || ['Amortiguación anatómica', 'Suela antideslizante'],
+                features: mockMatch?.features || ['Diseño ergonómico', 'Ajuste cómodo', 'Material de alta calidad'],
                 rating: avgRating,
-                reviewCount: p.reviews.length || 18,
+                reviewCount: p.reviews.length || mockMatch?.reviewCount || 18,
                 inStock: p.inStock,
                 createdAt: p.createdAt.toISOString()
               };

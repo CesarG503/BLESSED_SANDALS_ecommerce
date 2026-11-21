@@ -1,6 +1,7 @@
 import { Store } from '../state/store';
 import { Icons } from './Icons';
 import { Toast } from './Toast';
+import { Product, ColorVariant } from '../types/product';
 
 export class QuickViewModal {
   private container: HTMLElement;
@@ -16,6 +17,13 @@ export class QuickViewModal {
     this.container = el;
 
     this.store.subscribe(() => this.render());
+
+    // Permitir cerrar modal con la tecla Escape
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && this.store.activeQuickViewProduct) {
+        this.store.closeQuickView();
+      }
+    });
   }
 
   public render(): void {
@@ -26,119 +34,64 @@ export class QuickViewModal {
       return;
     }
 
-    if (!this.selectedSize || !product.sizes.includes(this.selectedSize)) {
-      this.selectedSize = product.sizes[0] || 40;
-    }
+    try {
+      // Garantizar que sizes sea un arreglo válido
+      const sizes: number[] = Array.isArray(product.sizes) && product.sizes.length > 0
+        ? product.sizes
+        : [38, 39, 40, 41, 42, 43, 44];
 
-    if (this.selectedColorIndex >= product.colors.length) {
-      this.selectedColorIndex = 0;
-    }
+      if (!this.selectedSize || !sizes.includes(this.selectedSize)) {
+        this.selectedSize = sizes[0] || 40;
+      }
 
-    const selectedColor = product.colors[this.selectedColorIndex] || product.colors[0];
-    const currentImg = selectedColor.image || product.image;
-    const isFav = this.store.isInWishlist(product.id);
+      // Garantizar que colors sea un arreglo válido
+      const colors: ColorVariant[] = Array.isArray(product.colors) && product.colors.length > 0
+        ? product.colors
+        : [{ name: 'Original', hex: '#111827', image: product.image }];
 
-    this.container.classList.add('is-active');
-    this.container.innerHTML = `
-      <div class="modal-backdrop" id="quickview-backdrop"></div>
-      <div class="modal-dialog animate-scale-up" role="dialog" aria-modal="true">
-        <button class="modal-close-btn" id="quickview-close-btn" aria-label="Cerrar modal">
-          ${Icons.close('w-6 h-6')}
-        </button>
+      if (this.selectedColorIndex >= colors.length) {
+        this.selectedColorIndex = 0;
+      }
 
-        <div class="quickview-content-grid">
-          <!-- GALERÍA DE IMÁGENES -->
-          <div class="quickview-gallery">
-            <div class="quickview-main-image-wrap">
-              <img src="${currentImg}" alt="${product.name}" class="quickview-main-img" id="quickview-featured-img" />
-              ${
-                product.has3DModel
-                  ? `
-                <button class="btn-badge-3d" id="quickview-btn-3d" title="Ver modelo 3D">
-                  ${Icons.cube3d('w-4 h-4')} Ver en 3D
-                </button>
-              `
-                  : ''
-              }
-            </div>
+      const selectedColor = colors[this.selectedColorIndex] || colors[0];
+      const currentImg = selectedColor?.image || product.image;
+      const isFav = this.store.isInWishlist(product.id);
 
-            <div class="quickview-thumbnails">
-              ${product.gallery
-                .map(
-                  (thumbUrl, idx) => `
-                <button class="thumb-btn ${idx === 0 ? 'is-active' : ''}" data-thumb-src="${thumbUrl}">
-                  <img src="${thumbUrl}" alt="${product.name} ángulo ${idx + 1}" />
-                </button>
-              `
-                )
-                .join('')}
-            </div>
-          </div>
+      // Garantizar que gallery sea un arreglo válido
+      const gallery: string[] = Array.isArray(product.gallery) && product.gallery.length > 0
+        ? product.gallery
+        : (product.image ? [product.image] : []);
 
-          <!-- DETALLES Y COMPRA -->
-          <div class="quickview-details">
-            <div class="quickview-header-info">
-              ${
-                product.badge
-                  ? `<span class="product-badge badge-${product.badge.toLowerCase().replace(/\s+/g, '-')}">${product.badge}</span>`
-                  : ''
-              }
-              <h2 class="quickview-title">${product.name}</h2>
-              <p class="quickview-subtitle">${product.subtitle}</p>
+      this.container.classList.add('is-active');
+      this.container.innerHTML = `
+        <div class="modal-backdrop" id="quickview-backdrop"></div>
+        <div class="modal-dialog animate-scale-up" role="dialog" aria-modal="true">
+          <button class="modal-close-btn" id="quickview-close-btn" aria-label="Cerrar modal">
+            ${Icons.close('w-6 h-6')}
+          </button>
 
-              <div class="quickview-price-rating">
-                <div class="price-box">
-                  <span class="quickview-price">$${product.price}</span>
-                  ${product.originalPrice ? `<span class="quickview-original-price">$${product.originalPrice}</span>` : ''}
-                </div>
-                <div class="quickview-rating">
-                  <span class="star-icon">★</span>
-                  <strong>${product.rating.toFixed(1)}</strong>
-                  <span class="reviews-count">(${product.reviewCount} opiniones)</span>
-                </div>
-              </div>
-            </div>
-
-            <p class="quickview-description">${product.description}</p>
-
-            <!-- SELECTOR DE COLOR -->
-            <div class="quickview-section">
-              <label class="section-label">
-                Color: <strong>${selectedColor.name}</strong>
-              </label>
-              <div class="quickview-color-swatches">
-                ${product.colors
-                  .map(
-                    (c, i) => `
-                  <button 
-                    type="button" 
-                    class="qv-color-btn ${i === this.selectedColorIndex ? 'is-selected' : ''}" 
-                    style="background-color: ${c.hex};" 
-                    data-color-index="${i}"
-                    title="${c.name}"
-                  ></button>
+          <div class="quickview-content-grid">
+            <!-- GALERÍA DE IMÁGENES -->
+            <div class="quickview-gallery">
+              <div class="quickview-main-image-wrap">
+                <img src="${currentImg}" alt="${product.name}" class="quickview-main-img" id="quickview-featured-img" />
+                ${
+                  product.has3DModel || product.model3dUrl
+                    ? `
+                  <button class="btn-badge-3d" id="quickview-btn-3d" title="Ver modelo 3D">
+                    ${Icons.cube3d('w-4 h-4')} Ver en 3D
+                  </button>
                 `
-                  )
-                  .join('')}
+                    : ''
+                }
               </div>
-            </div>
 
-            <!-- SELECTOR DE TALLA -->
-            <div class="quickview-section">
-              <div class="size-header-row">
-                <label class="section-label">Seleccionar Talla (EU):</label>
-                <span class="size-guide-link">Guía de tallas</span>
-              </div>
-              <div class="quickview-sizes-grid">
-                ${product.sizes
+              <div class="quickview-thumbnails">
+                ${gallery
                   .map(
-                    (size) => `
-                  <button 
-                    type="button" 
-                    class="qv-size-pill ${size === this.selectedSize ? 'is-selected' : ''}" 
-                    data-size="${size}"
-                  >
-                    ${size}
+                    (thumbUrl, idx) => `
+                  <button class="thumb-btn ${idx === 0 ? 'is-active' : ''}" data-thumb-src="${thumbUrl}">
+                    <img src="${thumbUrl}" alt="${product.name} ángulo ${idx + 1}" />
                   </button>
                 `
                   )
@@ -146,47 +99,123 @@ export class QuickViewModal {
               </div>
             </div>
 
-            <!-- CANTIDAD Y BOTÓN AGREGAR -->
-            <div class="quickview-actions-row">
-              <div class="quantity-stepper">
-                <button type="button" class="btn-qty" id="qty-minus" aria-label="Menos">-</button>
-                <span class="qty-number" id="qty-display">${this.quantity}</span>
-                <button type="button" class="btn-qty" id="qty-plus" aria-label="Más">+</button>
+            <!-- DETALLES Y COMPRA -->
+            <div class="quickview-details">
+              <div class="quickview-header-info">
+                ${
+                  product.badge
+                    ? `<span class="product-badge badge-${product.badge.toLowerCase().replace(/\s+/g, '-')}">${product.badge}</span>`
+                    : ''
+                }
+                <h2 class="quickview-title">${product.name}</h2>
+                <p class="quickview-subtitle">${product.subtitle || ''}</p>
+
+                <div class="quickview-price-rating">
+                  <div class="price-box">
+                    <span class="quickview-price">$${product.price}</span>
+                    ${product.originalPrice ? `<span class="quickview-original-price">$${product.originalPrice}</span>` : ''}
+                  </div>
+                  <div class="quickview-rating">
+                    <span class="star-icon">★</span>
+                    <strong>${(product.rating || 4.8).toFixed(1)}</strong>
+                    <span class="reviews-count">(${product.reviewCount || 18} opiniones)</span>
+                  </div>
+                </div>
               </div>
 
-              <button class="btn btn-primary btn-add-bag" id="quickview-add-to-cart">
-                ${Icons.bag('w-5 h-5')} Añadir a la Bolsa
-              </button>
+              <p class="quickview-description">${product.description || ''}</p>
 
-              <button class="btn-icon-square ${isFav ? 'is-active' : ''}" id="quickview-fav-btn" title="Guardar en favoritos">
-                ${Icons.heart('w-5 h-5', isFav)}
-              </button>
-            </div>
+              <!-- SELECTOR DE COLOR -->
+              <div class="quickview-section">
+                <label class="section-label">
+                  Color: <strong>${selectedColor?.name || 'Estándar'}</strong>
+                </label>
+                <div class="quickview-color-swatches">
+                  ${colors
+                    .map(
+                      (c, i) => `
+                    <button 
+                      type="button" 
+                      class="qv-color-btn ${i === this.selectedColorIndex ? 'is-selected' : ''}" 
+                      style="background-color: ${c.hex};" 
+                      data-color-index="${i}"
+                      title="${c.name}"
+                    ></button>
+                  `
+                    )
+                    .join('')}
+                </div>
+              </div>
 
-            <!-- BENEFICIOS BLESSED -->
-            <div class="quickview-perks">
-              <div class="perk-item">
-                <span class="perk-icon">🚚</span>
-                <span>Envío express gratuito en compras superiores a $50</span>
+              <!-- SELECTOR DE TALLA -->
+              <div class="quickview-section">
+                <div class="size-header-row">
+                  <label class="section-label">Seleccionar Talla (EU):</label>
+                  <span class="size-guide-link">Guía de tallas</span>
+                </div>
+                <div class="quickview-sizes-grid">
+                  ${sizes
+                    .map(
+                      (size) => `
+                    <button 
+                      type="button" 
+                      class="qv-size-pill ${size === this.selectedSize ? 'is-selected' : ''}" 
+                      data-size="${size}"
+                    >
+                      ${size}
+                    </button>
+                  `
+                    )
+                    .join('')}
+                </div>
               </div>
-              <div class="perk-item">
-                <span class="perk-icon">🔄</span>
-                <span>Devolución gratuita durante 30 días sin complicaciones</span>
+
+              <!-- CANTIDAD Y BOTÓN AGREGAR -->
+              <div class="quickview-actions-row">
+                <div class="quantity-stepper">
+                  <button type="button" class="btn-qty" id="qty-minus" aria-label="Menos">-</button>
+                  <span class="qty-number" id="qty-display">${this.quantity}</span>
+                  <button type="button" class="btn-qty" id="qty-plus" aria-label="Más">+</button>
+                </div>
+
+                <button class="btn btn-primary btn-add-bag" id="quickview-add-to-cart">
+                  ${Icons.bag('w-5 h-5')} Añadir a la Bolsa
+                </button>
+
+                <button class="btn-icon-square ${isFav ? 'is-active' : ''}" id="quickview-fav-btn" title="Guardar en favoritos">
+                  ${Icons.heart('w-5 h-5', isFav)}
+                </button>
               </div>
-              <div class="perk-item">
-                <span class="perk-icon">🛡️</span>
-                <span>Autenticidad 100% garantizada con sello Blessed Sandals</span>
+
+              <!-- BENEFICIOS BLESSED -->
+              <div class="quickview-perks">
+                <div class="perk-item">
+                  <span class="perk-icon">🚚</span>
+                  <span>Envío express gratuito en compras superiores a $50</span>
+                </div>
+                <div class="perk-item">
+                  <span class="perk-icon">🔄</span>
+                  <span>Devolución gratuita durante 30 días sin complicaciones</span>
+                </div>
+                <div class="perk-item">
+                  <span class="perk-icon">🛡️</span>
+                  <span>Autenticidad 100% garantizada con sello Blessed Sandals</span>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
-    `;
+      `;
 
-    this.setupEvents(product);
+      this.setupEvents(product, colors);
+    } catch (err) {
+      console.error('Error renderizando QuickViewModal:', err);
+      this.container.classList.remove('is-active');
+      this.container.innerHTML = '';
+    }
   }
 
-  private setupEvents(product: import('../types/product').Product): void {
+  private setupEvents(product: Product, colors: ColorVariant[]): void {
     // Cerrar modal
     const closeBtn = this.container.querySelector('#quickview-close-btn');
     const backdrop = this.container.querySelector('#quickview-backdrop');
@@ -248,7 +277,7 @@ export class QuickViewModal {
         return;
       }
 
-      const color = product.colors[this.selectedColorIndex];
+      const color = colors[this.selectedColorIndex] || colors[0];
       for (let i = 0; i < this.quantity; i++) {
         this.store.addToCart(product, this.selectedSize, color?.name);
       }

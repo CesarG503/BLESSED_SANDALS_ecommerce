@@ -140,7 +140,13 @@ export class Store {
   }
 
   private notify(): void {
-    this.listeners.forEach((listener) => listener());
+    this.listeners.forEach((listener) => {
+      try {
+        listener();
+      } catch (err) {
+        console.error('Error en listener del store:', err);
+      }
+    });
   }
 
   // --- CARGA DE CUPONES DESDE LA BASE DE DATOS ---

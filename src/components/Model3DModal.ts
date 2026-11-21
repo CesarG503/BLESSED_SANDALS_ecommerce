@@ -81,7 +81,8 @@ export class Model3DModal {
     backdrop?.addEventListener('click', close);
 
     this.container.querySelector('#btn-3d-add-cart')?.addEventListener('click', () => {
-      this.store.addToCart(product, product.sizes[0] || 40);
+      const defaultSize = (Array.isArray(product.sizes) && product.sizes[0]) || 40;
+      this.store.addToCart(product, defaultSize);
       this.store.close3DViewer();
       this.store.toggleCart(true);
     });
