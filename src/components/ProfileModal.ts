@@ -4,6 +4,7 @@ import { ApiService } from '../services/apiService';
 import { Icons } from './Icons';
 import { Toast } from './Toast';
 import confetti from 'canvas-confetti';
+import { MapPickerModal, SelectedLocation } from './MapPickerModal';
 
 // Departamentos y Municipios oficiales de El Salvador
 const EL_SALVADOR_DEPARTMENTS: Record<string, string[]> = {
@@ -540,23 +541,22 @@ export class ProfileModal {
           </div>
         </div>
 
-        ${
-          userCoupons.length === 0
-            ? `
+        ${userCoupons.length === 0
+        ? `
           <div class="empty-state-box profile-component-pop pop-step-4">
             <div class="empty-icon">${Icons.ticket('w-5 h-5')}</div>
             <h4>No tienes cupones asignados aún</h4>
             <p>Al registrarte por primera vez recibes tu cupón BIENVENIDA5 (5% de descuento).</p>
           </div>
         `
-            : `
+        : `
           <div class="coupons-cards-grid profile-component-pop pop-step-4">
             ${userCoupons
-              .map((uc: any) => {
-                const isPercentage = uc.promoCode.discountType === 'PERCENTAGE';
-                const discountText = isPercentage ? `${uc.promoCode.discountValue}%` : `$${uc.promoCode.discountValue}`;
+          .map((uc: any) => {
+            const isPercentage = uc.promoCode.discountType === 'PERCENTAGE';
+            const discountText = isPercentage ? `${uc.promoCode.discountValue}%` : `$${uc.promoCode.discountValue}`;
 
-                return `
+            return `
               <div class="coupon-ticket-card ${uc.isUsed ? 'is-spent' : 'is-ready'}">
                 <div class="ticket-left">
                   <div class="ticket-discount-banner">
@@ -568,35 +568,32 @@ export class ProfileModal {
                 <div class="ticket-center">
                   <div class="ticket-code-row">
                     <strong class="ticket-code">${uc.promoCode.code}</strong>
-                    ${
-                      uc.promoCode.isWelcomeOnly
-                        ? `<span class="badge-welcome">Bienvenida</span>`
-                        : ''
-                    }
+                    ${uc.promoCode.isWelcomeOnly
+                ? `<span class="badge-welcome">Bienvenida</span>`
+                : ''
+              }
                   </div>
                   <p class="ticket-desc">${uc.promoCode.description}</p>
                   
                   <div class="ticket-meta">
                     <span>• Límite: <strong>1 uso por persona</strong></span>
-                    ${
-                      uc.promoCode.minPurchase
-                        ? `<span>• Compra mínima: <strong>$${uc.promoCode.minPurchase}</strong></span>`
-                        : ''
-                    }
+                    ${uc.promoCode.minPurchase
+                ? `<span>• Compra mínima: <strong>$${uc.promoCode.minPurchase}</strong></span>`
+                : ''
+              }
                     <span>• Agregado: ${new Date(uc.claimedAt).toLocaleDateString('es-SV')}</span>
                   </div>
                 </div>
 
                 <div class="ticket-right">
-                  ${
-                    uc.isUsed
-                      ? `
+                  ${uc.isUsed
+                ? `
                     <div class="ticket-status-used">
                       <span class="status-badge-used">${Icons.check('w-3 h-3')} Canjeado</span>
                       <small>Usado el ${new Date(uc.usedAt || uc.claimedAt).toLocaleDateString('es-SV')}</small>
                     </div>
                   `
-                      : `
+                : `
                     <div class="ticket-status-available">
                       <span class="status-badge-ready">Disponible</span>
                       <button class="btn-copy-code" data-code="${uc.promoCode.code}" title="Copiar código">
@@ -607,15 +604,15 @@ export class ProfileModal {
                       </button>
                     </div>
                   `
-                  }
+              }
                 </div>
               </div>
             `;
-              })
-              .join('')}
+          })
+          .join('')}
           </div>
         `
-        }
+      }
 
         <!-- BANNER DE GARANTÍA DE CUPONES (POP-IN PASO 5) -->
         <div class="coupons-rules-notice profile-component-pop pop-step-5">
@@ -639,9 +636,8 @@ export class ProfileModal {
           </div>
         </div>
 
-        ${
-          orders.length === 0
-            ? `
+        ${orders.length === 0
+        ? `
           <div class="empty-state-box profile-component-pop pop-step-4">
             <div class="empty-icon">${Icons.bag('w-5 h-5')}</div>
             <h4>Aún no has realizado pedidos</h4>
@@ -649,21 +645,21 @@ export class ProfileModal {
             <button class="btn btn-primary btn-go-shop" style="margin-top:16px;">Ver Catálogo</button>
           </div>
         `
-            : `
+        : `
           <div class="orders-stack profile-component-pop pop-step-4">
             ${orders
-              .map((order: any) => {
-                const statusMap: Record<string, { label: string; color: string }> = {
-                  PENDING: { label: 'Pendiente', color: '#f59e0b' },
-                  PAID: { label: 'Pagado', color: '#10b981' },
-                  PROCESSING: { label: 'En Preparación', color: '#3b82f6' },
-                  SHIPPED: { label: 'En Camino (El Salvador)', color: '#8b5cf6' },
-                  DELIVERED: { label: 'Entregado', color: '#059669' },
-                  CANCELLED: { label: 'Cancelado', color: '#ef4444' }
-                };
-                const st = statusMap[order.status] || { label: order.status, color: '#64748b' };
+          .map((order: any) => {
+            const statusMap: Record<string, { label: string; color: string }> = {
+              PENDING: { label: 'Pendiente', color: '#f59e0b' },
+              PAID: { label: 'Pagado', color: '#10b981' },
+              PROCESSING: { label: 'En Preparación', color: '#3b82f6' },
+              SHIPPED: { label: 'En Camino (El Salvador)', color: '#8b5cf6' },
+              DELIVERED: { label: 'Entregado', color: '#059669' },
+              CANCELLED: { label: 'Cancelado', color: '#ef4444' }
+            };
+            const st = statusMap[order.status] || { label: order.status, color: '#64748b' };
 
-                return `
+            return `
               <div class="order-card-box">
                 <div class="order-card-header">
                   <div>
@@ -688,8 +684,8 @@ export class ProfileModal {
                 <!-- ITEMS DEL PEDIDO -->
                 <div class="order-items-list">
                   ${order.items
-                    .map(
-                      (item: any) => `
+                .map(
+                  (item: any) => `
                     <div class="order-item-row">
                       <img src="${item.productImage || '/assets/logo/Isotipo.png'}" alt="${item.productName}" class="order-prod-thumb" />
                       <div class="order-prod-info">
@@ -699,19 +695,18 @@ export class ProfileModal {
                       <span class="order-prod-price">$${item.total.toFixed(2)}</span>
                     </div>
                   `
-                    )
-                    .join('')}
+                )
+                .join('')}
                 </div>
 
                 <!-- RESUMEN FINANCIERO Y CUPÓN USADO -->
                 <div class="order-footer-breakdown">
                   <div class="order-notes-col">
                     ${order.notes ? `<p class="order-notes-text">Nota: ${order.notes}</p>` : ''}
-                    ${
-                      order.promoCode
-                        ? `<p class="order-promo-used">${Icons.ticket('w-3.5 h-3.5')} Cupón aplicado: <strong>${order.promoCode.code}</strong> (-$${order.discount.toFixed(2)})</p>`
-                        : ''
-                    }
+                    ${order.promoCode
+                ? `<p class="order-promo-used">${Icons.ticket('w-3.5 h-3.5')} Cupón aplicado: <strong>${order.promoCode.code}</strong> (-$${order.discount.toFixed(2)})</p>`
+                : ''
+              }
                   </div>
                   <div class="order-calc-col">
                     <div class="calc-row"><span>Subtotal:</span> <span>$${order.subtotal.toFixed(2)}</span></div>
@@ -722,11 +717,11 @@ export class ProfileModal {
                 </div>
               </div>
             `;
-              })
-              .join('')}
+          })
+          .join('')}
           </div>
         `
-        }
+      }
       </div>
     `;
   }
@@ -742,16 +737,31 @@ export class ProfileModal {
             <h2 class="panel-title">Direcciones de Envío (El Salvador)</h2>
             <p class="panel-subtitle">Guarda tus direcciones de entrega en los 14 departamentos de El Salvador para agilizar tus compras.</p>
           </div>
-          <button class="btn btn-primary" id="btn-toggle-new-address">
-            + Agregar Nueva Dirección
+          <button type="button" class="btn btn-primary" id="btn-open-map-direct" title="Abrir mapa de El Salvador para agregar dirección">
+            ${Icons.mapPin('w-4 h-4')} Agregar Ubicación
           </button>
         </div>
 
         <!-- FORMULARIO DE NUEVA DIRECCIÓN (DESPLEGABLE) -->
         <div class="address-form-box is-hidden profile-component-pop pop-step-5" id="box-new-address">
           <div class="address-form-header">
-            <h3>Nueva Dirección de Entrega en El Salvador</h3>
+            <div>
+              <h3>Nueva Dirección</h3>
+              <p style="margin: 2px 0 0; font-size: 0.8rem; color: #64748b;">Completa el formulario o selecciona tu ubicación exacta en el mapa de El Salvador.</p>
+            </div>
             <button type="button" class="btn-close-form" id="btn-cancel-new-address">${Icons.close('w-4 h-4')}</button>
+          </div>
+
+          <!-- BOTÓN SELECCIONAR UBICACIÓN CON MAPS -->
+          <div class="form-map-trigger-row">
+            <button type="button" class="btn btn-select-location-map" id="btn-trigger-map-picker">
+              <svg class="map-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon>
+                <line x1="8" y1="2" x2="8" y2="18"></line>
+                <line x1="16" y1="6" x2="16" y2="22"></line>
+              </svg>
+              Seleccionar ubicación
+            </button>
           </div>
 
           <form id="form-add-address" class="address-form">
@@ -773,8 +783,8 @@ export class ProfileModal {
                 <select id="addr-state" required>
                   <option value="">Selecciona un departamento...</option>
                   ${Object.keys(EL_SALVADOR_DEPARTMENTS)
-                    .map((dept) => `<option value="${dept}">${dept}</option>`)
-                    .join('')}
+        .map((dept) => `<option value="${dept}">${dept}</option>`)
+        .join('')}
                 </select>
               </div>
 
@@ -818,52 +828,89 @@ export class ProfileModal {
         </div>
 
         <!-- LISTADO DE DIRECCIONES GUARDADAS (POP-IN PASO 4) -->
-        ${
-          addresses.length === 0
-            ? `
+        ${addresses.length === 0
+        ? `
           <div class="empty-state-box profile-component-pop pop-step-4">
             <div class="empty-icon">${Icons.mapPin('w-5 h-5')}</div>
             <h4>No tienes direcciones guardadas en El Salvador</h4>
             <p>Agrega tu primera dirección para envíos rápidos y seguros a domicilio.</p>
           </div>
         `
-            : `
-          <div class="addresses-grid profile-component-pop pop-step-4">
+        : `
+          <div class="addresses-list-container profile-component-pop pop-step-4">
             ${addresses
-              .map(
-                (addr: any) => `
-              <div class="address-card ${addr.isDefault ? 'is-default' : ''}">
-                <div class="addr-card-top">
-                  <div>
-                    <strong class="addr-name">${addr.fullName}</strong>
-                    <span class="addr-phone">${Icons.phone('w-3.5 h-3.5')} ${addr.phone}</span>
+          .map(
+            (addr: any, idx: number) => `
+              <div class="address-card-expandable ${addr.isDefault ? 'is-default' : ''} ${idx === 0 ? 'is-expanded' : ''}" data-addr-id="${addr.id}">
+                
+                <!-- CABECERA RESUMIDA (SIMPLE, LIMPIA Y CLICKABLE) -->
+                <div class="addr-card-summary-row" data-action="toggle-expand" title="Clic para ver o contraer detalles">
+                  <div class="addr-summary-left">
+                    <div class="addr-pin-badge">
+                      ${Icons.mapPin('w-4 h-4')}
+                    </div>
+                    <div class="addr-summary-text">
+                      <div class="addr-summary-title-line">
+                        <strong class="addr-name">${addr.fullName}</strong>
+                        ${addr.isDefault ? `<span class="badge-default-addr">Predeterminada</span>` : ''}
+                      </div>
+                      <p class="addr-summary-geo">
+                        <strong>${addr.city}</strong>, ${addr.state}
+                      </p>
+                      <p class="addr-summary-snippet">${addr.street}</p>
+                    </div>
                   </div>
-                  ${
-                    addr.isDefault
-                      ? `<span class="badge-default-addr">Predeterminada</span>`
-                      : `<button class="btn-make-default" data-id="${addr.id}">Marcar Principal</button>`
-                  }
+
+                  <div class="addr-summary-right">
+                    <span class="addr-expand-indicator" title="Ver más detalles">
+                      <svg class="chevron-icon" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                      </svg>
+                    </span>
+                  </div>
                 </div>
 
-                <div class="addr-card-body">
-                  <p class="addr-street">${addr.street}</p>
-                  <p class="addr-geo">
-                    <strong>${addr.city}</strong>, ${addr.state}, El Salvador (CP: ${addr.postalCode || '1101'})
-                  </p>
+                <!-- DETALLES EXTENDIDOS (SE EXTIENDE SIN MODAL) -->
+                <div class="addr-card-details-drawer">
+                  <div class="addr-card-details-inner">
+                    <div class="addr-details-grid">
+                      <div class="addr-detail-item">
+                        <span class="detail-label">Dirección exacta</span>
+                        <strong class="detail-val">${addr.street}</strong>
+                      </div>
+                      <div class="addr-detail-item">
+                        <span class="detail-label">Departamento & Municipio</span>
+                        <span class="detail-val">${addr.city}, ${addr.state}, El Salvador</span>
+                      </div>
+                      <div class="addr-detail-item">
+                        <span class="detail-label">Teléfono de contacto</span>
+                        <span class="detail-val">${Icons.phone('icon-phone-sm')} ${addr.phone}</span>
+                      </div>
+                      <div class="addr-detail-item">
+                        <span class="detail-label">Código Postal</span>
+                        <span class="detail-val">${addr.postalCode || '1101'}</span>
+                      </div>
+                    </div>
+
+                    <div class="addr-card-actions-row">
+                      ${addr.isDefault
+                ? `<span class="addr-is-default-notice">${Icons.check('icon-check-sm')} Dirección principal para envíos</span>`
+                : `<button type="button" class="btn-make-default" data-id="${addr.id}">Marcar como Principal</button>`
+              }
+                      <button type="button" class="btn-delete-addr" data-id="${addr.id}" title="Eliminar dirección">
+                        Eliminar dirección
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
-                <div class="addr-card-footer">
-                  <button class="btn-delete-addr" data-id="${addr.id}" title="Eliminar dirección">
-                    Eliminar
-                  </button>
-                </div>
               </div>
             `
-              )
-              .join('')}
+          )
+          .join('')}
           </div>
         `
-        }
+      }
       </div>
     `;
   }
@@ -907,8 +954,8 @@ export class ProfileModal {
                 <label for="card-month">Mes de Vencimiento *</label>
                 <select id="card-month" required>
                   ${Array.from({ length: 12 }, (_, i) => i + 1)
-                    .map((m) => `<option value="${m}">${m < 10 ? '0' + m : m}</option>`)
-                    .join('')}
+        .map((m) => `<option value="${m}">${m < 10 ? '0' + m : m}</option>`)
+        .join('')}
                 </select>
               </div>
 
@@ -916,8 +963,8 @@ export class ProfileModal {
                 <label for="card-year">Año de Vencimiento *</label>
                 <select id="card-year" required>
                   ${Array.from({ length: 10 }, (_, i) => 2026 + i)
-                    .map((y) => `<option value="${y}">${y}</option>`)
-                    .join('')}
+        .map((y) => `<option value="${y}">${y}</option>`)
+        .join('')}
                 </select>
               </div>
             </div>
@@ -937,25 +984,24 @@ export class ProfileModal {
         </div>
 
         <!-- LISTADO DE TARJETAS GUARDADAS (POP-IN PASO 4) -->
-        ${
-          paymentCards.length === 0
-            ? `
+        ${paymentCards.length === 0
+        ? `
           <div class="empty-state-box profile-component-pop pop-step-4">
             <div class="empty-icon">${Icons.creditCard('w-5 h-5')}</div>
             <h4>No tienes tarjetas agregadas</h4>
             <p>Agrega una tarjeta para procesar tus pagos de manera ágil y segura.</p>
           </div>
         `
-            : `
+        : `
           <div class="cards-grid profile-component-pop pop-step-4">
             ${paymentCards
-              .map((c: any) => {
-                const brandLogos: Record<string, string> = {
-                  VISA: 'VISA',
-                  MASTERCARD: 'MC',
-                  AMEX: 'AMEX'
-                };
-                return `
+          .map((c: any) => {
+            const brandLogos: Record<string, string> = {
+              VISA: 'VISA',
+              MASTERCARD: 'MC',
+              AMEX: 'AMEX'
+            };
+            return `
               <div class="credit-card-item ${c.isDefault ? 'is-default' : ''}">
                 <div class="card-chip-line">
                   <div class="card-emv-chip"></div>
@@ -985,11 +1031,11 @@ export class ProfileModal {
                 </div>
               </div>
             `;
-              })
-              .join('')}
+          })
+          .join('')}
           </div>
         `
-        }
+      }
       </div>
     `;
   }
@@ -1023,8 +1069,8 @@ export class ProfileModal {
               <select id="review-product-select" required>
                 <option value="">Elige un producto...</option>
                 ${this.productsList
-                  .map((p) => `<option value="${p.id}">${p.name} ($${p.price.toFixed(2)})</option>`)
-                  .join('')}
+        .map((p) => `<option value="${p.id}">${p.name} ($${p.price.toFixed(2)})</option>`)
+        .join('')}
               </select>
             </div>
 
@@ -1052,20 +1098,19 @@ export class ProfileModal {
         </div>
 
         <!-- LISTADO DE RESEÑAS (POP-IN PASO 4) -->
-        ${
-          reviews.length === 0
-            ? `
+        ${reviews.length === 0
+        ? `
           <div class="empty-state-box profile-component-pop pop-step-4">
             <div class="empty-icon">${Icons.star('w-5 h-5')}</div>
             <h4>No has publicado reseñas todavía</h4>
             <p>Cuéntanos qué te han parecido tus pares favoritos.</p>
           </div>
         `
-            : `
+        : `
           <div class="reviews-list-stack profile-component-pop pop-step-4">
             ${reviews
-              .map(
-                (rev: any) => `
+          .map(
+            (rev: any) => `
               <div class="profile-review-card">
                 <img src="${rev.productImage || '/assets/logo/Isotipo.png'}" alt="${rev.productName}" class="review-prod-thumb" />
                 <div class="review-content-col">
@@ -1080,11 +1125,11 @@ export class ProfileModal {
                 </div>
               </div>
             `
-              )
-              .join('')}
+          )
+          .join('')}
           </div>
         `
-        }
+      }
       </div>
     `;
   }
@@ -1102,9 +1147,8 @@ export class ProfileModal {
           </div>
         </div>
 
-        ${
-          wishlist.length === 0
-            ? `
+        ${wishlist.length === 0
+        ? `
           <div class="empty-state-box profile-component-pop pop-step-4">
             <div class="empty-icon">${Icons.heart('w-5 h-5')}</div>
             <h4>Tu lista de deseos está vacía</h4>
@@ -1112,11 +1156,11 @@ export class ProfileModal {
             <button class="btn btn-primary btn-go-shop" style="margin-top:16px;">Ver Catálogo</button>
           </div>
         `
-            : `
+        : `
           <div class="wishlist-profile-grid profile-component-pop pop-step-4">
             ${wishlist
-              .map(
-                (w: any) => `
+          .map(
+            (w: any) => `
               <div class="wishlist-prod-card">
                 <img src="${w.product.image}" alt="${w.product.name}" class="wish-img" />
                 <div class="wish-info">
@@ -1128,11 +1172,11 @@ export class ProfileModal {
                 </button>
               </div>
             `
-              )
-              .join('')}
+          )
+          .join('')}
           </div>
         `
-        }
+      }
       </div>
     `;
   }
@@ -1281,6 +1325,67 @@ export class ProfileModal {
       boxAddress?.classList.add('is-hidden');
     });
 
+    // Apertura y autocompletado con el mapa interactivo de El Salvador
+    const openMapAndFillAddress = () => {
+      boxAddress?.classList.remove('is-hidden');
+
+      MapPickerModal.getInstance().open((location: SelectedLocation) => {
+        const stateSelect = this.container.querySelector('#addr-state') as HTMLSelectElement | null;
+        const citySelect = this.container.querySelector('#addr-city') as HTMLSelectElement | null;
+        const streetInput = this.container.querySelector('#addr-street') as HTMLTextAreaElement | null;
+        const postalInput = this.container.querySelector('#addr-postal') as HTMLInputElement | null;
+        const refInput = this.container.querySelector('#addr-reference') as HTMLInputElement | null;
+
+        // 1. Asignar Departamento
+        if (stateSelect) {
+          stateSelect.value = location.state;
+          stateSelect.dispatchEvent(new Event('change'));
+        }
+
+        // 2. Asignar Municipio
+        if (citySelect) {
+          let matched = false;
+          const locCityClean = location.city.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+          for (let i = 0; i < citySelect.options.length; i++) {
+            const optVal = citySelect.options[i].value;
+            const optClean = optVal.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            if (optClean.includes(locCityClean) || locCityClean.includes(optClean)) {
+              citySelect.selectedIndex = i;
+              matched = true;
+              break;
+            }
+          }
+
+          if (!matched && citySelect.options.length > 1) {
+            citySelect.selectedIndex = 1;
+          }
+        }
+
+        // 3. Asignar Calle / Colonia
+        if (streetInput) {
+          streetInput.value = location.street;
+        }
+
+        // 4. Asignar Código Postal
+        if (postalInput) {
+          postalInput.value = location.postalCode;
+        }
+
+        // 5. Asignar Referencia
+        if (refInput && !refInput.value) {
+          refInput.value = location.reference || `Punto en mapa (${location.lat.toFixed(4)}, ${location.lng.toFixed(4)})`;
+        }
+
+        boxAddress?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        const nameInput = this.container.querySelector('#addr-fullname') as HTMLInputElement | null;
+        nameInput?.focus();
+      });
+    };
+
+    this.container.querySelector('#btn-open-map-direct')?.addEventListener('click', openMapAndFillAddress);
+    this.container.querySelector('#btn-trigger-map-picker')?.addEventListener('click', openMapAndFillAddress);
+
     // Selector dinámico de Departamentos de El Salvador -> Municipios
     const deptSelect = this.container.querySelector('#addr-state') as HTMLSelectElement | null;
     const citySelect = this.container.querySelector('#addr-city') as HTMLSelectElement | null;
@@ -1343,9 +1448,17 @@ export class ProfileModal {
       }
     });
 
+    // Toggle expansión de tarjetas de direcciones al hacer clic (sin abrir modal)
+    this.container.querySelectorAll('.address-card-expandable').forEach((card) => {
+      card.querySelector('[data-action="toggle-expand"]')?.addEventListener('click', () => {
+        card.classList.toggle('is-expanded');
+      });
+    });
+
     // Eliminar dirección
     this.container.querySelectorAll('.btn-delete-addr').forEach((btn) => {
-      btn.addEventListener('click', async () => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
         if (!this.store.currentUser) return;
         const addressId = (btn as HTMLElement).dataset.id;
         if (addressId && confirm('¿Estás seguro de eliminar esta dirección?')) {
@@ -1365,7 +1478,8 @@ export class ProfileModal {
 
     // Marcar dirección como predeterminada
     this.container.querySelectorAll('.btn-make-default').forEach((btn) => {
-      btn.addEventListener('click', async () => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
         if (!this.store.currentUser) return;
         const addressId = (btn as HTMLElement).dataset.id;
         if (addressId) {

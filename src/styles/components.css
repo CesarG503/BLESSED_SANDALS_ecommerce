@@ -5580,47 +5580,233 @@ body.profile-page-body {
   line-height: 1.45;
 }
 
-/* Direcciones en El Salvador */
-.addresses-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 16px;
-}
-
-.address-card {
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 20px;
-  background: #ffffff;
+/* Direcciones en El Salvador: Cards Expandibles Simples y Elegantes */
+.addresses-list-container {
   display: flex;
   flex-direction: column;
+  gap: 12px;
+}
+
+.address-card-expandable {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  overflow: hidden;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.address-card-expandable:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
+}
+
+.address-card-expandable.is-default {
+  border-color: #0B3B24;
+  background: #fcfdfc;
+}
+
+/* Fila de Resumen (Visible por defecto, muy simple y limpia) */
+.addr-card-summary-row {
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
   justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s;
+}
+
+.addr-card-summary-row:hover {
+  background: #f8fafc;
+}
+
+.addr-summary-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1;
+  min-width: 0;
+}
+
+.addr-pin-badge {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: #f1f5f9;
+  color: #475569;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
   transition: all 0.15s;
 }
 
-.address-card.is-default {
-  border-color: #0d643d;
-  box-shadow: 0 2px 10px rgba(13, 100, 61, 0.1);
+.address-card-expandable.is-default .addr-pin-badge {
+  background: #ecfdf5;
+  color: #0B3B24;
 }
 
-.addr-card-top {
+.addr-summary-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.addr-summary-title-line {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 12px;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
-.addr-name {
-  display: block;
+.addr-summary-title-line .addr-name {
   font-size: 0.95rem;
+  font-weight: 700;
   color: #0f172a;
 }
 
-.addr-phone {
-  display: block;
-  font-size: 0.78rem;
+.addr-summary-geo {
+  font-size: 0.84rem;
+  color: #334155;
+  margin: 2px 0 0;
+}
+
+.addr-summary-geo strong {
+  color: #0B3B24;
+}
+
+.addr-summary-snippet {
+  font-size: 0.76rem;
   color: #64748b;
-  margin-top: 2px;
+  margin: 1px 0 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 520px;
+}
+
+.addr-summary-right {
+  display: flex;
+  align-items: center;
+  margin-left: 12px;
+}
+
+.addr-expand-indicator {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #f8fafc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  transition: transform 0.25s ease, background 0.15s;
+}
+
+.addr-expand-indicator .chevron-icon {
+  width: 18px;
+  height: 18px;
+  transition: transform 0.25s ease;
+}
+
+.address-card-expandable.is-expanded .addr-expand-indicator .chevron-icon {
+  transform: rotate(180deg);
+}
+
+/* Cajón de Detalles que se Extiende sin Modal */
+.addr-card-details-drawer {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease;
+  border-top: 1px solid transparent;
+}
+
+.address-card-expandable.is-expanded .addr-card-details-drawer {
+  max-height: 400px;
+  opacity: 1;
+  border-top-color: #f1f5f9;
+}
+
+.addr-card-details-inner {
+  padding: 16px 20px 20px;
+  background: #fafbfd;
+}
+
+.addr-details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.addr-detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.addr-detail-item .detail-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #94a3b8;
+  font-weight: 700;
+}
+
+.addr-detail-item .detail-val {
+  font-size: 0.84rem;
+  color: #1e293b;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.icon-phone-sm,
+.addr-detail-item .detail-val svg {
+  width: 14px !important;
+  height: 14px !important;
+  min-width: 14px !important;
+  min-height: 14px !important;
+  max-width: 14px !important;
+  max-height: 14px !important;
+  display: inline-block;
+  vertical-align: middle;
+  flex-shrink: 0;
+  color: #64748b;
+}
+
+.addr-card-actions-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 14px;
+  border-top: 1px solid #e2e8f0;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.addr-is-default-notice {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #047857;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.icon-check-sm,
+.addr-is-default-notice svg {
+  width: 13px !important;
+  height: 13px !important;
+  min-width: 13px !important;
+  min-height: 13px !important;
+  max-width: 13px !important;
+  max-height: 13px !important;
+  display: inline-block;
+  vertical-align: middle;
+  flex-shrink: 0;
+  color: #059669;
 }
 
 .badge-default-addr {
@@ -5628,7 +5814,7 @@ body.profile-page-body {
   color: #047857;
   font-size: 0.68rem;
   font-weight: 800;
-  padding: 3px 8px;
+  padding: 2px 8px;
   border-radius: 999px;
   border: 1px solid #a7f3d0;
 }
@@ -5636,39 +5822,18 @@ body.profile-page-body {
 .btn-make-default {
   background: transparent;
   border: 1px solid #cbd5e1;
-  color: #475569;
-  font-size: 0.7rem;
-  font-weight: 700;
-  padding: 3px 8px;
+  color: #334155;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 5px 12px;
   border-radius: 6px;
   cursor: pointer;
+  transition: all 0.15s;
 }
 
 .btn-make-default:hover {
   background: #f1f5f9;
-}
-
-.addr-card-body {
-  margin-bottom: 16px;
-}
-
-.addr-street {
-  font-size: 0.85rem;
-  color: #334155;
-  margin: 0 0 6px;
-  line-height: 1.4;
-}
-
-.addr-geo {
-  font-size: 0.78rem;
-  color: #64748b;
-  margin: 0;
-}
-
-.addr-card-footer {
-  border-top: 1px solid #f1f5f9;
-  padding-top: 10px;
-  text-align: right;
+  border-color: #94a3b8;
 }
 
 .btn-delete-addr {
@@ -5678,9 +5843,13 @@ body.profile-page-body {
   font-size: 0.76rem;
   font-weight: 600;
   cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.15s;
 }
 
 .btn-delete-addr:hover {
+  background: #fee2e2;
   text-decoration: underline;
 }
 
@@ -6217,5 +6386,373 @@ body.profile-page-body {
 .profile-no-auth-actions {
   display: flex;
   flex-direction: column;
+  gap: 10px;
+}
+
+/* ==========================================================================
+   MODAL DE MAPA INTERACTIVO DE ENTREGAS EN EL SALVADOR
+   ========================================================================== */
+.map-picker-modal-root {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 100000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.map-picker-modal-root.is-hidden {
+  display: none !important;
+}
+
+.map-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background-color: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(6px);
+  z-index: 1;
+}
+
+.map-modal-dialog {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: 840px;
+  max-height: 92vh;
+  background: #ffffff;
+  border-radius: 20px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+.map-modal-top-bar {
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #ffffff;
+}
+
+.map-modal-top-bar .map-search-form {
+  flex: 1;
+}
+
+.btn-close-map-modal {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.btn-close-map-modal:hover {
+  background: #fee2e2;
+  color: #ef4444;
+  border-color: #fca5a5;
+}
+
+.map-modal-controls {
+  padding: 12px 24px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.map-search-form {
+  display: flex;
+  gap: 10px;
+}
+
+.map-search-input-wrap {
+  flex: 1;
+  position: relative;
+}
+
+.map-search-input-wrap .search-input-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #94a3b8;
+  pointer-events: none;
+}
+
+.map-search-input-wrap input {
+  width: 100%;
+  height: 38px;
+  padding: 0 14px 0 38px;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  font-size: 0.85rem;
+  color: #0f172a;
+  outline: none;
+  transition: all 0.15s;
+}
+
+.map-search-input-wrap input:focus {
+  border-color: #0B3B24;
+  box-shadow: 0 0 0 3px rgba(11, 59, 36, 0.12);
+}
+
+.map-quick-chips-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.quick-chips-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+
+.chips-scroll-container {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+}
+
+.btn-quick-chip {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #334155;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-quick-chip:hover {
+  background: #0B3B24;
+  color: #ffffff;
+  border-color: #0B3B24;
+}
+
+.map-canvas-wrapper {
+  position: relative;
+  width: 100%;
+  height: 360px;
+}
+
+.leaflet-delivery-map-el-salvador {
+  width: 100%;
+  height: 100%;
+  background: #e5e7eb;
+}
+
+.map-loading-indicator {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 1000;
+  background: rgba(15, 23, 42, 0.85);
+  color: #ffffff;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.map-loading-indicator.is-hidden {
+  display: none;
+}
+
+/* Pin Personalizado Blessed Sandals */
+.blessed-custom-pin-root {
+  position: relative;
+}
+
+.blessed-pin-bubble {
+  width: 38px;
+  height: 38px;
+  background: #0B3B24;
+  border: 3px solid #ffffff;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 18px rgba(11, 59, 36, 0.45);
+  transition: transform 0.15s;
+}
+
+.blessed-pin-bubble .pin-svg-icon {
+  transform: rotate(45deg);
+  width: 18px;
+  height: 18px;
+  stroke: #ffffff;
+}
+
+.blessed-pin-pulse {
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 16px;
+  height: 6px;
+  background: rgba(11, 59, 36, 0.35);
+  border-radius: 50%;
+}
+
+/* Tarjeta de vista previa */
+.map-preview-card {
+  padding: 14px 24px;
+  background: #ffffff;
+  border-top: 1px solid #e2e8f0;
+}
+
+.preview-card-grid {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.preview-col-main {
+  flex: 1;
+}
+
+.preview-badges-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.preview-badge-dept {
+  background: #0B3B24;
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+.preview-badge-city {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+.preview-badge-country {
+  font-size: 0.72rem;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.preview-address-text {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 580px;
+}
+
+.preview-postal-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 6px 12px;
+  text-align: center;
+}
+
+.postal-label {
+  display: block;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  color: #94a3b8;
+  font-weight: 700;
+}
+
+.postal-value {
+  font-size: 0.95rem;
+  color: #0B3B24;
+  font-weight: 800;
+}
+
+.map-modal-footer {
+  padding: 14px 24px;
+  background: #f8fafc;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* Botón Seleccionar Ubicación con Icono de Maps */
+.form-map-trigger-row {
+  margin-bottom: 20px;
+}
+
+.btn-select-location-map {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #f0fdf4;
+  color: #0B3B24;
+  border: 1.5px solid #0B3B24;
+  padding: 9px 18px;
+  border-radius: 10px;
+  font-size: 0.86rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-select-location-map:hover {
+  background: #0B3B24;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(11, 59, 36, 0.18);
+  transform: translateY(-1px);
+}
+
+.btn-select-location-map .map-icon-svg {
+  width: 17px !important;
+  height: 17px !important;
+  min-width: 17px !important;
+  min-height: 17px !important;
+  max-width: 17px !important;
+  max-height: 17px !important;
+  flex-shrink: 0;
+  stroke: currentColor;
+}
+
+.panel-header-btns-group {
+  display: flex;
+  align-items: center;
   gap: 10px;
 }
