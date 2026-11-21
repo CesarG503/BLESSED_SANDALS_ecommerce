@@ -83,4 +83,20 @@ export class StorageService {
       console.error('Error saving promo to localStorage', e);
     }
   }
+
+  static getWelcomePromoRedeemed(): boolean {
+    try {
+      return localStorage.getItem('blessed_welcome_promo_redeemed') === 'true';
+    } catch {
+      return false;
+    }
+  }
+
+  static saveWelcomePromoRedeemed(redeemed: boolean): void {
+    try {
+      localStorage.setItem('blessed_welcome_promo_redeemed', redeemed ? 'true' : 'false');
+    } catch (e) {
+      console.error('Error saving welcome promo status', e);
+    }
+  }
 }

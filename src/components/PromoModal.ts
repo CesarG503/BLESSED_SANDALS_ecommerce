@@ -7,6 +7,8 @@ export class PromoModal {
   private container: HTMLElement;
   private store: Store;
   private inputCode: string = '';
+  private expandedCodes: Set<string> = new Set();
+  private repositionHandler: (() => void) | null = null;
 
   constructor(containerId: string) {
     this.store = Store.getInstance();
@@ -15,55 +17,69 @@ export class PromoModal {
     this.container = el;
 
     this.store.subscribe(() => this.render());
+    this.setupGlobalListeners();
+  }
+
+  private setupGlobalListeners(): void {
+    // Cerrar con tecla Escape
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && this.store.isPromoOpen) {
+        this.store.togglePromo(false);
+      }
+    });
+
+    this.repositionHandler = () => {
+      if (this.store.isPromoOpen) {
+        this.updatePosition();
+      }
+    };
+
+    window.addEventListener('resize', this.repositionHandler, { passive: true });
+    window.addEventListener('scroll', this.repositionHandler, { passive: true });
   }
 
   public render(): void {
     const isOpen = this.store.isPromoOpen;
     const applied = this.store.appliedPromo;
-    const subtotal = this.store.getCartSubtotal();
+    const user = this.store.currentUser;
 
-    if (isOpen) {
-      this.container.classList.add('is-open');
-      document.body.style.overflow = 'hidden';
-    } else {
+    if (!isOpen) {
       this.container.classList.remove('is-open');
-      document.body.style.overflow = '';
+      this.container.innerHTML = '';
       return;
     }
 
+    this.container.classList.add('is-open');
+
     this.container.innerHTML = `
-      <div class="modal-backdrop" id="promo-modal-backdrop"></div>
-      <div class="promo-modal-panel animate-scale-up" role="dialog" aria-modal="true">
-        <!-- CABECERA -->
-        <div class="promo-modal-header">
-          <div class="promo-header-icon-title">
-            <span class="promo-title-icon">${Icons.ticket('w-6 h-6')}</span>
-            <div>
-              <h3 class="promo-modal-title">Códigos Promocionales</h3>
-              <p class="promo-modal-subtitle">Aplica tu cupón y ahorra en tu próxima compra</p>
-            </div>
-          </div>
-          <button class="modal-close-btn" id="promo-modal-close" aria-label="Cerrar modal">
-            ${Icons.close('w-5 h-5')}
+      <!-- FONDO TRANSPARENTE PARA CERRAR AL HACER CLIC AFUERA (SIN BLUR, SIN OSCURECER LA WEB) -->
+      <div class="promo-popover-dismiss" id="promo-popover-dismiss" aria-hidden="true"></div>
+
+      <!-- POPOVER COMPACTO FLOTANTE DEBAJO DEL BOTÓN DE TICKET -->
+      <div class="promo-popover-card animate-promo-pop" id="promo-popover-panel" role="dialog" aria-modal="true">
+        <!-- FLECHA APUNTANDO AL BOTÓN DEL HEADER -->
+        <div class="promo-popover-arrow" id="promo-popover-arrow" aria-hidden="true"></div>
+
+        <!-- BOTÓN DE CERRAR LIMPIO EN LA ESQUINA SUPERIOR -->
+        <div class="promo-popover-top-bar">
+          <button class="promo-popover-close-btn" id="promo-modal-close" aria-label="Cerrar ventana">
+            ${Icons.close('w-3.5 h-3.5')}
           </button>
         </div>
 
-        <!-- CUPÓN ACTUAL APLICADO (SI EXISTE) -->
+        <!-- CUPÓN ACTIVO (SI YA HAY UNO APLICADO) -->
         ${
           applied
             ? `
-          <div class="promo-active-banner">
-            <div class="promo-active-info">
-              <span class="promo-badge-tag">${Icons.check('w-4 h-4')} Activo</span>
-              <div>
-                <strong class="promo-active-code">${applied.code}</strong>
-                <p class="promo-active-desc">${applied.description}</p>
-                <span class="promo-discount-calc">
-                  Descuento estimado: <strong>-$${this.store.getDiscountAmount().toFixed(2)}</strong>
-                </span>
+          <div class="promo-popover-active-row">
+            <div class="promo-active-left">
+              <span class="promo-active-icon">${Icons.check('w-3 h-3')}</span>
+              <div class="promo-active-text">
+                <span class="promo-active-label">Activo: <strong>${applied.code}</strong></span>
+                <span class="promo-active-desc">${applied.description}</span>
               </div>
             </div>
-            <button class="btn-remove-promo" id="btn-remove-promo-active" title="Remover cupón">
+            <button class="btn-promo-remove" id="btn-remove-promo-active" title="Quitar cupón">
               Quitar
             </button>
           </div>
@@ -71,91 +87,210 @@ export class PromoModal {
             : ''
         }
 
-        <!-- FORMULARIO PARA INGRESAR CÓDIGO -->
-        <div class="promo-input-box">
-          <label for="promo-code-input" class="promo-input-label">Ingresa tu código</label>
-          <div class="promo-input-row">
-            <div class="input-with-icon">
-              <span class="field-icon">${Icons.ticket('w-4 h-4')}</span>
+        <!-- FORMULARIO ULTRA-COMPACTO DE CUPÓN CON LÍNEA FINA -->
+        <div class="promo-popover-input-area">
+          <div class="promo-input-compact-row">
+            <div class="promo-input-field-wrap">
               <input 
                 type="text" 
                 id="promo-code-input" 
-                class="promo-text-input" 
-                placeholder="Ej. BLESSED10, WILD15..." 
+                class="promo-compact-input" 
+                placeholder="Ingresa tu código..." 
                 value="${this.inputCode}" 
                 autocomplete="off"
                 spellcheck="false"
               />
             </div>
-            <button class="btn btn-primary btn-apply-promo" id="btn-submit-promo">
+            <button class="btn-promo-compact-apply" id="btn-submit-promo">
               Aplicar
             </button>
           </div>
         </div>
 
-        <!-- CUPONES DISPONIBLES DE LA TIENDA -->
-        <div class="promo-available-section">
-          <h4 class="promo-section-heading">Cupones Disponibles</h4>
-          <div class="promo-coupons-list">
-            ${this.store.promoCodes
-              .map((p) => {
-                const isCurrent = applied?.code === p.code;
-                return `
-              <div class="promo-coupon-card ${isCurrent ? 'is-selected' : ''}">
-                <div class="coupon-left">
-                  <div class="coupon-tag-badge">
-                    ${p.discountType === 'PERCENTAGE' ? `${p.discountValue}% OFF` : `-$${p.discountValue}`}
-                  </div>
-                  <div class="coupon-details">
-                    <strong class="coupon-code-label">${p.code}</strong>
-                    <p class="coupon-desc">${p.description}</p>
-                    ${p.minPurchase ? `<span class="coupon-min">Compra mín. $${p.minPurchase}</span>` : ''}
-                  </div>
-                </div>
-                <div class="coupon-right">
-                  ${
-                    isCurrent
-                      ? `<span class="coupon-applied-status">${Icons.check('w-4 h-4')} Aplicado</span>`
-                      : `<button class="btn-coupon-claim" data-code="${p.code}">Usar</button>`
-                  }
-                </div>
-              </div>
-            `;
-              })
-              .join('')}
+        <!-- SECCIÓN DE "MIS CUPONES" -->
+        <div class="promo-popover-chips-area">
+          <div class="promo-section-title-row">
+            <span class="promo-chips-title">Mis Cupones</span>
+            ${
+              user
+                ? `<span class="promo-user-active-badge">${user.name}</span>`
+                : ''
+            }
           </div>
-        </div>
 
-        <!-- RESUMEN RÁPIDO DE CARRITO -->
-        <div class="promo-cart-summary-footer">
-          <div class="summary-line">
-            <span>Subtotal de tu bolsa:</span>
-            <strong>$${subtotal.toFixed(2)}</strong>
-          </div>
           ${
-            applied && this.store.getDiscountAmount() > 0
+            user
               ? `
-            <div class="summary-line discount-line">
-              <span>Descuento (${applied.code}):</span>
-              <strong class="text-discount">-$${this.store.getDiscountAmount().toFixed(2)}</strong>
-            </div>
-            <div class="summary-line total-line">
-              <span>Nuevo Total:</span>
-              <strong class="text-primary">$${this.store.getCartTotal().toFixed(2)}</strong>
+            <!-- SI EL USUARIO TIENE CUENTA: SE MUESTRAN SUS CUPONES CON TEXTO EXPANDIBLE AL CLIC -->
+            <div class="promo-coupons-stack">
+              ${
+                !this.store.isWelcomePromoRedeemed
+                  ? `
+                <div class="promo-coupon-item ${this.expandedCodes.has('BIENVENIDA5') ? 'is-expanded' : ''}" data-coupon="BIENVENIDA5">
+                  <div class="promo-coupon-main">
+                    <div class="promo-coupon-left" data-action="toggle-info" data-code="BIENVENIDA5">
+                      <strong class="promo-coupon-code">BIENVENIDA5</strong>
+                      <span class="promo-discount-pill">-5%</span>
+                      <button type="button" class="btn-coupon-info-toggle" data-action="toggle-info" data-code="BIENVENIDA5" title="Ver detalles" aria-label="Ver detalles">
+                        <svg class="w-3 h-3 info-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                      </button>
+                    </div>
+                    <div class="promo-coupon-right">
+                      ${
+                        applied?.code === 'BIENVENIDA5'
+                          ? `<span class="coupon-status-applied">${Icons.check('w-3 h-3')} Activo</span>`
+                          : `<button type="button" class="btn-claim-coupon" data-code="BIENVENIDA5">Usar</button>`
+                      }
+                    </div>
+                  </div>
+                  <div class="promo-coupon-expandable">
+                    <p class="promo-coupon-explanation">
+                      Cupón de bienvenida para cuenta nueva (5% de descuento en tu orden).
+                    </p>
+                  </div>
+                </div>
+              `
+                  : ''
+              }
+              ${this.store.promoCodes
+                .map((p) => {
+                  const isCurrent = applied?.code === p.code;
+                  const valueText = p.discountType === 'PERCENTAGE' ? `${p.discountValue}%` : `$${p.discountValue}`;
+                  const isExpanded = this.expandedCodes.has(p.code);
+                  return `
+                <div class="promo-coupon-item ${isExpanded ? 'is-expanded' : ''}" data-coupon="${p.code}">
+                  <div class="promo-coupon-main">
+                    <div class="promo-coupon-left" data-action="toggle-info" data-code="${p.code}">
+                      <strong class="promo-coupon-code">${p.code}</strong>
+                      <span class="promo-discount-pill">-${valueText}</span>
+                      <button type="button" class="btn-coupon-info-toggle" data-action="toggle-info" data-code="${p.code}" title="Ver detalles" aria-label="Ver detalles">
+                        <svg class="w-3 h-3 info-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                      </button>
+                    </div>
+                    <div class="promo-coupon-right">
+                      ${
+                        isCurrent
+                          ? `<span class="coupon-status-applied">${Icons.check('w-3 h-3')} Activo</span>`
+                          : `<button type="button" class="btn-claim-coupon" data-code="${p.code}">Usar</button>`
+                      }
+                    </div>
+                  </div>
+                  <div class="promo-coupon-expandable">
+                    <p class="promo-coupon-explanation">
+                      ${p.description}
+                      ${p.minPurchase ? `<span class="promo-min-text">• Compra mínima: $${p.minPurchase}</span>` : ''}
+                    </p>
+                  </div>
+                </div>
+              `;
+                })
+                .join('')}
             </div>
           `
-              : ''
+              : `
+            <!-- SI NO TIENE CUENTA: SALE EL CUPÓN DE BIENVENIDA CON -5% EN PILL Y TEXTO EXPANDIBLE AL CLIC -->
+            <div class="promo-coupons-stack">
+              <div class="promo-coupon-item ${this.expandedCodes.has('BIENVENIDA5') ? 'is-expanded' : ''}" data-coupon="BIENVENIDA5">
+                <div class="promo-coupon-main">
+                  <div class="promo-coupon-left" data-action="toggle-info" data-code="BIENVENIDA5">
+                    <strong class="promo-coupon-code">BIENVENIDA5</strong>
+                    <span class="promo-discount-pill">-5%</span>
+                    <button type="button" class="btn-coupon-info-toggle" data-action="toggle-info" data-code="BIENVENIDA5" title="Ver detalles" aria-label="Ver detalles">
+                      <svg class="w-3 h-3 info-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="6 9 12 15 18 9"></polyline>
+                      </svg>
+                    </button>
+                  </div>
+                  <div class="promo-coupon-right">
+                    ${
+                      applied?.code === 'BIENVENIDA5'
+                        ? `<span class="coupon-status-applied">${Icons.check('w-3 h-3')} Activo</span>`
+                        : this.store.isWelcomePromoRedeemed
+                        ? `<span class="coupon-status-used">Canjeado</span>`
+                        : `<button type="button" class="btn-claim-coupon" data-code="BIENVENIDA5">Canjear</button>`
+                    }
+                  </div>
+                </div>
+                <!-- TEXTO EXTRA QUE SOLO SE MUESTRA AL DARLE CLIC -->
+                <div class="promo-coupon-expandable">
+                  <p class="promo-coupon-explanation">
+                    Cupón de bienvenida exclusivo para cuenta nueva (5% de descuento en tu compra).
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- INVITACIÓN A INICIAR SESIÓN -->
+            <div class="promo-login-invite">
+              <button type="button" class="btn-invite-login" id="link-open-login-from-promo">
+                Inicia sesión para desbloquear más cupones →
+              </button>
+            </div>
+          `
           }
         </div>
       </div>
     `;
 
     this.setupEvents();
+    this.updatePosition();
+
+    // Auto-focus al campo de cupón para escribir inmediatamente sin clics adicionales
+    setTimeout(() => {
+      const inputEl = this.container.querySelector('#promo-code-input') as HTMLInputElement | null;
+      if (inputEl) {
+        inputEl.focus();
+        inputEl.select();
+      }
+    }, 50);
+  }
+
+  /**
+   * Posiciona el popover con precisión milimétrica justo debajo del botón de ticket
+   */
+  private updatePosition(): void {
+    const btn = document.getElementById('header-promo-btn');
+    const panel = this.container.querySelector('#promo-popover-panel') as HTMLElement | null;
+    const arrow = this.container.querySelector('#promo-popover-arrow') as HTMLElement | null;
+
+    if (!btn || !panel) return;
+
+    const rect = btn.getBoundingClientRect();
+    const popoverWidth = Math.min(320, window.innerWidth - 24);
+    panel.style.width = `${popoverWidth}px`;
+
+    // Posición Vertical: Justo debajo del botón
+    const top = rect.bottom + 10;
+
+    // Posición Horizontal: Centrado bajo el botón y acotado por los márgenes de la pantalla
+    const margin = 12;
+    let left = rect.left + rect.width / 2 - popoverWidth / 2;
+
+    if (left + popoverWidth > window.innerWidth - margin) {
+      left = window.innerWidth - popoverWidth - margin;
+    }
+    if (left < margin) {
+      left = margin;
+    }
+
+    panel.style.top = `${top}px`;
+    panel.style.left = `${left}px`;
+
+    // Flechita apuntando al centro exacto del botón de ticket
+    if (arrow) {
+      const buttonCenter = rect.left + rect.width / 2;
+      const arrowLeft = Math.max(16, Math.min(popoverWidth - 24, buttonCenter - left - 6));
+      arrow.style.left = `${arrowLeft}px`;
+    }
   }
 
   private setupEvents(): void {
-    // Cerrar con backdrop o botón X
-    this.container.querySelector('#promo-modal-backdrop')?.addEventListener('click', () => {
+    // Cerrar al hacer clic afuera (fondo transparente) o en la X
+    this.container.querySelector('#promo-popover-dismiss')?.addEventListener('click', () => {
       this.store.togglePromo(false);
     });
 
@@ -163,7 +298,7 @@ export class PromoModal {
       this.store.togglePromo(false);
     });
 
-    // Input change
+    // Control de texto
     const inputEl = this.container.querySelector('#promo-code-input') as HTMLInputElement | null;
     inputEl?.addEventListener('input', (e) => {
       this.inputCode = (e.target as HTMLInputElement).value;
@@ -171,6 +306,7 @@ export class PromoModal {
 
     inputEl?.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
+        e.preventDefault();
         this.submitCode();
       }
     });
@@ -180,32 +316,63 @@ export class PromoModal {
       this.submitCode();
     });
 
-    // Remover cupón activo
+    // Quitar cupón activo
     this.container.querySelector('#btn-remove-promo-active')?.addEventListener('click', () => {
       this.store.removePromo();
       Toast.show('Cupón removido');
     });
 
-    // Botones de cupones disponibles "Usar"
-    const claimBtns = this.container.querySelectorAll('.btn-coupon-claim');
-    claimBtns.forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const code = (btn as HTMLElement).dataset.code;
+    // Toggle para expandir información extra al hacer clic en el cupón o en la flechita
+    const toggleTriggers = this.container.querySelectorAll('[data-action="toggle-info"]');
+    toggleTriggers.forEach((trigger) => {
+      trigger.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const code = (trigger as HTMLElement).dataset.code;
         if (code) {
-          const res = this.store.applyPromo(code);
-          if (res.success) {
-            confetti({
-              particleCount: 50,
-              spread: 60,
-              origin: { y: 0.6 }
-            });
-            Toast.show(res.message);
+          if (this.expandedCodes.has(code)) {
+            this.expandedCodes.delete(code);
           } else {
-            Toast.show(res.message);
+            this.expandedCodes.add(code);
+          }
+          const itemEl = this.container.querySelector(`[data-coupon="${code}"]`);
+          if (itemEl) {
+            itemEl.classList.toggle('is-expanded');
           }
         }
       });
     });
+
+    // Clic en los botones "Canjear" / "Usar"
+    const claimBtns = this.container.querySelectorAll('.btn-claim-coupon');
+    claimBtns.forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const code = (btn as HTMLElement).dataset.code;
+        if (code) {
+          this.applySpecificCode(code);
+        }
+      });
+    });
+
+    // Clic para abrir login desde el popover
+    this.container.querySelector('#link-open-login-from-promo')?.addEventListener('click', () => {
+      this.store.togglePromo(false);
+      this.store.toggleAuth(true);
+    });
+  }
+
+  private applySpecificCode(code: string): void {
+    const res = this.store.applyPromo(code);
+    if (res.success) {
+      confetti({
+        particleCount: 50,
+        spread: 65,
+        origin: { y: 0.15 }
+      });
+      Toast.show(res.message);
+    } else {
+      Toast.show(res.message);
+    }
   }
 
   private submitCode(): void {
@@ -219,9 +386,9 @@ export class PromoModal {
     if (res.success) {
       this.inputCode = '';
       confetti({
-        particleCount: 60,
-        spread: 70,
-        origin: { y: 0.6 }
+        particleCount: 50,
+        spread: 65,
+        origin: { y: 0.15 }
       });
       Toast.show(res.message);
     } else {

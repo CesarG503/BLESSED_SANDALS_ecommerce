@@ -36,6 +36,15 @@ export class Store {
   // Promociones y Descuentos
   public isPromoOpen: boolean = false;
   public appliedPromo: PromoCode | null = null;
+  public welcomePromo: PromoCode = {
+    id: 'promo-welcome',
+    code: 'BIENVENIDA5',
+    description: '5% de descuento para cuenta nueva (1 solo uso)',
+    discountType: 'PERCENTAGE',
+    discountValue: 5,
+    isActive: true
+  };
+  public isWelcomePromoRedeemed: boolean = false;
   public promoCodes: PromoCode[] = [
     {
       id: 'promo-1',
@@ -89,6 +98,7 @@ export class Store {
     this.wishlist = StorageService.getWishlist();
     this.currentUser = StorageService.getUser();
     this.appliedPromo = StorageService.getPromo();
+    this.isWelcomePromoRedeemed = StorageService.getWelcomePromoRedeemed();
   }
 
   public static getInstance(): Store {
@@ -231,6 +241,26 @@ export class Store {
   // --- ACCIONES DE PROMOCIONES / CUPONES ---
   public applyPromo(code: string): { success: boolean; message: string } {
     const clean = code.trim().toUpperCase();
+
+    // Verificación especial para cupón de bienvenida (5% para cuentas nuevas)
+    if (clean === 'BIENVENIDA5' || clean === 'BIENVENIDO5') {
+      if (this.isWelcomePromoRedeemed) {
+        return {
+          success: false,
+          message: 'El cupón de bienvenida BIENVENIDA5 (5%) ya ha sido canjeado anteriormente. Solo es válido 1 vez por cuenta nueva.'
+        };
+      }
+      this.appliedPromo = this.welcomePromo;
+      this.isWelcomePromoRedeemed = true;
+      StorageService.saveWelcomePromoRedeemed(true);
+      StorageService.savePromo(this.welcomePromo);
+      this.notify();
+      return {
+        success: true,
+        message: '¡Cupón de bienvenida BIENVENIDA5 aplicado con éxito! 5% de descuento en tu compra.'
+      };
+    }
+
     const found = this.promoCodes.find((p) => p.code === clean && p.isActive);
     if (!found) {
       return { success: false, message: `El código "${code}" no es válido o ha expirado.` };

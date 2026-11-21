@@ -3472,313 +3472,408 @@
 }
 
 /* ==========================================================================
-   MODAL DE CÓDIGOS PROMOCIONALES (PROMO MODAL)
+   POPOVER FLOTANTE DE CÓDIGOS PROMOCIONALES (PROMO POPOVER)
    ========================================================================== */
 
-.promo-modal-panel {
+.promo-popover-container {
+  position: relative;
+  z-index: 1200;
+  pointer-events: none;
+}
+
+.promo-popover-container.is-open {
+  pointer-events: auto;
+}
+
+/* Fondo transparente para cerrar al hacer clic afuera (sin blur, sin oscurecer la web) */
+.promo-popover-dismiss {
   position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 90%;
-  max-width: 500px;
-  max-height: 85vh;
+  inset: 0;
+  z-index: 1201;
+  background: transparent;
+  cursor: default;
+}
+
+/* Animación interesante con elasticidad y spring suave */
+@keyframes promoPopoverEntrance {
+  0% {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.92);
+    filter: blur(2px);
+  }
+  60% {
+    transform: translateY(3px) scale(1.015);
+    filter: blur(0px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0px);
+  }
+}
+
+.animate-promo-pop {
+  animation: promoPopoverEntrance 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transform-origin: top center;
+}
+
+.promo-popover-card {
+  position: fixed;
+  z-index: 1202;
+  width: 320px;
   background: #ffffff;
-  border-radius: 16px;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-  z-index: 1001;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  border: 1px solid var(--color-border-light);
+  border-radius: 14px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 16px 36px -6px rgba(0, 0, 0, 0.16), 0 0 0 1px rgba(0, 0, 0, 0.04);
+  overflow: visible;
+  user-select: none;
 }
 
-.promo-modal-header {
+.promo-popover-arrow {
+  position: absolute;
+  top: -6px;
+  width: 12px;
+  height: 12px;
+  background: #ffffff;
+  transform: rotate(45deg);
+  border-left: 1px solid rgba(0, 0, 0, 0.08);
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  border-top-left-radius: 2px;
+  z-index: 1;
+}
+
+.promo-popover-top-bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 20px 24px;
-  border-bottom: 1px solid var(--color-border-light);
-  background: #fafafa;
+  justify-content: flex-end;
+  padding: 8px 10px 2px;
 }
 
-.promo-header-icon-title {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.promo-title-icon {
-  width: 42px;
-  height: 42px;
-  border-radius: 10px;
-  background: #fef3c7;
-  color: #b45309;
+.promo-popover-close-btn {
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-full);
+  border: none;
+  background: transparent;
+  color: #9ca3af;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: all 0.15s ease;
 }
 
-.promo-modal-title {
-  font-size: 1.15rem;
-  font-weight: 800;
+.promo-popover-close-btn:hover {
+  background: #f4f4f5;
   color: #111111;
-  margin: 0;
 }
 
-.promo-modal-subtitle {
-  font-size: 0.78rem;
-  color: #71717a;
-  margin: 2px 0 0;
-}
-
-.promo-active-banner {
-  margin: 16px 24px 0;
-  padding: 12px 16px;
+.promo-popover-active-row {
+  margin: 0 12px 8px;
+  padding: 6px 10px;
   background: #f0fdf4;
-  border: 1px solid #86efac;
-  border-radius: 10px;
+  border: 1px dashed #86efac;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
 
-.promo-active-info {
+.promo-active-left {
   display: flex;
-  align-items: flex-start;
-  gap: 10px;
+  align-items: center;
+  gap: 7px;
 }
 
-.promo-badge-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 0.7rem;
-  font-weight: 700;
+.promo-active-icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
   background: #22c55e;
   color: #ffffff;
-  padding: 2px 8px;
-  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
-.promo-active-code {
-  font-size: 0.95rem;
-  color: #14532d;
-  letter-spacing: 0.5px;
+.promo-active-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
 }
 
-.promo-active-desc {
-  font-size: 0.75rem;
-  color: #166534;
-  margin: 1px 0;
-}
-
-.promo-discount-calc {
-  font-size: 0.75rem;
+.promo-active-label {
+  font-size: 0.76rem;
   color: #15803d;
 }
 
-.btn-remove-promo {
+.promo-active-desc {
+  font-size: 0.65rem;
+  color: #166534;
+}
+
+.btn-promo-remove {
+  border: none;
   background: transparent;
-  border: 1px solid #f87171;
-  color: #dc2626;
-  font-size: 0.75rem;
-  font-weight: 600;
-  padding: 4px 10px;
-  border-radius: 6px;
+  color: #ef4444;
+  font-size: 0.72rem;
+  font-weight: 700;
   cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
   transition: all 0.15s ease;
 }
 
-.btn-remove-promo:hover {
-  background: #fef2f2;
+.btn-promo-remove:hover {
+  background: #fee2e2;
 }
 
-.promo-input-box {
-  padding: 20px 24px;
+.promo-popover-input-area {
+  padding: 2px 12px 10px;
 }
 
-.promo-input-label {
-  display: block;
-  font-size: 0.78rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: #4b5563;
-  margin-bottom: 8px;
-}
-
-.promo-input-row {
+.promo-input-compact-row {
   display: flex;
-  gap: 10px;
+  gap: 6px;
+  align-items: center;
 }
 
-.input-with-icon {
+.promo-input-field-wrap {
   position: relative;
   flex: 1;
 }
 
-.field-icon {
-  position: absolute;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: #9ca3af;
-  pointer-events: none;
-}
-
-.promo-text-input {
+.promo-compact-input {
   width: 100%;
-  padding: 10px 14px 10px 38px;
-  font-size: 0.92rem;
-  border: 1.5px solid var(--color-border);
-  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 0.82rem;
+  font-weight: 700;
   text-transform: uppercase;
-  font-weight: 600;
   letter-spacing: 0.5px;
-  transition: border-color 0.2s ease;
-}
-
-.promo-text-input:focus {
+  border: 1px solid #d4d4d8; /* Línea menos gruesa */
+  border-radius: 8px;
   outline: none;
-  border-color: #111111;
-}
-
-.btn-apply-promo {
-  padding: 10px 20px;
-  font-size: 0.88rem;
-  font-weight: 700;
-  border-radius: 8px;
-  white-space: nowrap;
-}
-
-.promo-available-section {
-  padding: 0 24px 16px;
-  overflow-y: auto;
-  max-height: 250px;
-}
-
-.promo-section-heading {
-  font-size: 0.8rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: #6b7280;
-  margin-bottom: 12px;
-}
-
-.promo-coupons-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.promo-coupon-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 14px;
-  border: 1px dashed var(--color-border);
-  border-radius: 10px;
-  background: #fbfbfb;
+  background: #ffffff;
   transition: all 0.15s ease;
 }
 
-.promo-coupon-card:hover {
-  background: #f7f7f7;
+.promo-compact-input:focus {
   border-color: #111111;
+  box-shadow: none; /* Sin sombra gruesa */
 }
 
-.promo-coupon-card.is-selected {
-  border-color: #22c55e;
-  background: #f0fdf4;
-}
-
-.coupon-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.coupon-tag-badge {
-  font-size: 0.76rem;
-  font-weight: 800;
+.btn-promo-compact-apply {
+  padding: 8px 14px;
+  font-size: 0.78rem;
+  font-weight: 700;
   background: #111111;
   color: #ffffff;
-  padding: 4px 8px;
-  border-radius: 6px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
   white-space: nowrap;
 }
 
-.promo-coupon-card.is-selected .coupon-tag-badge {
-  background: #16a34a;
+.btn-promo-compact-apply:hover {
+  background: #27272a;
+  transform: translateY(-1px);
 }
 
-.coupon-code-label {
-  font-size: 0.88rem;
-  color: #111111;
-  display: block;
+.promo-popover-chips-area {
+  padding: 10px 12px 12px;
+  background: #fafafa;
+  border-top: 1px solid #f1f5f9; /* Línea divisoria menos gruesa y más sutil */
+  border-bottom-left-radius: 14px;
+  border-bottom-right-radius: 14px;
 }
 
-.coupon-desc {
-  font-size: 0.74rem;
-  color: #6b7280;
-  margin: 1px 0;
+.promo-section-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
 }
 
-.coupon-min {
+.promo-chips-title {
   font-size: 0.68rem;
-  color: #9ca3af;
+  font-weight: 800;
+  color: #4b5563;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
-.btn-coupon-claim {
-  padding: 5px 14px;
-  font-size: 0.76rem;
+.promo-user-active-badge {
+  font-size: 0.64rem;
+  font-weight: 600;
+  color: #16a34a;
+  background: #dcfce7;
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+}
+
+.promo-coupons-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.promo-coupon-item {
+  background: #ffffff;
+  border: 1px solid #e4e4e7;
+  border-radius: 8px;
+  overflow: hidden;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.promo-coupon-item:hover {
+  border-color: #cbd5e1;
+}
+
+.promo-coupon-item.is-expanded {
+  border-color: #94a3b8;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+}
+
+.promo-coupon-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 10px;
+}
+
+.promo-coupon-left {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.promo-coupon-code {
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: #111111;
+  letter-spacing: 0.4px;
+}
+
+/* Nuevo estilo para el descuento sin badge pesado */
+.promo-discount-pill {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #15803d;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.btn-coupon-info-toggle {
+  background: none;
+  border: none;
+  padding: 2px;
+  color: #94a3b8;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), color 0.15s ease;
+}
+
+.btn-coupon-info-toggle:hover {
+  color: #111111;
+}
+
+.promo-coupon-item.is-expanded .btn-coupon-info-toggle {
+  transform: rotate(180deg);
+  color: #111111;
+}
+
+.btn-claim-coupon {
+  padding: 4px 10px;
+  font-size: 0.72rem;
   font-weight: 700;
   border-radius: var(--radius-full);
   background: #111111;
   color: #ffffff;
   border: none;
   cursor: pointer;
+  white-space: nowrap;
   transition: all 0.15s ease;
 }
 
-.btn-coupon-claim:hover {
+.btn-claim-coupon:hover {
   background: #333333;
   transform: translateY(-1px);
 }
 
-.coupon-applied-status {
+.coupon-status-applied {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  font-size: 0.75rem;
+  gap: 3px;
+  font-size: 0.7rem;
   font-weight: 700;
   color: #16a34a;
+  background: #dcfce7;
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
 }
 
-.promo-cart-summary-footer {
-  padding: 14px 24px;
-  background: #f9fafb;
-  border-top: 1px solid var(--color-border-light);
-  font-size: 0.82rem;
+.coupon-status-used {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #94a3b8;
 }
 
-.summary-line {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 4px;
+/* Sección expandible al dar clic en el cupón */
+.promo-coupon-expandable {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height 0.22s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.18s ease, padding 0.18s ease;
+  background: #f8fafc;
 }
 
-.discount-line {
-  color: #16a34a;
+.promo-coupon-item.is-expanded .promo-coupon-expandable {
+  max-height: 60px;
+  opacity: 1;
+  padding: 6px 10px 8px;
+  border-top: 1px solid #f1f5f9;
 }
 
-.total-line {
-  font-size: 0.95rem;
-  font-weight: 800;
-  padding-top: 6px;
-  border-top: 1px solid #e5e7eb;
+.promo-coupon-explanation {
+  font-size: 0.67rem;
+  color: #64748b;
+  margin: 0;
+  line-height: 1.35;
+}
+
+.promo-min-text {
+  display: inline-block;
+  color: #b45309;
+  font-weight: 600;
+}
+
+.promo-login-invite {
+  margin-top: 8px;
+  text-align: center;
+}
+
+.btn-invite-login {
+  background: none;
+  border: none;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #4b5563;
+  cursor: pointer;
+  transition: color 0.15s ease;
+  padding: 2px 4px;
+}
+
+.btn-invite-login:hover {
+  color: #111111;
+  text-decoration: underline;
 }
 
 /* ==========================================================================
