@@ -5,9 +5,14 @@ export type ProductGender = 'Hombre' | 'Mujer' | 'Unisex';
 export type ShoeHeight = 'Baja' | 'Media' | 'Alta';
 
 export interface ColorVariant {
+  id?: string;
   name: string;
   hex: string;
   image: string;
+  gallery?: string[];
+  price?: number;
+  originalPrice?: number;
+  sizes?: Array<{ size: number; stock: number }>;
 }
 
 export interface Product {

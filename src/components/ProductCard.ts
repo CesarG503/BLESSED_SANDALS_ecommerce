@@ -165,17 +165,31 @@ export class ProductCard {
     container.querySelectorAll('[data-action="quick-add"]').forEach((btn) => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
+        const parentCard = btn.closest('.product-card');
         const id = (btn as HTMLElement).dataset.id;
         const prod = store.products.find((p) => p.id === id);
         if (prod) {
+          const activeDot = parentCard?.querySelector('.color-dot.is-active') as HTMLElement | null;
+          const colorIdx = activeDot ? parseInt(activeDot.dataset.colorIndex || '0', 10) : 0;
+          const selectedColor = prod.colors[colorIdx];
+          const displayPrice = selectedColor?.price ?? prod.price;
+          const displayOrigPrice = selectedColor?.originalPrice !== undefined ? selectedColor.originalPrice : prod.originalPrice;
+
+          const customProduct = {
+            ...prod,
+            price: displayPrice,
+            originalPrice: displayOrigPrice,
+            image: selectedColor?.image || prod.image
+          };
+
           const defaultSize = prod.sizes[0] || 40;
-          store.addToCart(prod, defaultSize);
+          store.addToCart(customProduct, defaultSize, selectedColor?.name);
           Toast.show(`${prod.name} (Talla ${defaultSize}) se añadió a tu bolsa`, '¡Añadido al Carrito!', 'success');
         }
       });
     });
 
-    // Color Swatches interaction (cambia la foto de la tarjeta al hacer click o hover)
+    // Color Swatches interaction (cambia la foto y el precio de la tarjeta al hacer click)
     container.querySelectorAll('.color-dot').forEach((dot) => {
       dot.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -187,14 +201,32 @@ export class ProductCard {
         const prod = store.products.find((p) => p.id === prodId);
 
         if (prod && prod.colors[colorIdx]) {
+          const selectedColor = prod.colors[colorIdx];
           const imgEl = parentCard.querySelector('.product-card-img') as HTMLImageElement | null;
-          if (imgEl && prod.colors[colorIdx].image) {
+          if (imgEl && selectedColor.image) {
             imgEl.style.opacity = '0.5';
             setTimeout(() => {
-              imgEl.src = prod.colors[colorIdx].image;
+              imgEl.src = selectedColor.image;
               imgEl.style.opacity = '1';
             }, 150);
           }
+
+          // Actualizar precio de la tarjeta según la variante seleccionada
+          const displayPrice = selectedColor.price ?? prod.price;
+          const displayOrigPrice = selectedColor.originalPrice !== undefined ? selectedColor.originalPrice : prod.originalPrice;
+          const priceEl = parentCard.querySelector('.product-price') as HTMLElement | null;
+          if (priceEl) priceEl.textContent = `$${displayPrice}`;
+
+          const origPriceEl = parentCard.querySelector('.product-original-price') as HTMLElement | null;
+          if (origPriceEl) {
+            if (displayOrigPrice) {
+              origPriceEl.textContent = `$${displayOrigPrice}`;
+              origPriceEl.style.display = '';
+            } else {
+              origPriceEl.style.display = 'none';
+            }
+          }
+
           parentCard.querySelectorAll('.color-dot').forEach((d) => d.classList.remove('is-active'));
           dot.classList.add('is-active');
         }

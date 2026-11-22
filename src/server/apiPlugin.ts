@@ -1420,12 +1420,22 @@ export function apiPlugin(): Plugin {
                 model3dUrl: p.model3dUrl || mockMatch?.model3dUrl || undefined,
                 has3DModel: Boolean(p.model3dUrl || mockMatch?.has3DModel),
                 colors: p.colors.length > 0
-                  ? p.colors.map((c) => ({
-                      name: c.name,
-                      hex: c.hex,
-                      image: c.image || undefined
-                    }))
-                  : (mockMatch?.colors || [{ name: 'Original', hex: '#111827', image: p.image }]),
+                  ? p.colors.map((c) => {
+                      const colGallery = Array.isArray(c.gallery) && c.gallery.length > 0
+                        ? c.gallery
+                        : (c.image ? [c.image] : [p.image]);
+                      return {
+                        id: c.id,
+                        name: c.name,
+                        hex: c.hex,
+                        image: c.image || colGallery[0] || p.image,
+                        gallery: colGallery,
+                        price: c.price !== null && c.price !== undefined ? c.price : p.price,
+                        originalPrice: c.originalPrice !== null && c.originalPrice !== undefined ? c.originalPrice : (p.originalPrice || undefined),
+                        sizes: Array.isArray(c.sizes) ? c.sizes : undefined
+                      };
+                    })
+                  : (mockMatch?.colors || [{ name: 'Original', hex: '#111827', image: p.image, gallery: [p.image] }]),
                 sizes: p.sizes.length > 0
                   ? p.sizes.map((s) => s.size)
                   : (mockMatch?.sizes || [38, 39, 40, 41, 42, 43, 44]),
@@ -1486,7 +1496,16 @@ export function apiPlugin(): Plugin {
                   featured: p.featured,
                   totalStock,
                   sizes: p.sizes.map((s) => ({ id: s.id, size: s.size, stock: s.stock })),
-                  colors: p.colors.map((c) => ({ id: c.id, name: c.name, hex: c.hex, image: c.image })),
+                  colors: p.colors.map((c) => ({
+                    id: c.id,
+                    name: c.name,
+                    hex: c.hex,
+                    image: c.image,
+                    gallery: Array.isArray(c.gallery) && c.gallery.length > 0 ? c.gallery : (c.image ? [c.image] : []),
+                    price: c.price !== null && c.price !== undefined ? c.price : p.price,
+                    originalPrice: c.originalPrice !== null && c.originalPrice !== undefined ? c.originalPrice : (p.originalPrice || null),
+                    sizes: Array.isArray(c.sizes) ? c.sizes : []
+                  })),
                   reviewCount: p.reviews.length,
                   orderCount: p.orderItems.length,
                   createdAt: p.createdAt.toISOString()
@@ -1589,12 +1608,21 @@ export function apiPlugin(): Plugin {
                 colors: {
                   create: (Array.isArray(colors) && colors.length > 0
                     ? colors
-                    : [{ name: 'Original', hex: '#111827', image }]
-                  ).map((c: any) => ({
-                    name: c.name || 'Color Principal',
-                    hex: c.hex || '#000000',
-                    image: c.image || null
-                  }))
+                    : [{ name: 'Original', hex: '#111827', image: finalImage, gallery: finalGallery, price, originalPrice, sizes }]
+                  ).map((c: any) => {
+                    const colGallery = Array.isArray(c.gallery) && c.gallery.length > 0
+                      ? c.gallery
+                      : (c.image ? [c.image] : (finalGallery.length > 0 ? [finalGallery[0]] : []));
+                    return {
+                      name: c.name || 'Color Principal',
+                      hex: c.hex || '#000000',
+                      image: colGallery[0] || c.image || null,
+                      gallery: colGallery,
+                      price: c.price !== undefined && c.price !== null && c.price !== '' ? Number(c.price) : Number(price),
+                      originalPrice: c.originalPrice !== undefined && c.originalPrice !== null && c.originalPrice !== '' ? Number(c.originalPrice) : (originalPrice ? Number(originalPrice) : null),
+                      sizes: Array.isArray(c.sizes) ? c.sizes : null
+                    };
+                  })
                 }
               },
               include: {
@@ -1648,52 +1676,64 @@ export function apiPlugin(): Plugin {
               finalImage = finalGallery[0];
             }
 
-            // Actualizar datos base del producto
-            await prisma.product.update({
-              where: { id },
-              data: {
-                ...(name ? { name: name.trim() } : {}),
-                subtitle: subtitle !== undefined ? (subtitle ? subtitle.trim() : null) : undefined,
-                description: description !== undefined ? (description ? description.trim() : null) : undefined,
-                ...(price !== undefined ? { price: Number(price) } : {}),
-                originalPrice: originalPrice !== undefined ? (originalPrice ? Number(originalPrice) : null) : undefined,
-                badge: badge !== undefined ? (badge ? badge.trim() : null) : undefined,
-                ...(gender ? { gender } : {}),
-                ...(finalImage ? { image: finalImage.trim() } : {}),
-                ...(finalGallery !== undefined ? { gallery: finalGallery } : {}),
-                model3dUrl: model3dUrl !== undefined ? (model3dUrl ? model3dUrl.trim() : null) : undefined,
-                ...(categoryId ? { categoryId } : {}),
-                ...(inStock !== undefined ? { inStock: Boolean(inStock) } : {}),
-                ...(featured !== undefined ? { featured: Boolean(featured) } : {})
-              }
-            });
+            // Actualizar atómicamente dentro de una transacción para evitar inconsistencias de datos
+            await prisma.$transaction(async (tx) => {
+              // Actualizar datos base del producto
+              await tx.product.update({
+                where: { id },
+                data: {
+                  ...(name ? { name: name.trim() } : {}),
+                  subtitle: subtitle !== undefined ? (subtitle ? subtitle.trim() : null) : undefined,
+                  description: description !== undefined ? (description ? description.trim() : null) : undefined,
+                  ...(price !== undefined ? { price: Number(price) } : {}),
+                  originalPrice: originalPrice !== undefined ? (originalPrice ? Number(originalPrice) : null) : undefined,
+                  badge: badge !== undefined ? (badge ? badge.trim() : null) : undefined,
+                  ...(gender ? { gender } : {}),
+                  ...(finalImage ? { image: finalImage.trim() } : {}),
+                  ...(finalGallery !== undefined ? { gallery: finalGallery } : {}),
+                  model3dUrl: model3dUrl !== undefined ? (model3dUrl ? model3dUrl.trim() : null) : undefined,
+                  ...(categoryId ? { categoryId } : {}),
+                  ...(inStock !== undefined ? { inStock: Boolean(inStock) } : {}),
+                  ...(featured !== undefined ? { featured: Boolean(featured) } : {})
+                }
+              });
 
-            // Si se enviaron tallas, refrescarlas
-            if (Array.isArray(sizes)) {
-              await prisma.productSize.deleteMany({ where: { productId: id } });
-              if (sizes.length > 0) {
-                await prisma.productSize.createMany({
-                  data: sizes.map((s: any) => ({
-                    productId: id,
-                    size: typeof s === 'number' ? s : Number(s.size),
-                    stock: typeof s === 'object' && s.stock !== undefined ? Math.max(0, Number(s.stock)) : 0
-                  }))
+              // Si se enviaron tallas, refrescarlas
+              if (Array.isArray(sizes)) {
+                await tx.productSize.deleteMany({ where: { productId: id } });
+                if (sizes.length > 0) {
+                  await tx.productSize.createMany({
+                    data: sizes.map((s: any) => ({
+                      productId: id,
+                      size: typeof s === 'number' ? s : Number(s.size),
+                      stock: typeof s === 'object' && s.stock !== undefined ? Math.max(0, Number(s.stock)) : 0
+                    }))
+                  });
+                }
+              }
+
+              // Si se enviaron colores, refrescarlos con su galería, precio y tallas independientes
+              if (Array.isArray(colors) && colors.length > 0) {
+                await tx.productColor.deleteMany({ where: { productId: id } });
+                await tx.productColor.createMany({
+                  data: colors.map((c: any) => {
+                    const colGallery = Array.isArray(c.gallery) && c.gallery.length > 0
+                      ? c.gallery
+                      : (c.image ? [c.image] : []);
+                    return {
+                      productId: id,
+                      name: c.name || 'Color',
+                      hex: c.hex || '#000000',
+                      image: colGallery[0] || c.image || null,
+                      gallery: colGallery,
+                      price: c.price !== undefined && c.price !== null && c.price !== '' ? Number(c.price) : (price !== undefined ? Number(price) : null),
+                      originalPrice: c.originalPrice !== undefined && c.originalPrice !== null && c.originalPrice !== '' ? Number(c.originalPrice) : (originalPrice !== undefined ? Number(originalPrice) : null),
+                      sizes: Array.isArray(c.sizes) ? c.sizes : null
+                    };
+                  })
                 });
               }
-            }
-
-            // Si se enviaron colores, refrescarlos
-            if (Array.isArray(colors) && colors.length > 0) {
-              await prisma.productColor.deleteMany({ where: { productId: id } });
-              await prisma.productColor.createMany({
-                data: colors.map((c: any) => ({
-                  productId: id,
-                  name: c.name || 'Color',
-                  hex: c.hex || '#000000',
-                  image: c.image || null
-                }))
-              });
-            }
+            });
 
             return sendJson(res, 200, {
               success: true,

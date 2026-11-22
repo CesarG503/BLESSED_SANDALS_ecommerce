@@ -8227,6 +8227,195 @@ body.profile-page-body {
 }
 
 /* ==========================================================================
+   BARRA SUPERIOR DE VARIANTES DE COLOR EN PRODUCTO (ADMIN)
+   ========================================================================== */
+.admin-view-header-main {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.admin-variants-bar {
+  margin: 10px 0 6px 0;
+  padding: 10px 14px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+
+.admin-variants-bar-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.variants-label-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.variants-caption {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.variants-help {
+  font-size: 0.72rem;
+  color: #64748b;
+  font-weight: 400;
+}
+
+.variants-swatches-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.variant-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.variant-color-circle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 0 1px #cbd5e1, 0 1px 2px rgba(0, 0, 0, 0.08);
+  cursor: pointer;
+  padding: 0;
+  outline: none;
+  transition: all 0.16s ease;
+  position: relative;
+  display: block;
+}
+
+.variant-color-circle:hover {
+  transform: scale(1.12);
+  box-shadow: 0 0 0 2px #ffffff, 0 0 0 3px #94a3b8;
+}
+
+.variant-color-circle.active {
+  transform: scale(1.15);
+  box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px #0f172a;
+}
+
+.variant-native-color-picker {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.btn-remove-variant {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  opacity: 0;
+  transition: all 0.15s ease;
+  z-index: 2;
+}
+
+.variant-chip:hover .btn-remove-variant {
+  opacity: 1;
+}
+
+.btn-remove-variant:hover {
+  background: #ef4444;
+  border-color: #ef4444;
+  color: #ffffff;
+}
+
+.btn-add-variant-circle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1.5px dashed #94a3b8;
+  background: #ffffff;
+  color: #475569;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.15s ease;
+}
+
+.btn-add-variant-circle:hover {
+  background: #0f172a;
+  border-color: #0f172a;
+  border-style: solid;
+  color: #ffffff;
+  transform: scale(1.1);
+}
+
+/* Indicadores de variante en recursos y galería */
+.active-variant-indicator-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  font-size: 0.75rem;
+  color: #0f172a;
+  vertical-align: middle;
+}
+
+.variant-indicator-dot {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.badge-variant-belong-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.65rem;
+  font-weight: 500;
+  color: #475569;
+  background: #f8fafc;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid #e2e8f0;
+}
+
+.mini-variant-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+/* ==========================================================================
    RECURSOS MULTIMEDIA Y GALERÍA ORDENADA EN ADMIN
    ========================================================================== */
 .admin-multimedia-header-flex {
@@ -8750,6 +8939,7 @@ details[open] .summary-arrow {
 }
 
 .admin-size-stock-card {
+  position: relative;
   border: 1px solid #e2e8f0;
   border-radius: 8px;
   padding: 10px;
@@ -8769,6 +8959,7 @@ details[open] .summary-arrow {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  padding-right: 18px; /* Espacio para la equis roja en la esquina */
 }
 
 .size-header-info {
@@ -8801,21 +8992,46 @@ details[open] .summary-arrow {
 }
 
 .btn-remove-size {
+  position: absolute;
+  top: 6px;
+  right: 6px;
   background: transparent;
   border: none;
-  color: #94a3b8;
+  color: #ef4444; /* Equis roja fina */
   cursor: pointer;
-  padding: 2px;
-  border-radius: 3px;
+  padding: 3px;
+  border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: color 0.15s ease, background 0.15s ease;
+  opacity: 0.75;
+  transition: opacity 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+  z-index: 2;
+  line-height: 1;
 }
 
 .btn-remove-size:hover {
-  color: #ef4444;
-  background: #fee2e2;
+  opacity: 1;
+  color: #dc2626;
+  background-color: #fee2e2;
+}
+
+.admin-price-heading-flex {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.active-variant-price-badge {
+  font-size: 0.78rem;
+  color: #64748b;
+  font-weight: 400;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .size-equivalents-sub {

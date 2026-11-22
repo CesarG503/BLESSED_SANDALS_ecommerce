@@ -36,15 +36,6 @@ export class QuickViewModal {
     }
 
     try {
-      // Garantizar que sizes sea un arreglo válido
-      const sizes: number[] = Array.isArray(product.sizes) && product.sizes.length > 0
-        ? product.sizes
-        : [38, 39, 40, 41, 42, 43, 44];
-
-      if (!this.selectedSize || !sizes.includes(this.selectedSize)) {
-        this.selectedSize = sizes[0] || 40;
-      }
-
       // Garantizar que colors sea un arreglo válido
       const colors: ColorVariant[] = Array.isArray(product.colors) && product.colors.length > 0
         ? product.colors
@@ -55,13 +46,37 @@ export class QuickViewModal {
       }
 
       const selectedColor = colors[this.selectedColorIndex] || colors[0];
-      const currentImg = selectedColor?.image || product.image;
       const isFav = this.store.isInWishlist(product.id);
 
-      // Garantizar que gallery sea un arreglo válido
-      const gallery: string[] = Array.isArray(product.gallery) && product.gallery.length > 0
-        ? product.gallery
-        : (product.image ? [product.image] : []);
+      // Tallas de la variante de color si están definidas, o las tallas generales del producto
+      let sizes: number[] = [];
+      if (Array.isArray(selectedColor?.sizes) && selectedColor.sizes.length > 0) {
+        const inStockSizes = selectedColor.sizes.filter((s: any) => s.stock > 0).map((s: any) => Number(s.size));
+        sizes = inStockSizes.length > 0 ? inStockSizes : selectedColor.sizes.map((s: any) => Number(s.size));
+      } else if (Array.isArray(product.sizes) && product.sizes.length > 0) {
+        sizes = product.sizes;
+      } else {
+        sizes = [38, 39, 40, 41, 42, 43, 44];
+      }
+
+      if (!this.selectedSize || !sizes.includes(this.selectedSize)) {
+        this.selectedSize = sizes[0] || 40;
+      }
+
+      // Precio según la variante seleccionada
+      const displayPrice = selectedColor?.price ?? product.price;
+      const displayOriginalPrice = selectedColor?.originalPrice !== undefined ? selectedColor.originalPrice : product.originalPrice;
+
+      // Galería propia de la variante de color seleccionada
+      const gallery: string[] = Array.isArray(selectedColor?.gallery) && selectedColor.gallery.length > 0
+        ? selectedColor.gallery
+        : (selectedColor?.image
+            ? [selectedColor.image]
+            : (Array.isArray(product.gallery) && product.gallery.length > 0
+                ? product.gallery
+                : (product.image ? [product.image] : [])));
+
+      const currentImg = gallery[0] || selectedColor?.image || product.image;
 
       this.container.classList.add('is-active');
       this.container.innerHTML = `
@@ -113,8 +128,8 @@ export class QuickViewModal {
 
                 <div class="quickview-price-rating">
                   <div class="price-box">
-                    <span class="quickview-price">$${product.price}</span>
-                    ${product.originalPrice ? `<span class="quickview-original-price">$${product.originalPrice}</span>` : ''}
+                    <span class="quickview-price">$${displayPrice}</span>
+                    ${displayOriginalPrice ? `<span class="quickview-original-price">$${displayOriginalPrice}</span>` : ''}
                   </div>
                   <div class="quickview-rating">
                     <span class="star-icon">★</span>
@@ -280,8 +295,18 @@ export class QuickViewModal {
       }
 
       const color = colors[this.selectedColorIndex] || colors[0];
+      const displayPrice = color?.price ?? product.price;
+      const displayOriginalPrice = color?.originalPrice !== undefined ? color.originalPrice : product.originalPrice;
+      const currentImg = (color?.gallery && color.gallery.length > 0 ? color.gallery[0] : color?.image) || product.image;
+
+      const customProduct = {
+        ...product,
+        price: displayPrice,
+        originalPrice: displayOriginalPrice,
+        image: currentImg
+      };
       for (let i = 0; i < this.quantity; i++) {
-        this.store.addToCart(product, this.selectedSize, color?.name);
+        this.store.addToCart(customProduct, this.selectedSize, color?.name);
       }
 
       Toast.show(

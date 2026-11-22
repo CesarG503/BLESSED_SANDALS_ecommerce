@@ -18,6 +18,17 @@ export type AdminTab =
   | 'promos-create'
   | 'minio-storage';
 
+export interface ProductVariantForm {
+  id: string;
+  hex: string;
+  name: string;
+  gallery: string[];
+  model3dUrl: string | null;
+  sizes: Array<{ size: number; stock: number }>;
+  price?: number;
+  originalPrice?: number | null;
+}
+
 export class AdminPanel {
   private container: HTMLElement;
   private store: Store;
@@ -41,36 +52,133 @@ export class AdminPanel {
   private formSizes: Array<{ size: number; stock: number }> = [];
   private formGallery: string[] = [];
   private formModel3dUrl: string | null = null;
+  private formVariants: ProductVariantForm[] = [];
+  private activeVariantIndex: number = 0;
   private adminSizeUnit: SizeUnit = 'EU';
   private showEquivalences: boolean = false;
 
-  private initFormSizes(): void {
-    if (this.editingProduct && Array.isArray(this.editingProduct.sizes) && this.editingProduct.sizes.length > 0) {
-      this.formSizes = this.editingProduct.sizes.map((s: any) => ({
-        size: Number(s.size),
-        stock: Number(s.stock) || 0
-      }));
-    } else {
-      // Para producto nuevo: las 13 tallas oficiales de la tabla con stock estrictamente en 0 para editar desde cero
-      this.formSizes = STANDARD_CHART_SIZES.map((sz) => ({
-        size: sz,
-        stock: 0
-      }));
-    }
-    this.formSizes.sort((a, b) => a.size - b.size);
-
+  private initFormVariants(): void {
     if (this.editingProduct) {
-      if (Array.isArray(this.editingProduct.gallery) && this.editingProduct.gallery.length > 0) {
-        this.formGallery = [...this.editingProduct.gallery];
-      } else if (this.editingProduct.image) {
-        this.formGallery = [this.editingProduct.image];
+      const p = this.editingProduct;
+      if (Array.isArray(p.colors) && p.colors.length > 0) {
+        this.formVariants = p.colors.map((c: any, index: number) => {
+          const isPrimary = index === 0;
+          let gallery: string[] = [];
+          if (Array.isArray(c.gallery) && c.gallery.length > 0) {
+            gallery = [...c.gallery];
+          } else if (c.image) {
+            gallery = [c.image];
+          } else if (isPrimary && Array.isArray(p.gallery) && p.gallery.length > 0) {
+            gallery = [...p.gallery];
+          } else if (isPrimary && p.image) {
+            gallery = [p.image];
+          }
+
+          // Existencias independientes por variante de color
+          let sizes: Array<{ size: number; stock: number }> = [];
+          if (Array.isArray(c.sizes) && c.sizes.length > 0) {
+            sizes = c.sizes.map((s: any) => ({ size: Number(s.size), stock: Number(s.stock) || 0 }));
+          } else if (isPrimary && Array.isArray(p.sizes) && p.sizes.length > 0) {
+            sizes = p.sizes.map((s: any) => ({ size: Number(s.size), stock: Number(s.stock) || 0 }));
+          } else {
+            sizes = STANDARD_CHART_SIZES.map((sz) => ({ size: sz, stock: 0 }));
+          }
+
+          // Precios independientes por variante de color
+          const price = c.price !== undefined && c.price !== null ? Number(c.price) : (p.price !== undefined ? Number(p.price) : undefined);
+          const originalPrice = c.originalPrice !== undefined && c.originalPrice !== null ? Number(c.originalPrice) : (p.originalPrice !== undefined ? Number(p.originalPrice) : null);
+
+          return {
+            id: 'var_' + (c.id || index + 1),
+            hex: c.hex || (index === 0 ? '#000000' : '#ffffff'),
+            name: c.name || `Variante ${index + 1}`,
+            gallery,
+            model3dUrl: isPrimary ? (p.model3dUrl || null) : null,
+            sizes,
+            price,
+            originalPrice
+          };
+        });
       } else {
-        this.formGallery = [];
+        const gallery = Array.isArray(p.gallery) && p.gallery.length > 0
+          ? [...p.gallery]
+          : (p.image ? [p.image] : []);
+        const sizes = Array.isArray(p.sizes) && p.sizes.length > 0
+          ? p.sizes.map((s: any) => ({ size: Number(s.size), stock: Number(s.stock) || 0 }))
+          : STANDARD_CHART_SIZES.map((sz) => ({ size: sz, stock: 0 }));
+
+        this.formVariants = [
+          {
+            id: 'var_1',
+            hex: '#000000',
+            name: 'Original',
+            gallery,
+            model3dUrl: p.model3dUrl || null,
+            sizes,
+            price: p.price !== undefined ? Number(p.price) : undefined,
+            originalPrice: p.originalPrice !== undefined ? Number(p.originalPrice) : null
+          }
+        ];
       }
-      this.formModel3dUrl = this.editingProduct.model3dUrl || null;
     } else {
-      this.formGallery = [];
-      this.formModel3dUrl = null;
+      // Producto nuevo: 1 variante negra predeterminada con stock en 0 y galería vacía
+      this.formVariants = [
+        {
+          id: 'var_1',
+          hex: '#000000',
+          name: 'Negro',
+          gallery: [],
+          model3dUrl: null,
+          sizes: STANDARD_CHART_SIZES.map((sz) => ({ size: sz, stock: 0 })),
+          price: undefined,
+          originalPrice: null
+        }
+      ];
+    }
+
+    this.activeVariantIndex = 0;
+    this.loadActiveVariantIntoForm();
+  }
+
+  private initFormSizes(): void {
+    this.initFormVariants();
+  }
+
+  private loadActiveVariantIntoForm(): void {
+    const v = this.formVariants[this.activeVariantIndex];
+    if (!v) return;
+    this.formSizes = v.sizes.map((s) => ({ ...s }));
+    this.formSizes.sort((a, b) => a.size - b.size);
+    this.formGallery = [...v.gallery];
+    this.formModel3dUrl = v.model3dUrl;
+
+    // Sincronizar campos de precio en el DOM si el formulario ya está renderizado
+    const priceInput = this.container.querySelector('#prod-price') as HTMLInputElement | null;
+    if (priceInput && v.price !== undefined) {
+      priceInput.value = v.price !== null ? String(v.price) : '';
+    }
+    const origPriceInput = this.container.querySelector('#prod-orig-price') as HTMLInputElement | null;
+    if (origPriceInput) {
+      origPriceInput.value = v.originalPrice !== undefined && v.originalPrice !== null ? String(v.originalPrice) : '';
+    }
+  }
+
+  private saveActiveVariantFromForm(): void {
+    const v = this.formVariants[this.activeVariantIndex];
+    if (!v) return;
+    this.syncSizesFromDom();
+    v.sizes = this.formSizes.map((s) => ({ ...s }));
+    v.gallery = [...this.formGallery];
+    v.model3dUrl = this.formModel3dUrl;
+
+    // Guardar precios del input a la variante activa
+    const priceInput = this.container.querySelector('#prod-price') as HTMLInputElement | null;
+    if (priceInput && priceInput.value.trim() !== '') {
+      v.price = parseFloat(priceInput.value);
+    }
+    const origPriceInput = this.container.querySelector('#prod-orig-price') as HTMLInputElement | null;
+    if (origPriceInput) {
+      v.originalPrice = origPriceInput.value.trim() !== '' ? parseFloat(origPriceInput.value) : null;
     }
   }
 
@@ -382,21 +490,21 @@ export class AdminPanel {
             <select id="admin-category-filter">
               <option value="all">Todas las Categorías</option>
               ${this.categories
-                .map((c) => `<option value="${c.id}" ${this.productCategoryFilter === c.id ? 'selected' : ''}>${c.name}</option>`)
-                .join('')}
+        .map((c) => `<option value="${c.id}" ${this.productCategoryFilter === c.id ? 'selected' : ''}>${c.name}</option>`)
+        .join('')}
             </select>
           </div>
         </div>
 
         <!-- LISTADO / TABLA MINIMALISTA -->
         ${filtered.length === 0
-          ? `
+        ? `
             <div class="admin-empty-state">
               <h4>No se encontraron productos</h4>
               <p>Prueba con otros términos de búsqueda o agrega un nuevo modelo al catálogo.</p>
             </div>
           `
-          : `
+        : `
             <div class="admin-products-table-wrap">
               <table class="admin-table">
                 <thead>
@@ -412,12 +520,12 @@ export class AdminPanel {
                 </thead>
                 <tbody>
                   ${filtered
-                    .map((p) => {
-                      const fullSizesTooltip = (p.sizes || [])
-                        .map((s: any) => `Talla ${s.size} (${formatFullEquivalence(s.size)}): ${s.stock} pares`)
-                        .join('\n');
+          .map((p) => {
+            const fullSizesTooltip = (p.sizes || [])
+              .map((s: any) => `Talla ${s.size} (${formatFullEquivalence(s.size)}): ${s.stock} pares`)
+              .join('\n');
 
-                      return `
+            return `
                         <tr data-product-id="${p.id}">
                           <td class="table-col-product">
                             <div class="table-prod-cell">
@@ -483,13 +591,13 @@ export class AdminPanel {
                           </td>
                         </tr>
                       `;
-                    })
-                    .join('')}
+          })
+          .join('')}
                 </tbody>
               </table>
             </div>
           `
-        }
+      }
       </div>
     `;
   }
@@ -501,25 +609,31 @@ export class AdminPanel {
     const isEdit = !!this.editingProduct;
     const p = this.editingProduct || {};
 
-    if (this.formSizes.length === 0) {
-      this.initFormSizes();
+    if (this.formVariants.length === 0) {
+      this.initFormVariants();
     }
 
     return `
       <div class="admin-view-panel">
         <div class="admin-view-header">
-          <div>
+          <div class="admin-view-header-main">
             <h2 class="admin-view-title">${isEdit ? `Editar: ${p.name}` : 'Agregar Nuevo Producto'}</h2>
+            
+            <!-- EN LO MÁS ALTO DEBAJO DEL TÍTULO: VARIANTES DE COLOR Y COLOR PICKER -->
+            <div class="admin-variants-bar" id="admin-variants-bar-wrapper">
+              ${this.renderVariantsBarHtml()}
+            </div>
+
             <p class="admin-view-subtitle">Completa la información técnica, precios, existencias por talla y recursos en MinIO.</p>
           </div>
           ${isEdit
-            ? `
+        ? `
               <button type="button" class="btn-admin-action-secondary" id="btn-cancel-edit-prod">
                 Cancelar Edición
               </button>
             `
-            : ''
-          }
+        : ''
+      }
         </div>
 
         <form id="form-admin-product" class="admin-editor-form">
@@ -543,8 +657,8 @@ export class AdminPanel {
                 <label for="prod-category">Categoría *</label>
                 <select id="prod-category" required>
                   ${this.categories
-                    .map((c) => `<option value="${c.id}" ${p.categoryId === c.id ? 'selected' : ''}>${c.name}</option>`)
-                    .join('')}
+        .map((c) => `<option value="${c.id}" ${p.categoryId === c.id ? 'selected' : ''}>${c.name}</option>`)
+        .join('')}
                 </select>
               </div>
 
@@ -571,16 +685,21 @@ export class AdminPanel {
 
           <!-- GRUPO 2: PRECIOS -->
           <div class="admin-form-section">
-            <h3 class="admin-section-heading">PRECIO Y VALOR COMERCIAL</h3>
+            <div class="admin-price-heading-flex">
+              <h3 class="admin-section-heading">PRECIO Y VALOR COMERCIAL</h3>
+              <span class="active-variant-price-badge" id="admin-price-variant-badge">
+                ${this.renderPriceVariantBadgeHtml()}
+              </span>
+            </div>
             <div class="admin-form-grid-2">
               <div class="admin-input-group">
                 <label for="prod-price">Precio de Venta ($ USD) *</label>
-                <input type="number" step="0.01" min="0" id="prod-price" value="${p.price !== undefined ? p.price : ''}" placeholder="55.00" required />
+                <input type="number" step="0.01" min="0" id="prod-price" value="${this.formVariants[this.activeVariantIndex]?.price !== undefined ? this.formVariants[this.activeVariantIndex].price : (p.price !== undefined ? p.price : '')}" placeholder="55.00" required />
               </div>
 
               <div class="admin-input-group">
                 <label for="prod-orig-price">Precio Original Tachado ($ USD opcional)</label>
-                <input type="number" step="0.01" min="0" id="prod-orig-price" value="${p.originalPrice || ''}" placeholder="Ej: 75.00 (para mostrar descuento)" />
+                <input type="number" step="0.01" min="0" id="prod-orig-price" value="${this.formVariants[this.activeVariantIndex]?.originalPrice !== undefined && this.formVariants[this.activeVariantIndex]?.originalPrice !== null ? this.formVariants[this.activeVariantIndex].originalPrice : (p.originalPrice || '')}" placeholder="Ej: 75.00 (para mostrar descuento)" />
               </div>
             </div>
           </div>
@@ -590,7 +709,9 @@ export class AdminPanel {
             <div class="admin-multimedia-header-flex">
               <div>
                 <h3 class="admin-section-heading">RECURSOS MULTIMEDIA (MINIO STORAGE)</h3>
-                <p class="admin-section-sub">Imágenes del artículo y modelo 3D. La primera imagen (#1) será la portada oficial de la tienda:</p>
+                <p class="admin-section-sub" id="admin-multimedia-sub-info">
+                  ${this.renderMultimediaSubtitleHtml()}
+                </p>
               </div>
               <div class="admin-multimedia-actions-bar">
                 <input type="file" id="file-hidden-gallery" accept="image/*" multiple style="display: none;" />
@@ -654,8 +775,241 @@ export class AdminPanel {
   }
 
   // ==========================================================================
+  // HELPERS: VARIANTES DE COLOR Y CAMBIO DINÁMICO DE RECURSOS
+  // ==========================================================================
+  private renderVariantsBarHtml(): string {
+    return `
+      <div class="admin-variants-bar-inner">
+        <div class="variants-label-group">
+          <span class="variants-caption">Variantes de Color:</span>
+        </div>
+        <div class="variants-swatches-row">
+          ${this.formVariants.map((v, idx) => {
+      const isActive = idx === this.activeVariantIndex;
+      return `
+              <div class="variant-chip ${isActive ? 'is-active' : ''}" data-variant-index="${idx}">
+                <button 
+                  type="button" 
+                  class="variant-color-circle ${isActive ? 'active' : ''}" 
+                  style="background-color: ${v.hex};" 
+                  title="${isActive ? `Color activo: ${v.hex} (Haz clic para cambiar color)` : `Variante ${idx + 1} (${v.hex})`}"
+                  data-action="select-variant"
+                  data-variant-index="${idx}"
+                ></button>
+                <input 
+                  type="color" 
+                  class="variant-native-color-picker" 
+                  data-variant-index="${idx}" 
+                  value="${v.hex}" 
+                />
+                ${this.formVariants.length > 1 ? `
+                  <button 
+                    type="button" 
+                    class="btn-remove-variant" 
+                    data-action="remove-variant" 
+                    data-variant-index="${idx}" 
+                    title="Eliminar variante"
+                  >
+                    ${Icons.close('w-3 h-3')}
+                  </button>
+                ` : ''}
+              </div>
+            `;
+    }).join('')}
+
+          <button 
+            type="button" 
+            class="btn-add-variant-circle" 
+            id="btn-add-color-variant" 
+            title="Agregar otra variante del par con diferente color"
+          >
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  private bindVariantsBarEvents(): void {
+    // 1. Botón + para agregar nueva variante con color distinto y formulario vacío
+    this.container.querySelector('#btn-add-color-variant')?.addEventListener('click', () => {
+      this.addColorVariant();
+    });
+
+    // 2. Clic en círculos de variante
+    this.container.querySelectorAll('[data-action="select-variant"]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const idx = Number((btn as HTMLElement).dataset.variantIndex);
+        if (isNaN(idx)) return;
+
+        if (idx === this.activeVariantIndex) {
+          // Si ya está activo, abrir el selector de color nativo
+          const picker = this.container.querySelector(`.variant-native-color-picker[data-variant-index="${idx}"]`) as HTMLInputElement | null;
+          picker?.click();
+        } else {
+          // Si no es el activo, cambiar a esta variante preservando la actual
+          this.switchActiveVariant(idx);
+        }
+      });
+    });
+
+    // 3. Modificación del color en el color picker nativo
+    this.container.querySelectorAll('.variant-native-color-picker').forEach((input) => {
+      input.addEventListener('input', (e) => {
+        const idx = Number((input as HTMLElement).dataset.variantIndex);
+        const newHex = (e.target as HTMLInputElement).value;
+        if (!isNaN(idx) && this.formVariants[idx]) {
+          this.formVariants[idx].hex = newHex;
+          const circleBtn = this.container.querySelector(`.variant-color-circle[data-variant-index="${idx}"]`) as HTMLElement | null;
+          if (circleBtn) {
+            circleBtn.style.backgroundColor = newHex;
+            circleBtn.title = `Color activo: ${newHex} (Haz clic para cambiar color)`;
+          }
+        }
+      });
+
+      input.addEventListener('change', (e) => {
+        const idx = Number((input as HTMLElement).dataset.variantIndex);
+        const newHex = (e.target as HTMLInputElement).value;
+        if (!isNaN(idx) && this.formVariants[idx]) {
+          this.formVariants[idx].hex = newHex;
+          Toast.show(`Color de variante establecido en ${newHex}.`, 'Variante', 'info');
+        }
+      });
+    });
+
+    // 4. Eliminar variante
+    this.container.querySelectorAll('[data-action="remove-variant"]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const idx = Number((btn as HTMLElement).dataset.variantIndex);
+        if (!isNaN(idx)) {
+          this.removeColorVariant(idx);
+        }
+      });
+    });
+  }
+
+  private addColorVariant(): void {
+    // 1. Guardar la configuración de la variante actual (incluyendo su precio)
+    this.saveActiveVariantFromForm();
+
+    const currentVar = this.formVariants[this.activeVariantIndex];
+    // Heredar automáticamente el mismo precio de la variante anterior pero permitiendo cambiarlo
+    const inheritedPrice = currentVar?.price !== undefined
+      ? currentVar.price
+      : (parseFloat((this.container.querySelector('#prod-price') as HTMLInputElement)?.value) || undefined);
+    const inheritedOrigPrice = currentVar?.originalPrice !== undefined
+      ? currentVar.originalPrice
+      : (parseFloat((this.container.querySelector('#prod-orig-price') as HTMLInputElement)?.value) || null);
+
+    // 2. Colores sugeridos distintos para la nueva variante
+    const palette = ['#000000', '#ffffff', '#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#14b8a6', '#ec4899'];
+    const used = this.formVariants.map((v) => v.hex.toLowerCase());
+    const nextHex = palette.find((c) => !used.includes(c.toLowerCase())) || '#64748b';
+
+    // 3. Crear nueva variante con formulario VACÍO de imágenes y tallas en stock 0, pero HEREDANDO el precio
+    const newVariant: ProductVariantForm = {
+      id: 'var_' + Date.now().toString(36),
+      hex: nextHex,
+      name: `Variante ${this.formVariants.length + 1}`,
+      gallery: [],
+      model3dUrl: null,
+      sizes: STANDARD_CHART_SIZES.map((sz) => ({ size: sz, stock: 0 })),
+      price: inheritedPrice,
+      originalPrice: inheritedOrigPrice
+    };
+
+    this.formVariants.push(newVariant);
+    this.activeVariantIndex = this.formVariants.length - 1;
+    this.loadActiveVariantIntoForm();
+
+    // 4. Refrescar secciones dependientes de la variante
+    this.refreshFormVariantSections();
+    Toast.show('Nueva variante agregada con precio heredado. Puedes personalizar su precio, imágenes y stock.', 'Variante', 'info');
+  }
+
+  private switchActiveVariant(newIndex: number): void {
+    if (newIndex === this.activeVariantIndex) return;
+
+    // 1. Guardar la configuración de la variante que dejamos
+    this.saveActiveVariantFromForm();
+
+    // 2. Cargar los datos de la variante seleccionada
+    this.activeVariantIndex = newIndex;
+    this.loadActiveVariantIntoForm();
+
+    // 3. Refrescar las secciones de la variante
+    this.refreshFormVariantSections();
+  }
+
+  private removeColorVariant(idx: number): void {
+    if (this.formVariants.length <= 1) {
+      Toast.show('El producto debe tener al menos una variante de color.', 'Atención', 'warning');
+      return;
+    }
+
+    const confirmed = window.confirm(`¿Deseas eliminar la variante ${this.formVariants[idx].hex}?`);
+    if (!confirmed) return;
+
+    this.formVariants.splice(idx, 1);
+    if (this.activeVariantIndex >= this.formVariants.length) {
+      this.activeVariantIndex = this.formVariants.length - 1;
+    }
+    this.loadActiveVariantIntoForm();
+    this.refreshFormVariantSections();
+    Toast.show('Variante eliminada.', 'Variantes', 'info');
+  }
+
+  private renderPriceVariantBadgeHtml(): string {
+    const cur = this.formVariants[this.activeVariantIndex];
+    const hex = cur?.hex || '#000000';
+    return `Precio exclusivo de: <span class="active-variant-indicator-tag"><span class="variant-indicator-dot" style="background-color: ${hex};"></span><strong>Variante #${this.activeVariantIndex + 1} (${hex})</strong></span>`;
+  }
+
+  private refreshFormVariantSections(): void {
+    // 1. Barra de variantes superior
+    const bar = this.container.querySelector('#admin-variants-bar-wrapper');
+    if (bar) {
+      bar.innerHTML = this.renderVariantsBarHtml();
+      this.bindVariantsBarEvents();
+    }
+
+    // 2. Badge indicador de variante en sección de precio
+    const priceBadge = this.container.querySelector('#admin-price-variant-badge');
+    if (priceBadge) {
+      priceBadge.innerHTML = this.renderPriceVariantBadgeHtml();
+    }
+
+    // 3. Subtítulo indicador de la variante activa en recursos multimedia
+    const subInfo = this.container.querySelector('#admin-multimedia-sub-info');
+    if (subInfo) {
+      subInfo.innerHTML = this.renderMultimediaSubtitleHtml();
+    }
+
+    // 4. Galería de fotos (se vacía o carga según la variante)
+    this.refreshGalleryOnly();
+
+    // 5. Modelo 3D
+    this.refresh3dStatusOnly();
+
+    // 6. Tarjetas de existencias por talla (se vacían a 0 o cargan según la variante)
+    this.refreshSizeCardsOnly();
+  }
+
+  // ==========================================================================
   // HELPERS: RECURSOS MULTIMEDIA (MINIO STORAGE & GALERÍA ORDENADA)
   // ==========================================================================
+  private renderMultimediaSubtitleHtml(): string {
+    const cur = this.formVariants[this.activeVariantIndex];
+    const hex = cur?.hex || '#000000';
+    return `Recursos multimedia exclusivos de: <span class="active-variant-indicator-tag"><span class="variant-indicator-dot" style="background-color: ${hex};"></span><strong>Variante #${this.activeVariantIndex + 1} (${hex})</strong></span>. La imagen #1 será la portada de este color.`;
+  }
+
   private render3dStatusHtml(): string {
     if (!this.formModel3dUrl) return '';
     const filename = this.formModel3dUrl.split('/').pop() || 'modelo.glb';
@@ -674,15 +1028,18 @@ export class AdminPanel {
   }
 
   private renderGalleryGridHtml(): string {
+    const cur = this.formVariants[this.activeVariantIndex];
+    const hex = cur?.hex || '#000000';
+
     if (this.formGallery.length === 0) {
       return `
         <div class="admin-gallery-empty-box">
           <div class="gallery-empty-icon">${Icons.camera('w-8 h-8')}</div>
-          <p class="gallery-empty-title">Sin imágenes cargadas para este producto</p>
-          <p class="gallery-empty-sub">Haz clic en el botón de abajo o "+ Subir Contenido" para cargar fotos a MinIO.</p>
+          <p class="gallery-empty-title">Sin imágenes en la Variante #${this.activeVariantIndex + 1} (${hex})</p>
+          <p class="gallery-empty-sub">Las imágenes que subas aquí pertenecerán exclusivamente a esta variante de color.</p>
           <button type="button" class="btn-empty-upload" id="btn-empty-upload-gallery">
             ${Icons.uploadCloud('w-4 h-4')}
-            <span>+ Subir Contenido</span>
+            <span>+ Subir Fotos para este Color</span>
           </button>
         </div>
       `;
@@ -695,10 +1052,14 @@ export class AdminPanel {
           return `
             <div class="gallery-thumb-card ${isCover ? 'is-cover' : ''}" data-index="${idx}">
               <div class="gallery-thumb-badge-wrap">
-                ${isCover 
-                  ? `<span class="badge-cover-primary">#1 PORTADA</span>` 
+                ${isCover
+                  ? `<span class="badge-cover-primary">#1 PORTADA</span>`
                   : `<span class="badge-gallery-num">#${idx + 1}</span>`
                 }
+                <span class="badge-variant-belong-pill" title="Pertenece a Variante #${this.activeVariantIndex + 1} (${hex})">
+                  <span class="mini-variant-dot" style="background-color: ${hex};"></span>
+                  <span>Var #${this.activeVariantIndex + 1}</span>
+                </span>
               </div>
               <div class="gallery-thumb-img-wrap">
                 <img src="${url}" alt="Recurso ${idx + 1}" class="gallery-thumb-img" />
@@ -760,6 +1121,9 @@ export class AdminPanel {
         if (!isNaN(idx) && idx >= 0 && idx < this.formGallery.length) {
           const [selected] = this.formGallery.splice(idx, 1);
           this.formGallery.unshift(selected);
+          if (this.formVariants[this.activeVariantIndex]) {
+            this.formVariants[this.activeVariantIndex].gallery = [...this.formGallery];
+          }
           this.refreshGalleryOnly();
           Toast.show('Imagen establecida como portada (#1).', 'Galería', 'info');
         }
@@ -774,6 +1138,9 @@ export class AdminPanel {
           const temp = this.formGallery[idx - 1];
           this.formGallery[idx - 1] = this.formGallery[idx];
           this.formGallery[idx] = temp;
+          if (this.formVariants[this.activeVariantIndex]) {
+            this.formVariants[this.activeVariantIndex].gallery = [...this.formGallery];
+          }
           this.refreshGalleryOnly();
         }
       });
@@ -787,6 +1154,9 @@ export class AdminPanel {
           const temp = this.formGallery[idx + 1];
           this.formGallery[idx + 1] = this.formGallery[idx];
           this.formGallery[idx] = temp;
+          if (this.formVariants[this.activeVariantIndex]) {
+            this.formVariants[this.activeVariantIndex].gallery = [...this.formGallery];
+          }
           this.refreshGalleryOnly();
         }
       });
@@ -798,6 +1168,9 @@ export class AdminPanel {
         const idx = Number((btn as HTMLElement).dataset.index);
         if (!isNaN(idx) && idx >= 0 && idx < this.formGallery.length) {
           this.formGallery.splice(idx, 1);
+          if (this.formVariants[this.activeVariantIndex]) {
+            this.formVariants[this.activeVariantIndex].gallery = [...this.formGallery];
+          }
           this.refreshGalleryOnly();
           Toast.show('Imagen eliminada de la galería.', 'Galería', 'info');
         }
@@ -808,6 +1181,9 @@ export class AdminPanel {
   private bind3dStatusEvents(): void {
     this.container.querySelector('#btn-remove-model-3d')?.addEventListener('click', () => {
       this.formModel3dUrl = null;
+      if (this.formVariants[this.activeVariantIndex]) {
+        this.formVariants[this.activeVariantIndex].model3dUrl = null;
+      }
       this.refresh3dStatusOnly();
       Toast.show('Modelo 3D retirado.', 'MinIO Storage', 'info');
     });
@@ -932,29 +1308,32 @@ export class AdminPanel {
         const displaySize = formatSizeDisplay(item.size, this.adminSizeUnit);
         return `
           <div class="admin-size-stock-card" data-card-size="${item.size}">
+            <button 
+              type="button" 
+              class="btn-remove-size" 
+              data-remove-size="${item.size}" 
+              title="Eliminar talla ${item.size} de esta variante"
+            >
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
             <div class="card-size-top">
               <div class="size-header-info">
                 <span class="size-group-badge size-group-${eq.group.toLowerCase()}">${eq.group}</span>
                 <strong class="size-primary-number">${this.adminSizeUnit === 'US' ? 'USA' : this.adminSizeUnit} ${displaySize}</strong>
               </div>
-              <button 
-                type="button" 
-                class="btn-remove-size" 
-                data-remove-size="${item.size}" 
-                title="Quitar talla ${item.size} del producto"
-              >
-                ${Icons.close('w-3.5 h-3.5')}
-              </button>
             </div>
 
             ${this.showEquivalences
-              ? `
+            ? `
                 <div class="size-equivalents-sub">
                   <span>EU ${eq.eu} • US ${eq.us} • UK ${eq.uk} • ${eq.cm} CM</span>
                 </div>
               `
-              : ''
-            }
+            : ''
+          }
 
             <div class="size-stock-controls-row">
               <label class="stock-input-label">Stock:</label>
@@ -1048,6 +1427,9 @@ export class AdminPanel {
         }
         this.formSizes.push({ size: euSize, stock: 0 });
         this.formSizes.sort((a, b) => a.size - b.size);
+        if (this.formVariants[this.activeVariantIndex]) {
+          this.formVariants[this.activeVariantIndex].sizes = this.formSizes.map((s) => ({ ...s }));
+        }
         this.refreshSizeCardsOnly();
         Toast.show(`Talla EU ${euSize} agregada con stock 0.`, 'Tallas', 'success');
       });
@@ -1059,6 +1441,9 @@ export class AdminPanel {
       if (!confirmed) return;
       this.syncSizesFromDom();
       this.formSizes.forEach((s) => (s.stock = 0));
+      if (this.formVariants[this.activeVariantIndex]) {
+        this.formVariants[this.activeVariantIndex].sizes = this.formSizes.map((s) => ({ ...s }));
+      }
       this.refreshSizeCardsOnly();
       Toast.show('Stock de todas las tallas establecido en 0.', 'Stock', 'info');
     });
@@ -1080,6 +1465,10 @@ export class AdminPanel {
       this.formSizes = Array.from(currentMap.entries())
         .map(([size, stock]) => ({ size, stock }))
         .sort((a, b) => a.size - b.size);
+
+      if (this.formVariants[this.activeVariantIndex]) {
+        this.formVariants[this.activeVariantIndex].sizes = this.formSizes.map((s) => ({ ...s }));
+      }
 
       this.refreshSizeCardsOnly();
       if (addedCount > 0) {
@@ -1114,6 +1503,9 @@ export class AdminPanel {
 
       this.formSizes.push({ size: euSize, stock });
       this.formSizes.sort((a, b) => a.size - b.size);
+      if (this.formVariants[this.activeVariantIndex]) {
+        this.formVariants[this.activeVariantIndex].sizes = this.formSizes.map((s) => ({ ...s }));
+      }
       this.refreshSizeCardsOnly();
 
       if (valInput) valInput.value = '';
@@ -1133,6 +1525,9 @@ export class AdminPanel {
         (input as HTMLInputElement).value = String(val);
         const item = this.formSizes.find((s) => s.size === size);
         if (item) item.stock = val;
+        if (this.formVariants[this.activeVariantIndex]) {
+          this.formVariants[this.activeVariantIndex].sizes = this.formSizes.map((s) => ({ ...s }));
+        }
       });
     });
 
@@ -1146,6 +1541,9 @@ export class AdminPanel {
           item.stock = Math.max(0, item.stock + delta);
           const inp = this.container.querySelector(`.input-size-stock[data-size="${size}"]`) as HTMLInputElement | null;
           if (inp) inp.value = String(item.stock);
+          if (this.formVariants[this.activeVariantIndex]) {
+            this.formVariants[this.activeVariantIndex].sizes = this.formSizes.map((s) => ({ ...s }));
+          }
         }
       });
     });
@@ -1160,16 +1558,23 @@ export class AdminPanel {
           item.stock = Math.max(0, item.stock + add);
           const inp = this.container.querySelector(`.input-size-stock[data-size="${size}"]`) as HTMLInputElement | null;
           if (inp) inp.value = String(item.stock);
+          if (this.formVariants[this.activeVariantIndex]) {
+            this.formVariants[this.activeVariantIndex].sizes = this.formSizes.map((s) => ({ ...s }));
+          }
         }
       });
     });
 
-    // Botón eliminar talla
+    // Botón eliminar talla (equis roja en la esquina de la card x fina)
     this.container.querySelectorAll('.btn-remove-size').forEach((btn) => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
         const size = Number((btn as HTMLElement).dataset.removeSize);
         this.syncSizesFromDom();
         this.formSizes = this.formSizes.filter((s) => s.size !== size);
+        if (this.formVariants[this.activeVariantIndex]) {
+          this.formVariants[this.activeVariantIndex].sizes = this.formSizes.map((s) => ({ ...s }));
+        }
         this.refreshSizeCardsOnly();
       });
     });
@@ -1193,20 +1598,20 @@ export class AdminPanel {
         </div>
 
         ${this.promos.length === 0
-          ? `
+        ? `
             <div class="admin-empty-state">
               <h4>No hay cupones creados</h4>
               <p>Crea el primer código promocional para que tus clientes puedan redimirlo.</p>
             </div>
           `
-          : `
+        : `
             <div class="admin-promos-grid">
               ${this.promos
-                .map((promo) => {
-                  const isPercentage = promo.discountType === 'PERCENTAGE';
-                  const discountLabel = isPercentage ? `${promo.discountValue}%` : `$${promo.discountValue}`;
+          .map((promo) => {
+            const isPercentage = promo.discountType === 'PERCENTAGE';
+            const discountLabel = isPercentage ? `${promo.discountValue}%` : `$${promo.discountValue}`;
 
-                  return `
+            return `
                     <div class="admin-promo-card ${promo.isActive ? 'is-active' : 'is-inactive'}">
                       <div class="admin-promo-header">
                         <div class="admin-promo-code-wrap">
@@ -1259,11 +1664,11 @@ export class AdminPanel {
                       </div>
                     </div>
                   `;
-                })
-                .join('')}
+          })
+          .join('')}
             </div>
           `
-        }
+      }
       </div>
     `;
   }
@@ -1283,13 +1688,13 @@ export class AdminPanel {
             <p class="admin-view-subtitle">Define las reglas comerciales, porcentaje o monto de descuento y restricciones.</p>
           </div>
           ${isEdit
-            ? `
+        ? `
               <button type="button" class="btn-admin-action-secondary" id="btn-cancel-edit-promo">
                 Cancelar Edición
               </button>
             `
-            : ''
-          }
+        : ''
+      }
         </div>
 
         <form id="form-admin-promo" class="admin-editor-form">
@@ -1410,26 +1815,26 @@ export class AdminPanel {
         <div class="admin-assets-section">
           <h3 class="admin-section-heading">RECURSOS ALMACENADOS EN EL BUCKET</h3>
           ${this.assets.length === 0
-            ? `
+        ? `
               <div class="admin-empty-state">
                 <p>No se encontraron archivos en el bucket de MinIO todavía o no se ha cargado la lista.</p>
                 <button type="button" class="btn-admin-action-secondary" id="btn-load-minio-list">Consultar MinIO</button>
               </div>
             `
-            : `
+        : `
               <div class="admin-assets-grid">
                 ${this.assets
-                  .map((asset) => {
-                    const is3D = asset.key.endsWith('.glb') || asset.key.endsWith('.gltf');
-                    const sizeKB = (asset.size / 1024).toFixed(1);
+          .map((asset) => {
+            const is3D = asset.key.endsWith('.glb') || asset.key.endsWith('.gltf');
+            const sizeKB = (asset.size / 1024).toFixed(1);
 
-                    return `
+            return `
                       <div class="admin-asset-card" data-key="${asset.key}">
                         <div class="asset-preview-wrap">
                           ${is3D
-                            ? `<div class="asset-3d-placeholder">${Icons.cube3d('w-8 h-8')}<span>Modelo 3D</span></div>`
-                            : `<img src="${asset.url}" alt="${asset.key}" class="asset-preview-img" loading="lazy" />`
-                          }
+                ? `<div class="asset-3d-placeholder">${Icons.cube3d('w-8 h-8')}<span>Modelo 3D</span></div>`
+                : `<img src="${asset.url}" alt="${asset.key}" class="asset-preview-img" loading="lazy" />`
+              }
                         </div>
                         <div class="asset-info-col">
                           <strong class="asset-filename" title="${asset.key}">${asset.key}</strong>
@@ -1457,11 +1862,11 @@ export class AdminPanel {
                         </div>
                       </div>
                     `;
-                  })
-                  .join('')}
+          })
+          .join('')}
               </div>
             `
-          }
+      }
         </div>
       </div>
     `;
@@ -1524,6 +1929,7 @@ export class AdminPanel {
 
     // Si estamos en la pestaña de crear/editar producto, enlazar eventos de tallas y recursos
     if (this.activeTab === 'products-create') {
+      this.bindVariantsBarEvents();
       this.setupSizesSectionEvents();
       this.bindGalleryEvents();
       this.bind3dStatusEvents();
@@ -1609,6 +2015,8 @@ export class AdminPanel {
       this.formSizes = [];
       this.formGallery = [];
       this.formModel3dUrl = null;
+      this.formVariants = [];
+      this.activeVariantIndex = 0;
       this.activeTab = 'products-list';
       this.updateMainContentOnly();
     });
@@ -1618,6 +2026,8 @@ export class AdminPanel {
       this.formSizes = [];
       this.formGallery = [];
       this.formModel3dUrl = null;
+      this.formVariants = [];
+      this.activeVariantIndex = 0;
       this.activeTab = 'products-list';
       this.updateMainContentOnly();
     });
@@ -1661,6 +2071,9 @@ export class AdminPanel {
       }
 
       galleryInput.value = '';
+      if (this.formVariants[this.activeVariantIndex]) {
+        this.formVariants[this.activeVariantIndex].gallery = [...this.formGallery];
+      }
       this.refreshGalleryOnly();
 
       if (successCount > 0) {
@@ -1693,6 +2106,9 @@ export class AdminPanel {
         if (uploadRes.success && uploadRes.url) {
           Toast.show('¡Modelo 3D subido a MinIO con éxito!', 'MinIO', 'success');
           this.formModel3dUrl = uploadRes.url;
+          if (this.formVariants[this.activeVariantIndex]) {
+            this.formVariants[this.activeVariantIndex].model3dUrl = uploadRes.url;
+          }
           this.refresh3dStatusOnly();
         } else {
           Toast.show(uploadRes.message || 'Error al subir modelo a MinIO.', 'Error', 'warning');
@@ -1702,12 +2118,37 @@ export class AdminPanel {
       modelFile.value = '';
     });
 
+    // Sincronización en vivo de precios por variante de color
+    const priceLiveInput = this.container.querySelector('#prod-price') as HTMLInputElement | null;
+    priceLiveInput?.addEventListener('input', () => {
+      const v = this.formVariants[this.activeVariantIndex];
+      if (v) {
+        v.price = priceLiveInput.value.trim() !== '' ? parseFloat(priceLiveInput.value) : undefined;
+      }
+    });
+
+    const origPriceLiveInput = this.container.querySelector('#prod-orig-price') as HTMLInputElement | null;
+    origPriceLiveInput?.addEventListener('input', () => {
+      const v = this.formVariants[this.activeVariantIndex];
+      if (v) {
+        v.originalPrice = origPriceLiveInput.value.trim() !== '' ? parseFloat(origPriceLiveInput.value) : null;
+      }
+    });
+
     // Submit del formulario de producto
     const prodForm = this.container.querySelector('#form-admin-product');
     prodForm?.addEventListener('submit', async (e) => {
       e.preventDefault();
 
-      if (this.formGallery.length === 0) {
+      // Guardar los datos de la variante activa actual
+      this.saveActiveVariantFromForm();
+
+      // Verificar que haya al menos una imagen en alguna variante
+      const primaryVariantWithImg = this.formVariants[0]?.gallery?.length > 0
+        ? this.formVariants[0]
+        : (this.formVariants.find((v) => v.gallery && v.gallery.length > 0) || this.formVariants[0]);
+
+      if (!primaryVariantWithImg || primaryVariantWithImg.gallery.length === 0) {
         Toast.show('Por favor sube al menos una imagen para el producto (portada).', 'Imagen Requerida', 'warning');
         return;
       }
@@ -1718,21 +2159,47 @@ export class AdminPanel {
       const gender = (this.container.querySelector('#prod-gender') as HTMLSelectElement)?.value;
       const badge = (this.container.querySelector('#prod-badge') as HTMLInputElement)?.value.trim() || null;
       const description = (this.container.querySelector('#prod-desc') as HTMLTextAreaElement)?.value.trim() || null;
-      const price = Number((this.container.querySelector('#prod-price') as HTMLInputElement)?.value);
+      
+      const formPrice = Number((this.container.querySelector('#prod-price') as HTMLInputElement)?.value);
       const origPriceInput = (this.container.querySelector('#prod-orig-price') as HTMLInputElement)?.value;
-      const originalPrice = origPriceInput ? Number(origPriceInput) : null;
-      const image = this.formGallery[0];
-      const gallery = [...this.formGallery];
-      const model3dUrl = this.formModel3dUrl;
+      const formOrigPrice = origPriceInput ? Number(origPriceInput) : null;
+      
       const inStock = (this.container.querySelector('#prod-instock') as HTMLInputElement)?.checked ?? true;
       const featured = (this.container.querySelector('#prod-featured') as HTMLInputElement)?.checked ?? false;
 
-      // Recolectar tallas y stock
-      this.syncSizesFromDom();
-      const sizes: Array<{ size: number; stock: number }> = this.formSizes.map((s) => ({
-        size: s.size,
-        stock: Math.max(0, s.stock)
+      // Imagen y galería principal de la variante 1 (sin mezclar fotos de otras variantes)
+      const image = primaryVariantWithImg.gallery[0];
+      const gallery = [...primaryVariantWithImg.gallery];
+
+      // Modelo 3D
+      const model3dUrl = this.formVariants.find((v) => Boolean(v.model3dUrl))?.model3dUrl || null;
+
+      // Variantes de color: CADA VARIANTE GUARDA SU PROPIA GALERÍA, PRECIO Y TALLAS AISLADAS
+      const colors = this.formVariants.map((v, i) => ({
+        name: v.name || `Color ${i + 1}`,
+        hex: v.hex,
+        image: v.gallery.length > 0 ? v.gallery[0] : image,
+        gallery: [...v.gallery],
+        price: v.price !== undefined ? v.price : formPrice,
+        originalPrice: v.originalPrice !== undefined ? v.originalPrice : formOrigPrice,
+        sizes: v.sizes.map((s) => ({ size: Number(s.size), stock: Number(s.stock) || 0 }))
       }));
+
+      // Existencias combinadas por talla: se suma completo el stock de todas las variantes
+      const sizesMap = new Map<number, number>();
+      this.formVariants.forEach((v) => {
+        v.sizes.forEach((s) => {
+          const prev = sizesMap.get(s.size) || 0;
+          sizesMap.set(s.size, prev + Math.max(0, s.stock));
+        });
+      });
+      const sizes = Array.from(sizesMap.entries())
+        .map(([size, stock]) => ({ size, stock }))
+        .sort((a, b) => a.size - b.size);
+
+      // Precios primarios del producto
+      const primaryPrice = this.formVariants[0]?.price ?? formPrice;
+      const primaryOrigPrice = this.formVariants[0]?.originalPrice !== undefined ? this.formVariants[0].originalPrice : formOrigPrice;
 
       const submitBtn = this.container.querySelector('#btn-save-product') as HTMLButtonElement | null;
       if (submitBtn) {
@@ -1751,14 +2218,15 @@ export class AdminPanel {
             gender,
             badge,
             description,
-            price,
-            originalPrice,
+            price: primaryPrice,
+            originalPrice: primaryOrigPrice,
             image,
             gallery,
             model3dUrl,
             inStock,
             featured,
-            sizes
+            sizes,
+            colors
           });
 
           if (res.success) {
@@ -1767,6 +2235,8 @@ export class AdminPanel {
             this.formSizes = [];
             this.formGallery = [];
             this.formModel3dUrl = null;
+            this.formVariants = [];
+            this.activeVariantIndex = 0;
             await this.loadInitialData();
             this.store.loadProducts();
             this.activeTab = 'products-list';
@@ -1783,14 +2253,15 @@ export class AdminPanel {
             gender,
             badge,
             description,
-            price,
-            originalPrice,
+            price: primaryPrice,
+            originalPrice: primaryOrigPrice,
             image,
             gallery,
             model3dUrl,
             inStock,
             featured,
-            sizes
+            sizes,
+            colors
           });
 
           if (res.success) {
@@ -1799,6 +2270,8 @@ export class AdminPanel {
             this.formSizes = [];
             this.formGallery = [];
             this.formModel3dUrl = null;
+            this.formVariants = [];
+            this.activeVariantIndex = 0;
             await this.loadInitialData();
             this.store.loadProducts();
             this.activeTab = 'products-list';
