@@ -37,6 +37,9 @@ export interface Product {
   inStock: boolean;
   has3DModel?: boolean;
   model3dUrl?: string;
+  carouselImage?: string | null;
+  showcaseActive?: boolean;
+  showcaseOrder?: number;
   createdAt: string;
 }
 

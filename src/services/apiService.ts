@@ -515,6 +515,22 @@ export class ApiService {
   }
 
   /**
+   * Actualiza la configuración de Circular Showcase (activación, orden y/o recurso .png)
+   */
+  static async updateAdminShowcase(userId: string, data: { id: string; showcaseActive?: boolean; showcaseOrder?: number; carouselImage?: string | null }): Promise<ApiResponse> {
+    try {
+      const res = await fetch('/api/admin/products/showcase', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'x-user-id': userId },
+        body: JSON.stringify({ ...data, userId })
+      });
+      return await res.json();
+    } catch {
+      return { success: false, message: 'Error al actualizar Circular Showcase.' };
+    }
+  }
+
+  /**
    * Obtiene todos los códigos promocionales
    */
   static async getAdminPromos(userId: string): Promise<ApiResponse<{ promos: any[] }>> {

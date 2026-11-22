@@ -128,6 +128,9 @@ model Product {
   image         String
   gallery       String[]       @default([])
   model3dUrl    String?
+  carouselImage String?
+  showcaseActive Boolean       @default(false)
+  showcaseOrder  Int           @default(0)
   inStock       Boolean        @default(true)
   featured      Boolean        @default(false)
   categoryId    String

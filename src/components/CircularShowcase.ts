@@ -2,35 +2,18 @@ import { Store } from '../state/store';
 import { Icons } from './Icons';
 import { Toast } from './Toast';
 import { Product } from '../types/product';
-
-interface SlideItem {
-  index: number;
-  id: string;
-  name: string;
-  edition: string;
-  colorName: string;
-  price: number;
-  image: string;
-  badge: string;
-}
+import {
+  DEFAULT_SHOWCASE_DEMOS,
+  SlideItem,
+  ShowcaseSettingsService,
+  ShowcaseSettings
+} from '../data/showcaseDemoItems';
 
 export class CircularShowcase {
   private container: HTMLElement;
   private store: Store;
 
-  // Lista de los 10 pares de calzado basados en slide.png
-  private items: SlideItem[] = [
-    { index: 0, id: 'blessed-slide-01', name: 'Blessed Slide Onyx Edition', edition: 'Edición #01', colorName: 'Midnight Onyx', price: 65, image: '/assets/slide/slide.png', badge: 'MÁS VENDIDO' },
-    { index: 1, id: 'blessed-slide-02', name: 'Blessed Slide Pure Ivory', edition: 'Edición #02', colorName: 'Pure Ivory', price: 65, image: '/assets/slide/slide.png', badge: 'NUEVO' },
-    { index: 2, id: 'blessed-slide-03', name: 'Blessed Slide Desert Sand', edition: 'Edición #03', colorName: 'Desert Sand', price: 68, image: '/assets/slide/slide.png', badge: 'POPULAR' },
-    { index: 3, id: 'blessed-slide-04', name: 'Blessed Slide Emerald Luxe', edition: 'Edición #04', colorName: 'Emerald Green', price: 72, image: '/assets/slide/slide.png', badge: 'EXCLUSIVO' },
-    { index: 4, id: 'blessed-slide-05', name: 'Blessed Slide Carbon Wave', edition: 'Edición #05', colorName: 'Carbon Matte', price: 65, image: '/assets/slide/slide.png', badge: 'EDICIÓN 2026' },
-    { index: 5, id: 'blessed-slide-06', name: 'Blessed Slide Vintage Amber', edition: 'Edición #06', colorName: 'Vintage Amber', price: 70, image: '/assets/slide/slide.png', badge: 'LIMITADO' },
-    { index: 6, id: 'blessed-slide-07', name: 'Blessed Slide Nordic Slate', edition: 'Edición #07', colorName: 'Slate Grey', price: 65, image: '/assets/slide/slide.png', badge: 'NUEVO' },
-    { index: 7, id: 'blessed-slide-08', name: 'Blessed Slide Forest Shadow', edition: 'Edición #08', colorName: 'Forest Deep', price: 68, image: '/assets/slide/slide.png', badge: 'CONFORT' },
-    { index: 8, id: 'blessed-slide-09', name: 'Blessed Slide Terra Cotta', edition: 'Edición #09', colorName: 'Terra Cotta', price: 65, image: '/assets/slide/slide.png', badge: 'VERANO' },
-    { index: 9, id: 'blessed-slide-10', name: 'Blessed Slide Gold Accent', edition: 'Edición #10', colorName: 'Gold Luxury', price: 75, image: '/assets/slide/slide.png', badge: 'PREMIUM' }
-  ];
+  private items: SlideItem[] = [...DEFAULT_SHOWCASE_DEMOS];
 
   // Estado físico de rotación continua
   private currentAngle: number = Math.PI / 2; // Inicia con el primer par en la cima del arco
@@ -59,10 +42,112 @@ export class CircularShowcase {
     if (!el) throw new Error(`Element #${containerId} not found`);
     this.container = el;
 
+    this.syncWithStoreProducts();
     this.render();
     this.setupEvents();
     this.setupCardDragAnd3D();
     this.startAnimationLoop();
+
+    this.store.subscribe(() => {
+      this.syncWithStoreProducts();
+    });
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('blessed:showcase_settings_changed', () => {
+        this.syncWithStoreProducts();
+      });
+    }
+  }
+
+  private syncWithStoreProducts(): void {
+    const settings = ShowcaseSettingsService.getSettings();
+    const showcaseProducts = this.store.products
+      .filter((p) => p.showcaseActive && p.carouselImage)
+      .sort((a, b) => (a.showcaseOrder || 0) - (b.showcaseOrder || 0));
+
+    const catalogItems: SlideItem[] = showcaseProducts.map((p, idx) => ({
+      index: idx,
+      id: p.id,
+      name: p.name,
+      edition: p.subtitle || `Edición #${idx + 1}`,
+      colorName: p.colors?.[0]?.name || 'Original',
+      price: p.price,
+      image: p.carouselImage!,
+      badge: p.badge || (idx === 0 ? 'MÁS VENDIDO' : idx === 1 ? 'NUEVO' : 'DESTACADO')
+    }));
+
+    // Ejemplos activos según settings.enabledDemoIds
+    const activeDemoItems: SlideItem[] = DEFAULT_SHOWCASE_DEMOS
+      .filter((d) => settings.enabledDemoIds.includes(d.id))
+      .map((d) => ({ ...d }));
+
+    if (catalogItems.length > 0) {
+      this.items = [...catalogItems, ...activeDemoItems];
+    } else {
+      this.items = [...activeDemoItems];
+    }
+
+    this.items.forEach((item, idx) => {
+      item.index = idx;
+    });
+
+    this.applyProportions(settings);
+
+    const wrap = this.container.querySelector('#orbit-items-wrap');
+    if (wrap) {
+      wrap.innerHTML = this.renderOrbitShoesHtml();
+      this.setupShoeHoverEvents();
+    }
+  }
+
+  private applyProportions(settings: ShowcaseSettings): void {
+    let ratio = 836 / 342; // default
+    if (settings.customProportionEnabled && settings.customWidth > 0 && settings.customHeight > 0) {
+      ratio = settings.customWidth / settings.customHeight;
+    } else if (!settings.adjustTo836x342) {
+      ratio = 290 / 125;
+    }
+
+    const baseWidth = 290;
+    const calcHeight = Math.round(baseWidth / ratio);
+    const fitMode = settings.preserveWithoutDistortion ? 'contain' : 'fill';
+
+    const stage = this.container.querySelector('#orbit-stage') as HTMLElement | null;
+    if (stage) {
+      stage.style.setProperty('--shoe-core-width', `${baseWidth}px`);
+      stage.style.setProperty('--shoe-core-height', `${calcHeight}px`);
+      stage.style.setProperty('--shoe-img-fit', fitMode);
+    }
+  }
+
+  private renderOrbitShoesHtml(): string {
+    return this.items
+      .map((item, i) => {
+        const prop = ShowcaseSettingsService.getProductProportion(item.id);
+        const ratio = prop.customProportionEnabled && prop.customWidth > 0 && prop.customHeight > 0
+          ? prop.customWidth / prop.customHeight
+          : (prop.adjustTo836x342 ? (836 / 342) : (290 / 125));
+        const baseWidth = 290;
+        const calcHeight = Math.round(baseWidth / ratio);
+        const fitMode = prop.preserveWithoutDistortion ? 'contain' : 'fill';
+
+        return `
+      <div 
+        class="orbit-shoe-item" 
+        id="shoe-item-${i}" 
+        data-index="${i}"
+      >
+        <div class="shoe-card-shell">
+          <div class="shoe-visual-core" style="--shoe-core-width: ${baseWidth}px; --shoe-core-height: ${calcHeight}px; --shoe-img-fit: ${fitMode};">
+            <img src="${item.image}" alt="${item.name}" class="shoe-img" draggable="false" />
+            <div class="shoe-shadow"></div>
+            <span class="shoe-indicator-dot">${i + 1}</span>
+          </div>
+        </div>
+      </div>
+    `;
+      })
+      .join('');
   }
 
   private render(): void {
@@ -85,27 +170,9 @@ export class CircularShowcase {
               <path d="M 40 350 Q 500 20 960 350" fill="none" stroke="rgba(210, 181, 136, 0.3)" stroke-width="2.5" stroke-dasharray="8,8" />
             </svg>
 
-            <!-- CONTENEDOR DINÁMICO DE LOS 10 PARES -->
+            <!-- CONTENEDOR DINÁMICO DE LOS PARES -->
             <div class="orbit-items-wrap" id="orbit-items-wrap">
-              ${this.items
-                .map(
-                  (item, i) => `
-                <div 
-                  class="orbit-shoe-item" 
-                  id="shoe-item-${i}" 
-                  data-index="${i}"
-                >
-                  <div class="shoe-card-shell">
-                    <div class="shoe-visual-core">
-                      <img src="${item.image}" alt="${item.name}" class="shoe-img" draggable="false" />
-                      <div class="shoe-shadow"></div>
-                      <span class="shoe-indicator-dot">${i + 1}</span>
-                    </div>
-                  </div>
-                </div>
-              `
-                )
-                .join('')}
+              ${this.renderOrbitShoesHtml()}
             </div>
 
             <!-- TARJETA MINIMALISTA FLOTANTE 3D (DESPLAZABLE Y ARRASTRABLE) -->
@@ -138,66 +205,7 @@ export class CircularShowcase {
     const runway = this.container.querySelector('#showcase-runway') as HTMLElement | null;
 
     // 1. Hover con Intent Delay sobre cada calzado
-    this.container.querySelectorAll('.orbit-shoe-item').forEach((itemEl) => {
-      const idx = parseInt((itemEl as HTMLElement).dataset.index || '0', 10);
-
-      const triggerHover = () => {
-        this.cancelHideCard();
-        this.isHoveringShoe = true;
-        itemEl.classList.add('is-focusing');
-
-        // Si la tarjeta ya está abierta para este par exacto, mantenerla activa
-        if (this.activeCardIndex === idx) return;
-
-        // Si el usuario está arrastrando la tarjeta, no cambiar
-        if (this.isCardDragging) return;
-
-        // Espera consciente de 260ms para no salir de golpe ni cambiar por accidente
-        if (this.hoverIntentTimer) clearTimeout(this.hoverIntentTimer);
-        this.hoverIntentTimer = window.setTimeout(() => {
-          if (this.isCardDragging) return;
-          this.activeHoveredIndex = idx;
-          this.activeCardIndex = idx;
-          this.velocity = 0;
-          this.showHoverCard(idx);
-        }, 260);
-      };
-
-      const cancelHover = () => {
-        itemEl.classList.remove('is-focusing');
-        this.isHoveringShoe = false;
-
-        // Si teníamos un temporizador para abrir este calzado y el cursor salió antes, cancelarlo
-        if (this.hoverIntentTimer && this.activeCardIndex !== idx) {
-          clearTimeout(this.hoverIntentTimer);
-          this.hoverIntentTimer = null;
-        }
-
-        // Si este calzado tiene la tarjeta activa actualmente, iniciar tolerancia para transitar a la tarjeta
-        if (this.activeCardIndex === idx) {
-          this.scheduleHideCard();
-        }
-      };
-
-      itemEl.addEventListener('mouseenter', triggerHover);
-      itemEl.addEventListener('mouseleave', cancelHover);
-
-      // Eventos táctiles para móviles
-      let touchPressTimer: number | null = null;
-      itemEl.addEventListener('touchstart', () => {
-        touchPressTimer = window.setTimeout(() => {
-          triggerHover();
-        }, 220);
-      }, { passive: true });
-
-      itemEl.addEventListener('touchend', () => {
-        if (touchPressTimer) clearTimeout(touchPressTimer);
-      });
-
-      itemEl.addEventListener('click', () => {
-        this.handleShoeClick(idx);
-      });
-    });
+    this.setupShoeHoverEvents();
 
     // 2. Corredor seguro enfocado entre el calzado y la tarjeta activa
     document.addEventListener('pointermove', (e: PointerEvent) => {
@@ -648,7 +656,75 @@ export class CircularShowcase {
     });
   }
 
+  private setupShoeHoverEvents(): void {
+    this.container.querySelectorAll('.orbit-shoe-item').forEach((itemEl) => {
+      const idx = parseInt((itemEl as HTMLElement).dataset.index || '0', 10);
+
+      const triggerHover = () => {
+        this.cancelHideCard();
+        this.isHoveringShoe = true;
+        itemEl.classList.add('is-focusing');
+
+        // Si la tarjeta ya está abierta para este par exacto, mantenerla activa
+        if (this.activeCardIndex === idx) return;
+
+        // Si el usuario está arrastrando la tarjeta, no cambiar
+        if (this.isCardDragging) return;
+
+        // Espera consciente de 260ms para no salir de golpe ni cambiar por accidente
+        if (this.hoverIntentTimer) clearTimeout(this.hoverIntentTimer);
+        this.hoverIntentTimer = window.setTimeout(() => {
+          if (this.isCardDragging) return;
+          this.activeHoveredIndex = idx;
+          this.activeCardIndex = idx;
+          this.velocity = 0;
+          this.showHoverCard(idx);
+        }, 260);
+      };
+
+      const cancelHover = () => {
+        itemEl.classList.remove('is-focusing');
+        this.isHoveringShoe = false;
+
+        // Si teníamos un temporizador para abrir este calzado y el cursor salió antes, cancelarlo
+        if (this.hoverIntentTimer && this.activeCardIndex !== idx) {
+          clearTimeout(this.hoverIntentTimer);
+          this.hoverIntentTimer = null;
+        }
+
+        // Si este calzado tiene la tarjeta activa actualmente, iniciar tolerancia para transitar a la tarjeta
+        if (this.activeCardIndex === idx) {
+          this.scheduleHideCard();
+        }
+      };
+
+      itemEl.addEventListener('mouseenter', triggerHover);
+      itemEl.addEventListener('mouseleave', cancelHover);
+
+      // Eventos táctiles para móviles
+      let touchPressTimer: number | null = null;
+      itemEl.addEventListener('touchstart', () => {
+        touchPressTimer = window.setTimeout(() => {
+          triggerHover();
+        }, 220);
+      }, { passive: true });
+
+      itemEl.addEventListener('touchend', () => {
+        if (touchPressTimer) clearTimeout(touchPressTimer);
+      });
+
+      itemEl.addEventListener('click', () => {
+        this.handleShoeClick(idx);
+      });
+    });
+  }
+
   private buildProductFromItem(item: SlideItem): Product {
+    const realProduct = this.store.products.find((p) => p.id === item.id);
+    if (realProduct) {
+      return realProduct;
+    }
+
     return {
       id: item.id,
       name: item.name,

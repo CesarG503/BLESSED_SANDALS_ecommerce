@@ -1419,6 +1419,9 @@ export function apiPlugin(): Plugin {
                 gallery,
                 model3dUrl: p.model3dUrl || mockMatch?.model3dUrl || undefined,
                 has3DModel: Boolean(p.model3dUrl || mockMatch?.has3DModel),
+                carouselImage: p.carouselImage || undefined,
+                showcaseActive: p.showcaseActive,
+                showcaseOrder: p.showcaseOrder,
                 colors: p.colors.length > 0
                   ? p.colors.map((c) => {
                       const colGallery = Array.isArray(c.gallery) && c.gallery.length > 0
@@ -1490,6 +1493,9 @@ export function apiPlugin(): Plugin {
                   image: p.image,
                   gallery: p.gallery && p.gallery.length > 0 ? p.gallery : (p.image ? [p.image] : []),
                   model3dUrl: p.model3dUrl,
+                  carouselImage: p.carouselImage,
+                  showcaseActive: Boolean(p.showcaseActive),
+                  showcaseOrder: p.showcaseOrder || 0,
                   categoryId: p.categoryId,
                   categoryName: p.category.name,
                   inStock: p.inStock,
@@ -1533,6 +1539,9 @@ export function apiPlugin(): Plugin {
               image,
               gallery,
               model3dUrl,
+              carouselImage,
+              showcaseActive = false,
+              showcaseOrder = 0,
               categoryId,
               inStock = true,
               featured = false,
@@ -1593,6 +1602,9 @@ export function apiPlugin(): Plugin {
                 image: finalImage.trim(),
                 gallery: finalGallery,
                 model3dUrl: model3dUrl ? model3dUrl.trim() : null,
+                carouselImage: carouselImage ? carouselImage.trim() : null,
+                showcaseActive: Boolean(showcaseActive),
+                showcaseOrder: Number(showcaseOrder) || 0,
                 categoryId: finalCategoryId,
                 inStock: Boolean(inStock),
                 featured: Boolean(featured),
@@ -1659,6 +1671,9 @@ export function apiPlugin(): Plugin {
               image,
               gallery,
               model3dUrl,
+              carouselImage,
+              showcaseActive = false,
+              showcaseOrder = 0,
               categoryId,
               inStock,
               featured,
@@ -1692,6 +1707,9 @@ export function apiPlugin(): Plugin {
                   ...(finalImage ? { image: finalImage.trim() } : {}),
                   ...(finalGallery !== undefined ? { gallery: finalGallery } : {}),
                   model3dUrl: model3dUrl !== undefined ? (model3dUrl ? model3dUrl.trim() : null) : undefined,
+                  ...(carouselImage !== undefined ? { carouselImage: carouselImage ? carouselImage.trim() : null } : {}),
+                  ...(showcaseActive !== undefined ? { showcaseActive: Boolean(showcaseActive) } : {}),
+                  ...(showcaseOrder !== undefined ? { showcaseOrder: Number(showcaseOrder) } : {}),
                   ...(categoryId ? { categoryId } : {}),
                   ...(inStock !== undefined ? { inStock: Boolean(inStock) } : {}),
                   ...(featured !== undefined ? { featured: Boolean(featured) } : {})
@@ -1799,6 +1817,35 @@ export function apiPlugin(): Plugin {
             return sendJson(res, 200, {
               success: true,
               message: 'Existencias actualizadas correctamente.'
+            });
+          }
+
+          // 5.5. PATCH /api/admin/products/showcase (Actualizar Circular Showcase de un producto)
+          if (pathname === '/api/admin/products/showcase' && req.method === 'PATCH') {
+            const body = await parseBody(req);
+            const isAdmin = await checkIsAdmin(req, parsedUrl, body.userId);
+            if (!isAdmin) {
+              return sendJson(res, 403, { success: false, message: 'Acceso no autorizado.' });
+            }
+
+            const { id, showcaseActive, showcaseOrder, carouselImage } = body;
+            if (!id) {
+              return sendJson(res, 400, { success: false, message: 'ID de producto requerido.' });
+            }
+
+            const updated = await prisma.product.update({
+              where: { id },
+              data: {
+                ...(showcaseActive !== undefined ? { showcaseActive: Boolean(showcaseActive) } : {}),
+                ...(showcaseOrder !== undefined ? { showcaseOrder: Number(showcaseOrder) } : {}),
+                ...(carouselImage !== undefined ? { carouselImage: carouselImage ? carouselImage.trim() : null } : {})
+              }
+            });
+
+            return sendJson(res, 200, {
+              success: true,
+              message: 'Circular Showcase actualizado correctamente.',
+              product: updated
             });
           }
 

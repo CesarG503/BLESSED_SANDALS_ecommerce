@@ -10,13 +10,18 @@ import {
   unitToEu,
   STANDARD_CHART_SIZES
 } from '../utils/sizeConverter';
+import {
+  DEFAULT_SHOWCASE_DEMOS,
+  ShowcaseSettingsService
+} from '../data/showcaseDemoItems';
 
 export type AdminTab =
   | 'products-list'
   | 'products-create'
   | 'promos-list'
   | 'promos-create'
-  | 'minio-storage';
+  | 'minio-storage'
+  | 'circular-showcase';
 
 export interface ProductVariantForm {
   id: string;
@@ -52,14 +57,19 @@ export class AdminPanel {
   private formSizes: Array<{ size: number; stock: number }> = [];
   private formGallery: string[] = [];
   private formModel3dUrl: string | null = null;
+  private formCarouselImage: string | null = null;
   private formVariants: ProductVariantForm[] = [];
   private activeVariantIndex: number = 0;
   private adminSizeUnit: SizeUnit = 'EU';
   private showEquivalences: boolean = false;
+  private showcaseSearchTerm: string = '';
+  private demosAccordionOpen: boolean = false;
+  private activeModalProductId: string | null = null;
 
   private initFormVariants(): void {
     if (this.editingProduct) {
       const p = this.editingProduct;
+      this.formCarouselImage = p.carouselImage || null;
       if (Array.isArray(p.colors) && p.colors.length > 0) {
         this.formVariants = p.colors.map((c: any, index: number) => {
           const isPrimary = index === 0;
@@ -122,6 +132,7 @@ export class AdminPanel {
       }
     } else {
       // Producto nuevo: 1 variante negra predeterminada con stock en 0 y galería vacía
+      this.formCarouselImage = null;
       this.formVariants = [
         {
           id: 'var_1',
@@ -383,6 +394,18 @@ export class AdminPanel {
               </nav>
             </div>
 
+            <div class="admin-nav-divider"></div>
+
+            <!-- SECCIÓN 4: APARIENCIA DE SITIO WEB -->
+            <div class="admin-nav-group">
+              <span class="admin-group-title">APARIENCIA DE SITIO WEB</span>
+              <nav class="admin-group-links">
+                <button type="button" class="admin-tab-btn ${this.activeTab === 'circular-showcase' ? 'active' : ''}" data-tab="circular-showcase">
+                  Circular Showcase
+                </button>
+              </nav>
+            </div>
+
             <div class="admin-sidebar-footer">
               <div class="admin-server-status">
                 <span class="status-pulse-dot"></span>
@@ -414,6 +437,8 @@ export class AdminPanel {
         return this.renderPromoFormTab();
       case 'minio-storage':
         return this.renderMinioStorageTab();
+      case 'circular-showcase':
+        return this.renderCircularShowcaseTab();
       default:
         return this.renderProductsListTab();
     }
@@ -737,6 +762,33 @@ export class AdminPanel {
             <div id="admin-gallery-wrapper">
               ${this.renderGalleryGridHtml()}
             </div>
+
+            <!-- LÍNEA FINA DIVISORIA -->
+            <div class="admin-media-fine-divider"></div>
+
+            <!-- SUBIDA DIFERENTE: RECURSO CARRUSEL (CIRCULAR SHOWCASE) -->
+            <div class="admin-carousel-resource-wrap">
+              <div class="admin-carousel-header">
+                <div>
+                  <h4 class="admin-subsection-heading">RECURSO CARRUSEL (CIRCULAR SHOWCASE)</h4>
+                  <p class="admin-section-sub">
+                    
+                  </p>
+                </div>
+                <div class="admin-carousel-actions">
+                  <input type="file" id="file-hidden-carousel" accept=".png,image/png" style="display: none;" />
+                  <button type="button" class="btn-field-action" id="btn-trigger-upload-carousel" title="Subir imagen .png para Circular Showcase">
+                    ${Icons.uploadCloud('w-4 h-4')}
+                    <span id="btn-label-carousel">${this.formCarouselImage ? 'Cambiar Carrusel (.PNG)' : 'Subir Carrusel (.PNG)'}</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- CONTENEDOR DE ESTADO DEL RECURSO CARRUSEL -->
+              <div id="admin-carousel-status-wrapper">
+                ${this.renderCarouselStatusHtml()}
+              </div>
+            </div>
           </div>
 
           <!-- GRUPO 4: TALLAS Y EXISTENCIAS EN FORMATOS EQUIVALENTES -->
@@ -1048,14 +1100,14 @@ export class AdminPanel {
     return `
       <div class="admin-gallery-grid" id="admin-gallery-cards-grid">
         ${this.formGallery.map((url, idx) => {
-          const isCover = idx === 0;
-          return `
+      const isCover = idx === 0;
+      return `
             <div class="gallery-thumb-card ${isCover ? 'is-cover' : ''}" data-index="${idx}">
               <div class="gallery-thumb-badge-wrap">
                 ${isCover
-                  ? `<span class="badge-cover-primary">#1 PORTADA</span>`
-                  : `<span class="badge-gallery-num">#${idx + 1}</span>`
-                }
+          ? `<span class="badge-cover-primary">#1 PORTADA</span>`
+          : `<span class="badge-gallery-num">#${idx + 1}</span>`
+        }
                 <span class="badge-variant-belong-pill" title="Pertenece a Variante #${this.activeVariantIndex + 1} (${hex})">
                   <span class="mini-variant-dot" style="background-color: ${hex};"></span>
                   <span>Var #${this.activeVariantIndex + 1}</span>
@@ -1082,7 +1134,7 @@ export class AdminPanel {
               </div>
             </div>
           `;
-        }).join('')}
+    }).join('')}
       </div>
     `;
   }
@@ -1186,6 +1238,77 @@ export class AdminPanel {
       }
       this.refresh3dStatusOnly();
       Toast.show('Modelo 3D retirado.', 'MinIO Storage', 'info');
+    });
+  }
+
+  // ==========================================================================
+  // HELPERS: RECURSO CARRUSEL (.PNG) PARA CIRCULAR SHOWCASE
+  // ==========================================================================
+  private renderCarouselStatusHtml(): string {
+    if (!this.formCarouselImage) {
+      return `
+        <div class="carousel-resource-empty-box">
+          <div class="carousel-empty-meta">
+            <span class="carousel-empty-icon">${Icons.camera('w-4 h-4')}</span>
+            <span>Sin recurso .png asignado para Circular Showcase.</span>
+          </div>
+          <button type="button" class="btn-subtle-upload" id="btn-trigger-upload-carousel-empty">
+            + Subir .PNG
+          </button>
+        </div>
+      `;
+    }
+
+    const filename = this.formCarouselImage.split('/').pop() || 'recurso-carrusel.png';
+
+    return `
+      <div class="carousel-resource-active-card">
+        <div class="carousel-preview-wrap" title="Vista previa en fondo de cuadrícula para transparencias">
+          <img src="${this.formCarouselImage}" alt="Recurso carrusel .png" class="carousel-preview-thumb" />
+        </div>
+        <div class="carousel-meta-wrap">
+          <span class="carousel-tag-badge">FORMATO .PNG TRANSPARENTE</span>
+          <span class="carousel-filename">${filename}</span>
+          <span class="carousel-note">Exclusivo para rotación en Circular Showcase. No visible en galería normal.</span>
+        </div>
+        <div class="carousel-actions-row">
+          <button type="button" class="btn-carousel-replace" id="btn-replace-carousel-resource" title="Cambiar imagen .png">
+            Sustituir
+          </button>
+          <button type="button" class="btn-carousel-remove" id="btn-remove-carousel-resource" title="Quitar recurso carrusel">
+            ${Icons.trash('w-3.5 h-3.5')}
+            <span>Quitar</span>
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  private refreshCarouselStatusOnly(): void {
+    const wrapper = this.container.querySelector('#admin-carousel-status-wrapper');
+    if (wrapper) {
+      wrapper.innerHTML = this.renderCarouselStatusHtml();
+      this.bindCarouselResourceEvents();
+    }
+    const label = this.container.querySelector('#btn-label-carousel');
+    if (label) {
+      label.textContent = this.formCarouselImage ? 'Cambiar Carrusel (.PNG)' : 'Subir Carrusel (.PNG)';
+    }
+  }
+
+  private bindCarouselResourceEvents(): void {
+    this.container.querySelector('#btn-trigger-upload-carousel-empty')?.addEventListener('click', () => {
+      (this.container.querySelector('#file-hidden-carousel') as HTMLInputElement | null)?.click();
+    });
+
+    this.container.querySelector('#btn-replace-carousel-resource')?.addEventListener('click', () => {
+      (this.container.querySelector('#file-hidden-carousel') as HTMLInputElement | null)?.click();
+    });
+
+    this.container.querySelector('#btn-remove-carousel-resource')?.addEventListener('click', () => {
+      this.formCarouselImage = null;
+      this.refreshCarouselStatusOnly();
+      Toast.show('Recurso de carrusel retirado.', 'Circular Showcase', 'info');
     });
   }
 
@@ -1873,6 +1996,450 @@ export class AdminPanel {
   }
 
   // ==========================================================================
+  // TAB 6: APARIENCIA DE SITIO WEB - CIRCULAR SHOWCASE
+  // ==========================================================================
+  private renderCircularShowcaseTab(): string {
+    const settings = ShowcaseSettingsService.getSettings();
+    const totalCount = this.products.length;
+    const withPngCount = this.products.filter((p) => Boolean(p.carouselImage)).length;
+    const activeShowcaseCount = this.products.filter((p) => p.showcaseActive && p.carouselImage).length;
+    const activeDemosCount = settings.enabledDemoIds.length;
+
+    // Filtrado por término de búsqueda si existe
+    const filteredProducts = this.products.filter((p) => {
+      if (!this.showcaseSearchTerm) return true;
+      const term = this.showcaseSearchTerm.toLowerCase();
+      return (
+        p.name.toLowerCase().includes(term) ||
+        (p.subtitle && p.subtitle.toLowerCase().includes(term)) ||
+        (p.categoryName && p.categoryName.toLowerCase().includes(term))
+      );
+    });
+
+    // Ordenar: PRIMERO los que ya tienen recurso .PNG y se pueden mostrar en el carrusel
+    const sorted = [...filteredProducts].sort((a, b) => {
+      const aHasPng = Boolean(a.carouselImage);
+      const bHasPng = Boolean(b.carouselImage);
+      const aActive = Boolean(a.showcaseActive && aHasPng);
+      const bActive = Boolean(b.showcaseActive && bHasPng);
+
+      // 1. Activos con PNG van al frente ordenados por showcaseOrder asc
+      if (aActive && !bActive) return -1;
+      if (!aActive && bActive) return 1;
+      if (aActive && bActive) {
+        return (a.showcaseOrder || 0) - (b.showcaseOrder || 0);
+      }
+
+      // 2. Calzados con PNG que aún están inactivos van inmediatamente después (listos para mostrar)
+      if (aHasPng && !bHasPng) return -1;
+      if (!aHasPng && bHasPng) return 1;
+
+      // 3. Calzados sin PNG al final
+      return a.name.localeCompare(b.name);
+    });
+
+    const activeList = sorted.filter((p) => p.showcaseActive && p.carouselImage);
+
+    return `
+      <div class="admin-view-panel">
+        <div class="admin-view-header">
+          <div class="admin-view-header-main">
+            <h2 class="admin-view-title">Apariencia: Circular Showcase</h2>
+            <p class="admin-view-subtitle">
+              Administra cómo se visualizan las siluetas en el escaparate 3D interactivo, sus proporciones (836 × 342), 
+              los calzados de ejemplo de Blessed Slides y el catálogo oficial.
+            </p>
+          </div>
+        </div>
+
+        <!-- TARJETAS DE MÉTRICAS -->
+        <div class="admin-kpi-grid admin-metrics-grid">
+          <div class="admin-kpi-card admin-metric-card">
+            <span class="kpi-label metric-lbl">ACTIVOS EN SHOWCASE</span>
+            <strong class="kpi-number metric-val text-emerald">${activeShowcaseCount}</strong>
+          </div>
+          <div class="admin-kpi-card admin-metric-card">
+            <span class="kpi-label metric-lbl">EJEMPLOS DEMO ACTIVOS</span>
+            <strong class="kpi-number metric-val">${activeDemosCount} / ${DEFAULT_SHOWCASE_DEMOS.length}</strong>
+          </div>
+          <div class="admin-kpi-card admin-metric-card">
+            <span class="kpi-label metric-lbl">CON RECURSO .PNG</span>
+            <strong class="kpi-number metric-val text-emerald">${withPngCount}</strong>
+          </div>
+          <div class="admin-kpi-card admin-metric-card">
+            <span class="kpi-label metric-lbl">TOTAL EN CATÁLOGO</span>
+            <strong class="kpi-number metric-val">${totalCount}</strong>
+          </div>
+        </div>
+
+        <!-- SECCIÓN DE CALZADOS DE EJEMPLO DEL ESCAPARATE (DESPLEGABLE / PLEGADO POR DEFECTO) -->
+        <div class="showcase-demos-accordion ${this.demosAccordionOpen ? 'is-open' : 'is-collapsed'}">
+          <button 
+            type="button" 
+            class="showcase-accordion-header" 
+            id="btn-toggle-demos-accordion"
+            aria-expanded="${this.demosAccordionOpen}"
+            title="Clic para desplegar o plegar calzados de demostración"
+          >
+            <div class="showcase-accordion-title-wrap">
+              <svg class="showcase-accordion-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+              <span class="showcase-accordion-title">Calzados de Ejemplo en Escaparate</span>
+              <span class="showcase-count-pill">${activeDemosCount} de ${DEFAULT_SHOWCASE_DEMOS.length} activos</span>
+            </div>
+            <span class="showcase-accordion-hint" id="demos-accordion-hint-text">
+              ${this.demosAccordionOpen ? 'Plegar lista' : 'Desplegar para gestionar'}
+            </span>
+          </button>
+
+          <div class="showcase-accordion-body" id="demos-accordion-body" style="${this.demosAccordionOpen ? '' : 'display: none;'}">
+            <div class="showcase-demos-subbar">
+              <p class="showcase-demos-help">
+                Activa o desactiva las 10 siluetas demostrativas de Blessed Slides en el escaparate.
+              </p>
+              <div class="showcase-demos-actions">
+                <button type="button" class="btn-demo-action danger" id="btn-remove-all-demos" title="Desactivar todos los calzados de demostración">
+                  Quitar todos los ejemplos
+                </button>
+                <button type="button" class="btn-demo-action" id="btn-enable-all-demos" title="Activar los 10 calzados de demostración">
+                  Activar todos los ejemplos
+                </button>
+              </div>
+            </div>
+
+            <div class="showcase-demos-grid">
+              ${DEFAULT_SHOWCASE_DEMOS.map((demo) => {
+                const isDemoActive = settings.enabledDemoIds.includes(demo.id);
+                return `
+                  <div class="showcase-demo-card ${isDemoActive ? 'is-active' : 'is-inactive'}" id="demo-card-${demo.id}">
+                    <div class="showcase-demo-thumb-wrap">
+                      <img src="${demo.image}" alt="${demo.name}" />
+                    </div>
+                    <div class="showcase-demo-meta">
+                      <span class="showcase-demo-title">${demo.name}</span>
+                      <span class="showcase-demo-sub">${demo.edition} • ${demo.colorName} • $${demo.price}</span>
+                    </div>
+                    <label class="admin-switch-label" title="${isDemoActive ? 'Desactivar este ejemplo' : 'Activar este ejemplo'}">
+                      <input 
+                        type="checkbox" 
+                        class="toggle-demo-item" 
+                        data-demo-id="${demo.id}" 
+                        ${isDemoActive ? 'checked' : ''} 
+                      />
+                      <span class="switch-ui"></span>
+                    </label>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        </div>
+
+        <!-- SECCIÓN: PRODUCTOS DEL CATÁLOGO (PRIORIZANDO LOS QUE TIENEN PNG) -->
+        <div class="showcase-catalog-section-header">
+          <div>
+            <h3 class="showcase-section-title">Calzados del Catálogo Oficial</h3>
+            <p class="showcase-section-desc">
+              Se muestran en primer lugar los calzados que ya tienen recurso .PNG asignado listos para el carrusel.
+            </p>
+          </div>
+        </div>
+
+        <!-- BARRA DE BÚSQUEDA Y FILTRO -->
+        <div class="admin-filter-bar admin-table-toolbar">
+          <div class="admin-search-input-wrap admin-search-wrap">
+            ${Icons.search('w-4 h-4')}
+            <input 
+              type="text" 
+              class="admin-search-input" 
+              id="showcase-search-input" 
+              placeholder="Buscar calzado por nombre o categoría..." 
+              value="${this.showcaseSearchTerm}" 
+            />
+          </div>
+        </div>
+
+        <!-- INPUT OCULTO PARA SUBIR .PNG DIRECTO DESDE LA TABLA -->
+        <input type="file" id="table-showcase-file-picker" accept=".png,image/png" style="display: none;" />
+
+        <!-- TABLA DE GESTIÓN DEL CIRCULAR SHOWCASE -->
+        <div class="admin-products-table-wrap admin-table-container">
+          <table class="admin-table admin-data-table">
+            <thead>
+              <tr>
+                <th style="width: 70px;">ORDEN</th>
+                <th class="table-col-product" style="min-width: 250px;">PRODUCTO</th>
+                <th style="min-width: 220px;">RECURSO CARRUSEL (.PNG)</th>
+                <th style="width: 175px;">PROPORCIÓN (836×342)</th>
+                <th style="width: 160px;">EN SHOWCASE</th>
+                <th style="width: 90px; text-align: right;">ACCIONES</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${sorted.length === 0
+        ? `
+                  <tr>
+                    <td colspan="6" class="admin-table-empty">
+                      No se encontraron calzados en el catálogo.
+                    </td>
+                  </tr>
+                `
+        : sorted.map((p) => {
+          const isActive = Boolean(p.showcaseActive && p.carouselImage);
+          const activeIndex = isActive ? activeList.findIndex((item) => item.id === p.id) : -1;
+          const isFirst = activeIndex === 0;
+          const isLast = activeIndex === activeList.length - 1;
+          const thumbImg = p.image || p.colors?.[0]?.image || '/assets/slide/slide.png';
+          const pngFileName = p.carouselImage ? p.carouselImage.split('/').pop() : null;
+
+          return `
+                      <tr class="${isActive ? 'row-showcase-active' : (p.carouselImage ? 'row-has-png' : '')}">
+                        <!-- 1. ORDEN -->
+                        <td>
+                          ${isActive
+              ? `
+                              <div class="showcase-order-cell">
+                                <span class="showcase-order-num">#${activeIndex + 1}</span>
+                                <div class="showcase-order-arrows">
+                                  <button 
+                                    type="button" 
+                                    class="btn-order-arrow btn-showcase-up" 
+                                    data-id="${p.id}" 
+                                    data-order="${p.showcaseOrder || 0}"
+                                    ${isFirst ? 'disabled style="opacity: 0.3; cursor: not-allowed;"' : ''}
+                                    title="Mover arriba en el showcase"
+                                  >▲</button>
+                                  <button 
+                                    type="button" 
+                                    class="btn-order-arrow btn-showcase-down" 
+                                    data-id="${p.id}" 
+                                    data-order="${p.showcaseOrder || 0}"
+                                    ${isLast ? 'disabled style="opacity: 0.3; cursor: not-allowed;"' : ''}
+                                    title="Mover abajo en el showcase"
+                                  >▼</button>
+                                </div>
+                              </div>
+                            `
+              : `<span style="color: #94a3b8; font-size: 0.82rem;">—</span>`
+            }
+                        </td>
+
+                        <!-- 2. PRODUCTO -->
+                        <td class="table-col-product">
+                          <div class="table-prod-cell admin-prod-cell">
+                            <img src="${thumbImg}" alt="${p.name}" class="table-prod-thumb admin-prod-thumb" />
+                            <div class="table-prod-meta admin-prod-info">
+                              <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                                <strong class="table-prod-name admin-prod-name">${p.name}</strong>
+                                ${p.carouselImage ? `<span class="badge-has-png">Listo</span>` : ''}
+                              </div>
+                              <span class="table-prod-sub admin-prod-sub">${p.subtitle || p.categoryName || 'Calzado deportivo'}</span>
+                              <div class="table-price-col">
+                                <strong>$${Number(p.price).toFixed(2)}</strong>
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+
+                        <!-- 3. RECURSO CARRUSEL (.PNG) -->
+                        <td>
+                          <div class="showcase-png-cell">
+                            ${p.carouselImage
+              ? `
+                                <div class="showcase-png-thumb-box" title="Recurso PNG transparente">
+                                  <img src="${p.carouselImage}" alt="PNG Carrusel" class="showcase-png-thumb" />
+                                </div>
+                                <div class="showcase-png-info" style="display: flex; flex-direction: column; gap: 4px; min-width: 0;">
+                                  <span class="showcase-png-filename" style="font-size: 0.74rem; font-weight: 600; color: #0f172a; max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${pngFileName}">
+                                    ${pngFileName}
+                                  </span>
+                                  <div class="showcase-png-actions" style="display: flex; gap: 6px;">
+                                    <button 
+                                      type="button" 
+                                      class="btn-showcase-action btn-table-upload-png" 
+                                      data-id="${p.id}" 
+                                      title="Sustituir archivo .png"
+                                    >
+                                      Sustituir
+                                    </button>
+                                    <button 
+                                      type="button" 
+                                      class="btn-showcase-action danger btn-table-delete-png" 
+                                      data-id="${p.id}" 
+                                      title="Eliminar recurso .png"
+                                    >
+                                      Quitar
+                                    </button>
+                                  </div>
+                                </div>
+                              `
+              : `
+                                <span class="badge-no-png">Sin recurso .png</span>
+                                <button 
+                                  type="button" 
+                                  class="btn-showcase-action primary btn-table-upload-png" 
+                                  data-id="${p.id}" 
+                                  title="Subir archivo .png para Circular Showcase"
+                                >
+                                  + Asignar .PNG
+                                </button>
+                              `
+            }
+                          </div>
+                        </td>
+
+                        <!-- 4. CONTROL VISUAL Y PROPORCIONES (836 × 342) INDIVIDUAL -->
+                        <td>
+                          ${(() => {
+                            const prop = ShowcaseSettingsService.getProductProportion(p.id);
+                            const dimText = prop.customProportionEnabled && prop.customWidth > 0 && prop.customHeight > 0
+                              ? `${prop.customWidth} × ${prop.customHeight} px`
+                              : (prop.adjustTo836x342 ? '836 × 342 px' : '290 × 125 px');
+                            const fitText = prop.preserveWithoutDistortion ? 'Sin distorsión' : 'Ajuste libre';
+                            const previewImgSrc = p.carouselImage || thumbImg;
+
+                            return `
+                              <button 
+                                type="button" 
+                                class="btn-showcase-prop-btn" 
+                                data-id="${p.id}"
+                                data-name="${p.name.replace(/"/g, '&quot;')}"
+                                data-img="${previewImgSrc}"
+                                title="Configurar proporción visual de este calzado"
+                              >
+                                <div class="prop-btn-top">
+                                  <span class="prop-btn-dims">${dimText}</span>
+                                  <span class="prop-btn-tag">${fitText}</span>
+                                </div>
+                                <span class="prop-btn-sub">Ajustar proporción</span>
+                              </button>
+                            `;
+                          })()}
+                        </td>
+
+                        <!-- 5. EN CIRCULAR SHOWCASE -->
+                        <td>
+                          <label class="admin-switch-label" title="${!p.carouselImage ? 'Requiere subir primero un recurso .png' : 'Activar o desactivar en Circular Showcase'}">
+                            <input 
+                              type="checkbox" 
+                              class="toggle-showcase-active" 
+                              data-id="${p.id}" 
+                              ${isActive ? 'checked' : ''} 
+                              ${!p.carouselImage ? 'data-needs-png="true"' : ''}
+                            />
+                            <span class="switch-ui"></span>
+                            <span class="showcase-status-label" style="font-size: 0.78rem; font-weight: 500; color: ${isActive ? '#0f172a' : '#64748b'};">
+                              ${isActive ? 'Visible en portada' : 'Desactivado'}
+                            </span>
+                          </label>
+                        </td>
+
+                        <!-- 6. ACCIONES -->
+                        <td style="text-align: right;">
+                          <button 
+                            type="button" 
+                            class="btn-showcase-action btn-edit-from-showcase" 
+                            data-id="${p.id}" 
+                            title="Editar este calzado en el catálogo"
+                          >
+                            Editar
+                          </button>
+                        </td>
+                      </tr>
+                    `;
+        }).join('')
+      }
+            </tbody>
+          </table>
+        </div>
+
+        <!-- MODAL MINIMALISTA DE PROPORCIÓN INDIVIDUAL POR CALZADO -->
+        <div class="showcase-prop-modal-backdrop is-hidden" id="modal-showcase-prop" role="dialog" aria-modal="true">
+          <div class="showcase-prop-modal-card">
+            <div class="showcase-prop-modal-header">
+              <div class="modal-header-text">
+                <span class="modal-header-badge">Control Visual y Proporciones</span>
+                <h3 class="showcase-prop-modal-title" id="modal-prop-product-name">—</h3>
+              </div>
+              <button type="button" class="btn-close-prop-modal" id="btn-close-prop-modal" aria-label="Cerrar modal">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
+
+            <div class="showcase-prop-modal-body">
+              <!-- PREVIEW EN VIVO DE ESTE CALZADO -->
+              <div class="modal-preview-section">
+                <div class="modal-preview-checkerboard" id="modal-preview-box">
+                  <img id="modal-preview-img" src="/assets/slide/slide.png" alt="Silueta calzado" />
+                </div>
+                <span class="modal-preview-label" id="modal-preview-dimensions-label">
+                  Marco simulado: 290 × 119 px (Proporción 2.44:1 • Sin distorsión)
+                </span>
+              </div>
+
+              <!-- OPCIONES DE PROPORCIÓN -->
+              <div class="modal-prop-options-list">
+                <!-- Opción 1: 836 x 342 -->
+                <label class="modal-prop-option" for="modal-check-adjust-836">
+                  <input type="checkbox" id="modal-check-adjust-836" checked />
+                  <div class="modal-option-info">
+                    <span class="modal-option-title">Ajustar a proporción 836 × 342 (Recomendada)</span>
+                    <span class="modal-option-desc">Aplica la relación 836 : 342 (~2.44:1) nativa del calzado oficial de Blessed Slides.</span>
+                  </div>
+                </label>
+
+                <!-- Opción 2: Sin distorsión -->
+                <label class="modal-prop-option" for="modal-check-no-distortion">
+                  <input type="checkbox" id="modal-check-no-distortion" checked />
+                  <div class="modal-option-info">
+                    <span class="modal-option-title">Mantener aspecto sin distorsionar (object-fit: contain)</span>
+                    <span class="modal-option-desc">Preserva la silueta original para que no se deforme ni se estire.</span>
+                  </div>
+                </label>
+
+                <!-- Opción 3: Proporción personalizada -->
+                <label class="modal-prop-option" for="modal-check-custom-ratio">
+                  <input type="checkbox" id="modal-check-custom-ratio" />
+                  <div class="modal-option-info">
+                    <span class="modal-option-title">Definir proporción personalizada</span>
+                    <span class="modal-option-desc">Permite ingresar manualmente ancho y alto de referencia para este calzado.</span>
+                  </div>
+                </label>
+              </div>
+
+              <!-- INPUTS PERSONALIZADOS -->
+              <div class="modal-custom-dims-row is-disabled" id="modal-custom-inputs-box">
+                <div class="modal-dim-group">
+                  <label for="modal-input-width">Ancho:</label>
+                  <input type="number" id="modal-input-width" value="836" min="100" max="2000" step="1" disabled />
+                  <span>px</span>
+                </div>
+                <div class="modal-dim-group">
+                  <label for="modal-input-height">Alto:</label>
+                  <input type="number" id="modal-input-height" value="342" min="50" max="1500" step="1" disabled />
+                  <span>px</span>
+                </div>
+                <button type="button" class="btn-modal-reset-dims" id="btn-modal-reset-dims" disabled>
+                  Restablecer a 836 × 342
+                </button>
+              </div>
+            </div>
+
+            <div class="showcase-prop-modal-footer">
+              <button type="button" class="btn-modal-secondary" id="btn-modal-cancel">Cancelar</button>
+              <button type="button" class="btn-modal-primary" id="btn-modal-save-prop">Guardar Proporción</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  // ==========================================================================
   // CONFIGURACIÓN DE EVENTOS GENERALES Y POR TAB
   // ==========================================================================
   private setupEvents(): void {
@@ -1933,6 +2500,12 @@ export class AdminPanel {
       this.setupSizesSectionEvents();
       this.bindGalleryEvents();
       this.bind3dStatusEvents();
+      this.bindCarouselResourceEvents();
+    }
+
+    // Si estamos en la pestaña de Circular Showcase
+    if (this.activeTab === 'circular-showcase') {
+      this.setupCircularShowcaseEvents();
     }
 
     // --- TAB 1: PRODUCTOS LIST ---
@@ -2015,6 +2588,7 @@ export class AdminPanel {
       this.formSizes = [];
       this.formGallery = [];
       this.formModel3dUrl = null;
+      this.formCarouselImage = null;
       this.formVariants = [];
       this.activeVariantIndex = 0;
       this.activeTab = 'products-list';
@@ -2026,6 +2600,7 @@ export class AdminPanel {
       this.formSizes = [];
       this.formGallery = [];
       this.formModel3dUrl = null;
+      this.formCarouselImage = null;
       this.formVariants = [];
       this.activeVariantIndex = 0;
       this.activeTab = 'products-list';
@@ -2118,6 +2693,52 @@ export class AdminPanel {
       modelFile.value = '';
     });
 
+    // Subida de imagen carrusel (.PNG) a MinIO desde el formulario
+    const carouselInput = this.container.querySelector('#file-hidden-carousel') as HTMLInputElement | null;
+    this.container.querySelector('#btn-trigger-upload-carousel')?.addEventListener('click', () => {
+      carouselInput?.click();
+    });
+
+    carouselInput?.addEventListener('change', async () => {
+      const file = carouselInput.files?.[0];
+      if (!file) return;
+
+      if (!file.type.includes('png') && !file.name.toLowerCase().endsWith('.png')) {
+        Toast.show('El recurso de carrusel debe ser una imagen en formato .png (sin fondo).', 'Formato no admitido', 'warning');
+        carouselInput.value = '';
+        return;
+      }
+
+      Toast.show('Subiendo recurso carrusel (.PNG) a MinIO...', 'MinIO Storage', 'info');
+      try {
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+
+        const uploadRes = await ApiService.uploadAssetToMinio(userId, {
+          filename: `carousel-${Date.now()}-${file.name.replace(/\s+/g, '_')}`,
+          contentType: 'image/png',
+          base64
+        });
+
+        if (uploadRes.success && uploadRes.url) {
+          this.formCarouselImage = uploadRes.url;
+          this.refreshCarouselStatusOnly();
+          Toast.show('Recurso carrusel (.PNG) asignado correctamente.', 'Circular Showcase', 'success');
+        } else {
+          Toast.show(uploadRes.message || 'Error al subir carrusel a MinIO.', 'MinIO', 'warning');
+        }
+      } catch (err) {
+        console.error(err);
+        Toast.show('Error al procesar el archivo .png.', 'Error', 'warning');
+      } finally {
+        carouselInput.value = '';
+      }
+    });
+
     // Sincronización en vivo de precios por variante de color
     const priceLiveInput = this.container.querySelector('#prod-price') as HTMLInputElement | null;
     priceLiveInput?.addEventListener('input', () => {
@@ -2159,11 +2780,11 @@ export class AdminPanel {
       const gender = (this.container.querySelector('#prod-gender') as HTMLSelectElement)?.value;
       const badge = (this.container.querySelector('#prod-badge') as HTMLInputElement)?.value.trim() || null;
       const description = (this.container.querySelector('#prod-desc') as HTMLTextAreaElement)?.value.trim() || null;
-      
+
       const formPrice = Number((this.container.querySelector('#prod-price') as HTMLInputElement)?.value);
       const origPriceInput = (this.container.querySelector('#prod-orig-price') as HTMLInputElement)?.value;
       const formOrigPrice = origPriceInput ? Number(origPriceInput) : null;
-      
+
       const inStock = (this.container.querySelector('#prod-instock') as HTMLInputElement)?.checked ?? true;
       const featured = (this.container.querySelector('#prod-featured') as HTMLInputElement)?.checked ?? false;
 
@@ -2223,6 +2844,7 @@ export class AdminPanel {
             image,
             gallery,
             model3dUrl,
+            carouselImage: this.formCarouselImage,
             inStock,
             featured,
             sizes,
@@ -2235,6 +2857,7 @@ export class AdminPanel {
             this.formSizes = [];
             this.formGallery = [];
             this.formModel3dUrl = null;
+            this.formCarouselImage = null;
             this.formVariants = [];
             this.activeVariantIndex = 0;
             await this.loadInitialData();
@@ -2258,6 +2881,7 @@ export class AdminPanel {
             image,
             gallery,
             model3dUrl,
+            carouselImage: this.formCarouselImage,
             inStock,
             featured,
             sizes,
@@ -2270,6 +2894,7 @@ export class AdminPanel {
             this.formSizes = [];
             this.formGallery = [];
             this.formModel3dUrl = null;
+            this.formCarouselImage = null;
             this.formVariants = [];
             this.activeVariantIndex = 0;
             await this.loadInitialData();
@@ -2546,6 +3171,407 @@ export class AdminPanel {
           } else {
             Toast.show(res.message || 'Error al eliminar recurso.', 'MinIO', 'warning');
           }
+        }
+      });
+    });
+  }
+
+  // ==========================================================================
+  // EVENTOS: TAB APARIENCIA CIRCULAR SHOWCASE
+  // ==========================================================================
+  private setupCircularShowcaseEvents(): void {
+    const userId = this.store.currentUser?.id;
+    if (!userId) return;
+
+    // 1. Buscador en vivo
+    const searchInput = this.container.querySelector('#showcase-search-input') as HTMLInputElement | null;
+    searchInput?.addEventListener('input', () => {
+      this.showcaseSearchTerm = searchInput.value;
+      const main = this.container.querySelector('#admin-main-viewport');
+      if (main) {
+        main.innerHTML = this.renderCircularShowcaseTab();
+        this.setupCircularShowcaseEvents();
+      }
+    });
+
+    // 2. Acordeón Desplegable de Calzados de Ejemplo
+    const accordionBtn = this.container.querySelector('#btn-toggle-demos-accordion');
+    accordionBtn?.addEventListener('click', () => {
+      this.demosAccordionOpen = !this.demosAccordionOpen;
+      const accordion = this.container.querySelector('.showcase-demos-accordion');
+      const body = this.container.querySelector('#demos-accordion-body') as HTMLElement | null;
+      const hint = this.container.querySelector('#demos-accordion-hint-text');
+      if (accordion) {
+        accordion.classList.toggle('is-open', this.demosAccordionOpen);
+        accordion.classList.toggle('is-collapsed', !this.demosAccordionOpen);
+      }
+      if (body) {
+        body.style.display = this.demosAccordionOpen ? 'block' : 'none';
+      }
+      if (hint) {
+        hint.textContent = this.demosAccordionOpen ? 'Plegar lista' : 'Desplegar para gestionar';
+      }
+      accordionBtn.setAttribute('aria-expanded', String(this.demosAccordionOpen));
+    });
+
+    // 2.1 Modal de Proporción Individual (836 × 342) por Producto
+    const modal = this.container.querySelector('#modal-showcase-prop') as HTMLElement | null;
+    const modalProductName = this.container.querySelector('#modal-prop-product-name');
+    const modalImg = this.container.querySelector('#modal-preview-img') as HTMLImageElement | null;
+    const modalBox = this.container.querySelector('#modal-preview-box') as HTMLElement | null;
+    const modalLabel = this.container.querySelector('#modal-preview-dimensions-label');
+    const chk836 = this.container.querySelector('#modal-check-adjust-836') as HTMLInputElement | null;
+    const chkNoDist = this.container.querySelector('#modal-check-no-distortion') as HTMLInputElement | null;
+    const chkCustom = this.container.querySelector('#modal-check-custom-ratio') as HTMLInputElement | null;
+    const customBox = this.container.querySelector('#modal-custom-inputs-box');
+    const inpW = this.container.querySelector('#modal-input-width') as HTMLInputElement | null;
+    const inpH = this.container.querySelector('#modal-input-height') as HTMLInputElement | null;
+    const btnResetDims = this.container.querySelector('#btn-modal-reset-dims') as HTMLButtonElement | null;
+    const btnCloseModal = this.container.querySelector('#btn-close-prop-modal');
+    const btnCancelModal = this.container.querySelector('#btn-modal-cancel');
+    const btnSaveProp = this.container.querySelector('#btn-modal-save-prop');
+
+    const updateModalPreview = () => {
+      let ratio = 836 / 342;
+      const isCustom = Boolean(chkCustom?.checked);
+      const w = Math.max(100, parseInt(inpW?.value || '836', 10) || 836);
+      const h = Math.max(50, parseInt(inpH?.value || '342', 10) || 342);
+
+      if (isCustom && w > 0 && h > 0) {
+        ratio = w / h;
+      } else if (!chk836?.checked) {
+        ratio = 290 / 125;
+      }
+
+      const ratioDisplay = ratio.toFixed(2);
+      const boxHeight = Math.max(50, Math.min(200, Math.round(290 / ratio)));
+      const fitMode = chkNoDist?.checked ? 'contain' : 'fill';
+
+      if (modalBox) modalBox.style.height = `${boxHeight}px`;
+      if (modalImg) modalImg.style.objectFit = fitMode;
+      if (modalLabel) {
+        modalLabel.textContent = `Marco simulado: 290 × ${boxHeight} px (Proporción ${ratioDisplay}:1 • ${chkNoDist?.checked ? 'Sin distorsión' : 'Ajuste libre'})`;
+      }
+    };
+
+    // Abrir modal al dar click en el botón de la fila
+    this.container.querySelectorAll('.btn-showcase-prop-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const pId = (btn as HTMLElement).dataset.id;
+        const pName = (btn as HTMLElement).dataset.name || 'Calzado';
+        const pImg = (btn as HTMLElement).dataset.img || '/assets/slide/slide.png';
+        if (!pId) return;
+
+        this.activeModalProductId = pId;
+        if (modalProductName) modalProductName.textContent = pName;
+        if (modalImg) modalImg.src = pImg;
+
+        const prop = ShowcaseSettingsService.getProductProportion(pId);
+        if (chk836) chk836.checked = prop.adjustTo836x342;
+        if (chkNoDist) chkNoDist.checked = prop.preserveWithoutDistortion;
+        if (chkCustom) chkCustom.checked = prop.customProportionEnabled;
+        if (inpW) {
+          inpW.value = String(prop.customWidth || 836);
+          inpW.disabled = !prop.customProportionEnabled;
+        }
+        if (inpH) {
+          inpH.value = String(prop.customHeight || 342);
+          inpH.disabled = !prop.customProportionEnabled;
+        }
+        if (btnResetDims) btnResetDims.disabled = !prop.customProportionEnabled;
+        customBox?.classList.toggle('is-disabled', !prop.customProportionEnabled);
+
+        updateModalPreview();
+        modal?.classList.remove('is-hidden');
+      });
+    });
+
+    chkCustom?.addEventListener('change', () => {
+      const isCustom = Boolean(chkCustom.checked);
+      customBox?.classList.toggle('is-disabled', !isCustom);
+      if (inpW) inpW.disabled = !isCustom;
+      if (inpH) inpH.disabled = !isCustom;
+      if (btnResetDims) btnResetDims.disabled = !isCustom;
+      updateModalPreview();
+    });
+
+    chk836?.addEventListener('change', updateModalPreview);
+    chkNoDist?.addEventListener('change', updateModalPreview);
+    inpW?.addEventListener('input', updateModalPreview);
+    inpH?.addEventListener('input', updateModalPreview);
+
+    btnResetDims?.addEventListener('click', () => {
+      if (inpW) inpW.value = '836';
+      if (inpH) inpH.value = '342';
+      if (chk836) chk836.checked = true;
+      if (chkNoDist) chkNoDist.checked = true;
+      updateModalPreview();
+    });
+
+    const closeModal = () => {
+      modal?.classList.add('is-hidden');
+      this.activeModalProductId = null;
+    };
+
+    btnCloseModal?.addEventListener('click', closeModal);
+    btnCancelModal?.addEventListener('click', closeModal);
+    modal?.addEventListener('click', (e) => {
+      if (e.target === modal) closeModal();
+    });
+
+    btnSaveProp?.addEventListener('click', () => {
+      if (!this.activeModalProductId) return;
+
+      const w = Math.max(100, parseInt(inpW?.value || '836', 10) || 836);
+      const h = Math.max(50, parseInt(inpH?.value || '342', 10) || 342);
+
+      ShowcaseSettingsService.saveProductProportion(this.activeModalProductId, {
+        adjustTo836x342: Boolean(chk836?.checked),
+        preserveWithoutDistortion: Boolean(chkNoDist?.checked),
+        customProportionEnabled: Boolean(chkCustom?.checked),
+        customWidth: w,
+        customHeight: h
+      });
+
+      Toast.show('Proporción guardada correctamente para este calzado.', 'Visualización', 'success');
+      closeModal();
+
+      const main = this.container.querySelector('#admin-main-viewport');
+      if (main) {
+        main.innerHTML = this.renderCircularShowcaseTab();
+        this.setupCircularShowcaseEvents();
+      }
+    });
+
+    // 3. Manejo de Calzados de Ejemplo (Blessed Slide Demo)
+    this.container.querySelector('#btn-remove-all-demos')?.addEventListener('click', () => {
+      ShowcaseSettingsService.setAllDemos(false);
+      Toast.show('Se han retirado todos los calzados de ejemplo del escaparate.', 'Ejemplos', 'info');
+      const main = this.container.querySelector('#admin-main-viewport');
+      if (main) {
+        main.innerHTML = this.renderCircularShowcaseTab();
+        this.setupCircularShowcaseEvents();
+      }
+    });
+
+    this.container.querySelector('#btn-enable-all-demos')?.addEventListener('click', () => {
+      ShowcaseSettingsService.setAllDemos(true);
+      Toast.show('Se han activado los 10 calzados de ejemplo en el escaparate.', 'Ejemplos', 'success');
+      const main = this.container.querySelector('#admin-main-viewport');
+      if (main) {
+        main.innerHTML = this.renderCircularShowcaseTab();
+        this.setupCircularShowcaseEvents();
+      }
+    });
+
+    this.container.querySelectorAll('.toggle-demo-item').forEach((chk) => {
+      chk.addEventListener('change', () => {
+        const input = chk as HTMLInputElement;
+        const demoId = input.dataset.demoId;
+        if (!demoId) return;
+        ShowcaseSettingsService.toggleDemoItem(demoId, input.checked);
+        const card = this.container.querySelector(`#demo-card-${demoId}`);
+        card?.classList.toggle('is-active', input.checked);
+        card?.classList.toggle('is-inactive', !input.checked);
+        Toast.show(
+          input.checked ? 'Ejemplo activado en escaparate.' : 'Ejemplo quitado del escaparate.',
+          'Ejemplos',
+          'info'
+        );
+      });
+    });
+
+    // 4. Subida o sustitución de .PNG desde la tabla
+    const filePicker = this.container.querySelector('#table-showcase-file-picker') as HTMLInputElement | null;
+    let targetProductIdForUpload: string | null = null;
+
+    this.container.querySelectorAll('.btn-table-upload-png').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        targetProductIdForUpload = (btn as HTMLElement).dataset.id || null;
+        if (targetProductIdForUpload && filePicker) {
+          filePicker.value = '';
+          filePicker.click();
+        }
+      });
+    });
+
+    filePicker?.addEventListener('change', async () => {
+      const file = filePicker.files?.[0];
+      if (!file || !targetProductIdForUpload) return;
+
+      if (!file.type.includes('png') && !file.name.toLowerCase().endsWith('.png')) {
+        Toast.show('El recurso debe ser una imagen en formato .png (sin fondo).', 'Formato no admitido', 'warning');
+        return;
+      }
+
+      Toast.show('Subiendo imagen .png a MinIO...', 'MinIO Storage', 'info');
+      try {
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+
+        const uploadRes = await ApiService.uploadAssetToMinio(userId, {
+          filename: `carousel-${Date.now()}-${file.name.replace(/\s+/g, '_')}`,
+          contentType: 'image/png',
+          base64
+        });
+
+        if (uploadRes.success && uploadRes.url) {
+          // Asignar y activar automáticamente en Circular Showcase
+          const patchRes = await ApiService.updateAdminShowcase(userId, {
+            id: targetProductIdForUpload,
+            carouselImage: uploadRes.url,
+            showcaseActive: true
+          });
+
+          if (patchRes.success) {
+            Toast.show('¡Recurso carrusel (.PNG) asignado y activado en el Showcase!', 'Circular Showcase', 'success');
+            await this.loadInitialData();
+            this.store.loadProducts();
+            this.updateMainContentOnly();
+          } else {
+            Toast.show(patchRes.message || 'Error al actualizar producto.', 'Atención', 'warning');
+          }
+        } else {
+          Toast.show(uploadRes.message || 'Error al subir a MinIO.', 'MinIO', 'warning');
+        }
+      } catch (err) {
+        console.error(err);
+        Toast.show('Error al procesar el archivo .png.', 'Error', 'warning');
+      } finally {
+        targetProductIdForUpload = null;
+        filePicker.value = '';
+      }
+    });
+
+    // 5. Quitar .PNG desde la tabla
+    this.container.querySelectorAll('.btn-table-delete-png').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const pId = (btn as HTMLElement).dataset.id;
+        if (!pId) return;
+
+        const res = await ApiService.updateAdminShowcase(userId, {
+          id: pId,
+          carouselImage: null,
+          showcaseActive: false
+        });
+
+        if (res.success) {
+          Toast.show('Recurso carrusel retirado.', 'Circular Showcase', 'info');
+          await this.loadInitialData();
+          this.store.loadProducts();
+          this.updateMainContentOnly();
+        } else {
+          Toast.show(res.message || 'Error al quitar recurso.', 'Atención', 'warning');
+        }
+      });
+    });
+
+    // 6. Toggle switch de activación
+    this.container.querySelectorAll('.toggle-showcase-active').forEach((chk) => {
+      chk.addEventListener('change', async () => {
+        const input = chk as HTMLInputElement;
+        const pId = input.dataset.id;
+        const needsPng = input.dataset.needsPng === 'true';
+
+        if (!pId) return;
+
+        if (input.checked && needsPng) {
+          input.checked = false;
+          Toast.show(
+            'Debes subir primero un recurso carrusel en formato .png antes de activar este calzado en el Circular Showcase.',
+            'Recurso Requerido',
+            'warning'
+          );
+          return;
+        }
+
+        const res = await ApiService.updateAdminShowcase(userId, {
+          id: pId,
+          showcaseActive: input.checked
+        });
+
+        if (res.success) {
+          Toast.show(
+            input.checked ? 'Calzado visible en Circular Showcase.' : 'Calzado ocultado de Circular Showcase.',
+            'Circular Showcase',
+            'info'
+          );
+          await this.loadInitialData();
+          this.store.loadProducts();
+          this.updateMainContentOnly();
+        } else {
+          input.checked = !input.checked;
+          Toast.show(res.message || 'Error al cambiar estado.', 'Atención', 'warning');
+        }
+      });
+    });
+
+    // 7. Flechas de ordenamiento ▲ / ▼
+    const activeList = this.products
+      .filter((p) => p.showcaseActive && p.carouselImage)
+      .sort((a, b) => (a.showcaseOrder || 0) - (b.showcaseOrder || 0));
+
+    this.container.querySelectorAll('.btn-showcase-up').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const pId = (btn as HTMLElement).dataset.id;
+        const idx = activeList.findIndex((p) => p.id === pId);
+        if (idx > 0) {
+          const current = activeList[idx];
+          const prev = activeList[idx - 1];
+
+          // Asignar órdenes secuenciales
+          const currentOrder = current.showcaseOrder !== undefined ? current.showcaseOrder : idx;
+          const prevOrder = prev.showcaseOrder !== undefined ? prev.showcaseOrder : (idx - 1);
+          const newCurrentOrder = prevOrder;
+          const newPrevOrder = currentOrder === prevOrder ? currentOrder + 1 : currentOrder;
+
+          await ApiService.updateAdminShowcase(userId, { id: current.id, showcaseOrder: newCurrentOrder });
+          await ApiService.updateAdminShowcase(userId, { id: prev.id, showcaseOrder: newPrevOrder });
+
+          await this.loadInitialData();
+          this.store.loadProducts();
+          this.updateMainContentOnly();
+        }
+      });
+    });
+
+    this.container.querySelectorAll('.btn-showcase-down').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const pId = (btn as HTMLElement).dataset.id;
+        const idx = activeList.findIndex((p) => p.id === pId);
+        if (idx >= 0 && idx < activeList.length - 1) {
+          const current = activeList[idx];
+          const next = activeList[idx + 1];
+
+          const currentOrder = current.showcaseOrder !== undefined ? current.showcaseOrder : idx;
+          const nextOrder = next.showcaseOrder !== undefined ? next.showcaseOrder : (idx + 1);
+          const newCurrentOrder = nextOrder;
+          const newNextOrder = currentOrder === nextOrder ? nextOrder - 1 : currentOrder;
+
+          await ApiService.updateAdminShowcase(userId, { id: current.id, showcaseOrder: newCurrentOrder });
+          await ApiService.updateAdminShowcase(userId, { id: next.id, showcaseOrder: newNextOrder });
+
+          await this.loadInitialData();
+          this.store.loadProducts();
+          this.updateMainContentOnly();
+        }
+      });
+    });
+
+    // 8. Editar producto desde showcase
+    this.container.querySelectorAll('.btn-edit-from-showcase').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const pId = (btn as HTMLElement).dataset.id;
+        const product = this.products.find((p) => p.id === pId);
+        if (product) {
+          this.editingProduct = product;
+          this.initFormSizes();
+          this.activeTab = 'products-create';
+          this.updateMainContentOnly();
         }
       });
     });
