@@ -2,6 +2,14 @@ import { Store } from '../state/store';
 import { ApiService } from '../services/apiService';
 import { Icons } from './Icons';
 import { Toast } from './Toast';
+import {
+  SizeUnit,
+  formatSizeDisplay,
+  formatFullEquivalence,
+  getSizeEquivalence,
+  unitToEu,
+  STANDARD_CHART_SIZES
+} from '../utils/sizeConverter';
 
 export type AdminTab =
   | 'products-list'
@@ -30,6 +38,41 @@ export class AdminPanel {
   // State for editing
   private editingProduct: any | null = null;
   private editingPromo: any | null = null;
+  private formSizes: Array<{ size: number; stock: number }> = [];
+  private formGallery: string[] = [];
+  private formModel3dUrl: string | null = null;
+  private adminSizeUnit: SizeUnit = 'EU';
+  private showEquivalences: boolean = false;
+
+  private initFormSizes(): void {
+    if (this.editingProduct && Array.isArray(this.editingProduct.sizes) && this.editingProduct.sizes.length > 0) {
+      this.formSizes = this.editingProduct.sizes.map((s: any) => ({
+        size: Number(s.size),
+        stock: Number(s.stock) || 0
+      }));
+    } else {
+      // Para producto nuevo: las 13 tallas oficiales de la tabla con stock estrictamente en 0 para editar desde cero
+      this.formSizes = STANDARD_CHART_SIZES.map((sz) => ({
+        size: sz,
+        stock: 0
+      }));
+    }
+    this.formSizes.sort((a, b) => a.size - b.size);
+
+    if (this.editingProduct) {
+      if (Array.isArray(this.editingProduct.gallery) && this.editingProduct.gallery.length > 0) {
+        this.formGallery = [...this.editingProduct.gallery];
+      } else if (this.editingProduct.image) {
+        this.formGallery = [this.editingProduct.image];
+      } else {
+        this.formGallery = [];
+      }
+      this.formModel3dUrl = this.editingProduct.model3dUrl || null;
+    } else {
+      this.formGallery = [];
+      this.formModel3dUrl = null;
+    }
+  }
 
   constructor(containerId: string) {
     this.store = Store.getInstance();
@@ -358,11 +401,11 @@ export class AdminPanel {
               <table class="admin-table">
                 <thead>
                   <tr>
-                    <th>PRODUCTO</th>
+                    <th class="table-col-product">PRODUCTO</th>
                     <th>CATEGORÍA</th>
                     <th>PRECIO</th>
                     <th>GÉNERO</th>
-                    <th>STOCK POR TALLA</th>
+                    <th class="table-col-stock">STOCK TOTAL</th>
                     <th>ESTADO</th>
                     <th style="text-align: right;">ACCIONES</th>
                   </tr>
@@ -370,14 +413,13 @@ export class AdminPanel {
                 <tbody>
                   ${filtered
                     .map((p) => {
-                      const sizesText = (p.sizes || [])
-                        .map((s: any) => `T${s.size}:${s.stock}`)
-                        .slice(0, 5)
-                        .join(' • ');
+                      const fullSizesTooltip = (p.sizes || [])
+                        .map((s: any) => `Talla ${s.size} (${formatFullEquivalence(s.size)}): ${s.stock} pares`)
+                        .join('\n');
 
                       return `
                         <tr data-product-id="${p.id}">
-                          <td>
+                          <td class="table-col-product">
                             <div class="table-prod-cell">
                               <img src="${p.image || '/assets/logo/Isotipo.png'}" alt="${p.name}" class="table-prod-thumb" />
                               <div class="table-prod-meta">
@@ -398,10 +440,9 @@ export class AdminPanel {
                           <td>
                             <span class="table-text-muted">${p.gender || 'Unisex'}</span>
                           </td>
-                          <td>
+                          <td class="table-col-stock">
                             <div class="table-stock-detail">
-                              <strong class="stock-total-badge ${p.totalStock > 0 ? 'in' : 'out'}">${p.totalStock} pares</strong>
-                              <span class="stock-sizes-pill" title="Desglose por tallas">${sizesText || 'Sin desglose'}</span>
+                              <strong class="stock-total-badge ${p.totalStock > 0 ? 'in' : 'out'}" title="${fullSizesTooltip}">${p.totalStock} pares</strong>
                             </div>
                           </td>
                           <td>
@@ -460,12 +501,8 @@ export class AdminPanel {
     const isEdit = !!this.editingProduct;
     const p = this.editingProduct || {};
 
-    const availableSizes = [36, 37, 38, 39, 40, 41, 42, 43, 44, 45];
-    const existingSizesMap: Record<number, number> = {};
-    if (p.sizes && Array.isArray(p.sizes)) {
-      p.sizes.forEach((s: any) => {
-        existingSizesMap[Number(s.size)] = Number(s.stock);
-      });
+    if (this.formSizes.length === 0) {
+      this.initFormSizes();
     }
 
     return `
@@ -549,58 +586,40 @@ export class AdminPanel {
           </div>
 
           <!-- GRUPO 3: RECURSOS VISUALES (MINIO & 3D) -->
-          <div class="admin-form-section">
-            <h3 class="admin-section-heading">RECURSOS MULTIMEDIA (MINIO STORAGE)</h3>
-            
-            <div class="admin-input-group">
-              <label for="prod-image">URL de la Imagen Principal *</label>
-              <div class="admin-input-with-action">
-                <input type="url" id="prod-image" value="${p.image || ''}" placeholder="http://localhost:9002/ecommerce-assets/zapato.png" required />
-                <button type="button" class="btn-field-action" id="btn-trigger-upload-image" title="Subir archivo directo a MinIO">
+          <div class="admin-form-section" id="admin-multimedia-section">
+            <div class="admin-multimedia-header-flex">
+              <div>
+                <h3 class="admin-section-heading">RECURSOS MULTIMEDIA (MINIO STORAGE)</h3>
+                <p class="admin-section-sub">Imágenes del artículo y modelo 3D. La primera imagen (#1) será la portada oficial de la tienda:</p>
+              </div>
+              <div class="admin-multimedia-actions-bar">
+                <input type="file" id="file-hidden-gallery" accept="image/*" multiple style="display: none;" />
+                <button type="button" class="btn-field-action" id="btn-trigger-upload-gallery" title="Subir una o varias fotos a MinIO">
                   ${Icons.uploadCloud('w-4 h-4')}
-                  <span>Subir a MinIO</span>
+                  <span>+ Subir Contenido</span>
                 </button>
-              </div>
-              <input type="file" id="file-hidden-image" accept="image/*" style="display: none;" />
-              <div class="admin-image-preview-box" id="preview-image-box">
-                ${p.image ? `<img src="${p.image}" alt="Vista previa" class="admin-preview-img" />` : '<span class="text-muted">Sin vista previa seleccionada</span>'}
-              </div>
-            </div>
 
-            <div class="admin-input-group">
-              <label for="prod-model3d">URL Modelo 3D Interactivo (.glb en MinIO)</label>
-              <div class="admin-input-with-action">
-                <input type="text" id="prod-model3d" value="${p.model3dUrl || ''}" placeholder="http://localhost:9002/ecommerce-assets/modelo.glb" />
-                <button type="button" class="btn-field-action" id="btn-trigger-upload-3d" title="Subir modelo .glb directo a MinIO">
+                <input type="file" id="file-hidden-3d" accept=".glb,.gltf" style="display: none;" />
+                <button type="button" class="btn-field-action" id="btn-trigger-upload-3d" title="Subir modelo interactivo .glb a MinIO">
                   ${Icons.cube3d('w-4 h-4')}
-                  <span>Subir .GLB</span>
+                  <span id="btn-label-3d">${this.formModel3dUrl ? 'Cambiar .GLB' : 'Subir .GLB'}</span>
                 </button>
               </div>
-              <input type="file" id="file-hidden-3d" accept=".glb,.gltf" style="display: none;" />
+            </div>
+
+            <!-- ESTADO DEL MODELO 3D (SI ESTÁ CARGADO) -->
+            <div id="admin-3d-model-wrapper">
+              ${this.render3dStatusHtml()}
+            </div>
+
+            <!-- GRILLA DE IMÁGENES / GALERÍA CON REORDENAMIENTO -->
+            <div id="admin-gallery-wrapper">
+              ${this.renderGalleryGridHtml()}
             </div>
           </div>
 
-          <!-- GRUPO 4: TALLAS Y EXISTENCIAS -->
-          <div class="admin-form-section">
-            <h3 class="admin-section-heading">EXISTENCIAS POR TALLAS (STOCK)</h3>
-            <p class="admin-section-sub">Define la cantidad de unidades disponibles para cada talla numérica:</p>
-            <div class="admin-sizes-grid">
-              ${availableSizes
-                .map((size) => {
-                  const stock = existingSizesMap[size] !== undefined ? existingSizesMap[size] : 15;
-                  return `
-                    <div class="admin-size-stock-card">
-                      <span class="size-number-title">Talla ${size}</span>
-                      <div class="size-input-row">
-                        <label>Stock:</label>
-                        <input type="number" min="0" class="input-size-stock" data-size="${size}" value="${stock}" />
-                      </div>
-                    </div>
-                  `;
-                })
-                .join('')}
-            </div>
-          </div>
+          <!-- GRUPO 4: TALLAS Y EXISTENCIAS EN FORMATOS EQUIVALENTES -->
+          ${this.renderSizesSectionContent()}
 
           <!-- GRUPO 5: DISPONIBILIDAD -->
           <div class="admin-form-section">
@@ -632,6 +651,528 @@ export class AdminPanel {
         </form>
       </div>
     `;
+  }
+
+  // ==========================================================================
+  // HELPERS: RECURSOS MULTIMEDIA (MINIO STORAGE & GALERÍA ORDENADA)
+  // ==========================================================================
+  private render3dStatusHtml(): string {
+    if (!this.formModel3dUrl) return '';
+    const filename = this.formModel3dUrl.split('/').pop() || 'modelo.glb';
+    return `
+      <div class="model3d-status-pill">
+        <div class="model3d-status-info">
+          <span class="model3d-icon">${Icons.cube3d('w-4 h-4')}</span>
+          <span class="model3d-label">Modelo 3D activo: <strong>${filename}</strong></span>
+        </div>
+        <button type="button" class="btn-remove-3d-model" id="btn-remove-model-3d" title="Quitar modelo 3D">
+          ${Icons.close('w-3.5 h-3.5')}
+          <span>Quitar .GLB</span>
+        </button>
+      </div>
+    `;
+  }
+
+  private renderGalleryGridHtml(): string {
+    if (this.formGallery.length === 0) {
+      return `
+        <div class="admin-gallery-empty-box">
+          <div class="gallery-empty-icon">${Icons.camera('w-8 h-8')}</div>
+          <p class="gallery-empty-title">Sin imágenes cargadas para este producto</p>
+          <p class="gallery-empty-sub">Haz clic en el botón de abajo o "+ Subir Contenido" para cargar fotos a MinIO.</p>
+          <button type="button" class="btn-empty-upload" id="btn-empty-upload-gallery">
+            ${Icons.uploadCloud('w-4 h-4')}
+            <span>+ Subir Contenido</span>
+          </button>
+        </div>
+      `;
+    }
+
+    return `
+      <div class="admin-gallery-grid" id="admin-gallery-cards-grid">
+        ${this.formGallery.map((url, idx) => {
+          const isCover = idx === 0;
+          return `
+            <div class="gallery-thumb-card ${isCover ? 'is-cover' : ''}" data-index="${idx}">
+              <div class="gallery-thumb-badge-wrap">
+                ${isCover 
+                  ? `<span class="badge-cover-primary">#1 PORTADA</span>` 
+                  : `<span class="badge-gallery-num">#${idx + 1}</span>`
+                }
+              </div>
+              <div class="gallery-thumb-img-wrap">
+                <img src="${url}" alt="Recurso ${idx + 1}" class="gallery-thumb-img" />
+              </div>
+              <div class="gallery-thumb-toolbar">
+                ${!isCover ? `
+                  <button type="button" class="btn-gallery-action btn-make-cover" data-action="make-cover" data-index="${idx}" title="Convertir en Portada Oficial (#1)">
+                    Portada
+                  </button>
+                ` : ''}
+                <button type="button" class="btn-gallery-action" data-action="move-left" data-index="${idx}" ${idx === 0 ? 'disabled' : ''} title="Mover a la izquierda">
+                  ${Icons.chevronLeft('w-3.5 h-3.5')}
+                </button>
+                <button type="button" class="btn-gallery-action" data-action="move-right" data-index="${idx}" ${idx === this.formGallery.length - 1 ? 'disabled' : ''} title="Mover a la derecha">
+                  ${Icons.chevronRight('w-3.5 h-3.5')}
+                </button>
+                <button type="button" class="btn-gallery-action btn-delete-img" data-action="delete-img" data-index="${idx}" title="Eliminar de la lista">
+                  ${Icons.trash('w-3.5 h-3.5')}
+                </button>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }
+
+  private refreshGalleryOnly(): void {
+    const wrapper = this.container.querySelector('#admin-gallery-wrapper');
+    if (wrapper) {
+      wrapper.innerHTML = this.renderGalleryGridHtml();
+      this.bindGalleryEvents();
+    }
+  }
+
+  private refresh3dStatusOnly(): void {
+    const wrapper = this.container.querySelector('#admin-3d-model-wrapper');
+    if (wrapper) {
+      wrapper.innerHTML = this.render3dStatusHtml();
+      this.bind3dStatusEvents();
+    }
+    const label3d = this.container.querySelector('#btn-label-3d');
+    if (label3d) {
+      label3d.textContent = this.formModel3dUrl ? 'Cambiar .GLB' : 'Subir .GLB';
+    }
+  }
+
+  private bindGalleryEvents(): void {
+    // Botón de subir desde empty state
+    this.container.querySelector('#btn-empty-upload-gallery')?.addEventListener('click', () => {
+      const fileInput = this.container.querySelector('#file-hidden-gallery') as HTMLInputElement | null;
+      fileInput?.click();
+    });
+
+    // Make cover
+    this.container.querySelectorAll('[data-action="make-cover"]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const idx = Number((btn as HTMLElement).dataset.index);
+        if (!isNaN(idx) && idx >= 0 && idx < this.formGallery.length) {
+          const [selected] = this.formGallery.splice(idx, 1);
+          this.formGallery.unshift(selected);
+          this.refreshGalleryOnly();
+          Toast.show('Imagen establecida como portada (#1).', 'Galería', 'info');
+        }
+      });
+    });
+
+    // Move left
+    this.container.querySelectorAll('[data-action="move-left"]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const idx = Number((btn as HTMLElement).dataset.index);
+        if (!isNaN(idx) && idx > 0 && idx < this.formGallery.length) {
+          const temp = this.formGallery[idx - 1];
+          this.formGallery[idx - 1] = this.formGallery[idx];
+          this.formGallery[idx] = temp;
+          this.refreshGalleryOnly();
+        }
+      });
+    });
+
+    // Move right
+    this.container.querySelectorAll('[data-action="move-right"]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const idx = Number((btn as HTMLElement).dataset.index);
+        if (!isNaN(idx) && idx >= 0 && idx < this.formGallery.length - 1) {
+          const temp = this.formGallery[idx + 1];
+          this.formGallery[idx + 1] = this.formGallery[idx];
+          this.formGallery[idx] = temp;
+          this.refreshGalleryOnly();
+        }
+      });
+    });
+
+    // Delete image
+    this.container.querySelectorAll('[data-action="delete-img"]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const idx = Number((btn as HTMLElement).dataset.index);
+        if (!isNaN(idx) && idx >= 0 && idx < this.formGallery.length) {
+          this.formGallery.splice(idx, 1);
+          this.refreshGalleryOnly();
+          Toast.show('Imagen eliminada de la galería.', 'Galería', 'info');
+        }
+      });
+    });
+  }
+
+  private bind3dStatusEvents(): void {
+    this.container.querySelector('#btn-remove-model-3d')?.addEventListener('click', () => {
+      this.formModel3dUrl = null;
+      this.refresh3dStatusOnly();
+      Toast.show('Modelo 3D retirado.', 'MinIO Storage', 'info');
+    });
+  }
+
+  // ==========================================================================
+  // HELPERS: GESTIÓN DE TALLAS Y FORMATOS EQUIVALENTES (EU, US, UK, CM)
+  // ==========================================================================
+  private renderSizesSectionContent(): string {
+    return `
+      <!-- GRUPO 4: TALLAS Y EXISTENCIAS EN FORMATOS EQUIVALENTES -->
+      <div class="admin-form-section" id="admin-sizes-section">
+        <div class="admin-sizes-header-flex">
+          <div>
+            <h3 class="admin-section-heading">EXISTENCIAS POR TALLAS (STOCK)</h3>
+            <p class="admin-section-sub">Define las existencias por talla en formatos equivalentes EU, USA, UK y CM. Predeterminado en stock 0 para nuevo producto:</p>
+          </div>
+
+          <!-- SELECTOR DE UNIDAD EN ADMIN Y TOGGLE OJO DE EQUIVALENCIAS -->
+          <div class="admin-size-unit-selector" role="tablist" aria-label="Unidad activa de visualización">
+            <span class="unit-selector-label">Mostrar en:</span>
+            <div class="admin-unit-pills">
+              <button type="button" class="admin-unit-btn ${this.adminSizeUnit === 'EU' ? 'active' : ''}" data-admin-unit="EU">EU</button>
+              <button type="button" class="admin-unit-btn ${this.adminSizeUnit === 'US' ? 'active' : ''}" data-admin-unit="US">USA (US)</button>
+              <button type="button" class="admin-unit-btn ${this.adminSizeUnit === 'UK' ? 'active' : ''}" data-admin-unit="UK">UK</button>
+              <button type="button" class="admin-unit-btn ${this.adminSizeUnit === 'CM' ? 'active' : ''}" data-admin-unit="CM">CM</button>
+            </div>
+            <button 
+              type="button" 
+              class="btn-toggle-equivalences ${this.showEquivalences ? 'is-active' : ''}" 
+              id="btn-toggle-equivalences" 
+              title="${this.showEquivalences ? 'Ocultar equivalencias en tarjetas' : 'Mostrar equivalencias en tarjetas (EU • US • UK • CM)'}"
+            >
+              ${this.showEquivalences ? Icons.eye('w-4 h-4') : Icons.eyeOff('w-4 h-4')}
+            </button>
+          </div>
+        </div>
+
+        <!-- BARRA DE ACCIONES Y TALLAS PERSONALIZADAS -->
+        <div class="admin-custom-sizes-toolbar">
+          <!-- AGREGAR TALLA PERSONALIZADA A MEDIDA CON ACCIONES A LA PAR -->
+          <div class="admin-add-custom-size-row">
+            <span class="toolbar-caption">Definir Talla:</span>
+            <div class="custom-size-inputs-flex">
+              <input 
+                type="number" 
+                step="0.5" 
+                min="1" 
+                max="70" 
+                id="input-custom-size-val" 
+                placeholder="Ej: 37.5 o 13" 
+                class="input-custom-val" 
+              />
+              <select id="select-custom-size-unit" class="select-custom-unit">
+                <option value="EU" ${this.adminSizeUnit === 'EU' ? 'selected' : ''}>EU</option>
+                <option value="US" ${this.adminSizeUnit === 'US' ? 'selected' : ''}>USA (US)</option>
+                <option value="UK" ${this.adminSizeUnit === 'UK' ? 'selected' : ''}>UK</option>
+                <option value="CM" ${this.adminSizeUnit === 'CM' ? 'selected' : ''}>CM</option>
+              </select>
+              <input 
+                type="number" 
+                min="0" 
+                id="input-custom-size-stock" 
+                placeholder="Stock inicial" 
+                value="0" 
+                class="input-custom-stock" 
+              />
+              <button type="button" class="btn-add-custom-size" id="btn-add-custom-size">
+                + Agregar Talla
+              </button>
+              <button type="button" class="btn-tool-secondary" id="btn-reset-all-stock-zero" title="Establecer stock de todas las tallas en 0">
+                Stock en 0
+              </button>
+              <button type="button" class="btn-tool-secondary" id="btn-restore-official-sizes" title="Restablecer a las 13 tallas de la tabla oficial">
+                Tallas Oficiales
+              </button>
+            </div>
+          </div>
+
+          <!-- DESPLEGABLE PLEGADO POR DEFECTO PARA TALLAS PEQUEÑAS Y GRANDES -->
+          <details class="admin-more-sizes-dropdown" id="details-more-sizes">
+            <summary class="more-sizes-summary">
+              <span class="summary-text">+ Más tallas</span>
+              <span class="summary-arrow">${Icons.chevronDown('w-3.5 h-3.5')}</span>
+            </summary>
+            <div class="more-sizes-content">
+              <div class="toolbar-sub-group">
+                <span class="toolbar-caption">Tallas Pequeñas:</span>
+                <div class="preset-chips-row">
+                  <button type="button" class="btn-preset-size" data-preset-eu="36">+ 36 EU (US 3)</button>
+                  <button type="button" class="btn-preset-size" data-preset-eu="37">+ 37 EU (US 4)</button>
+                  <button type="button" class="btn-preset-size" data-preset-eu="38">+ 38 EU (US 5)</button>
+                  <button type="button" class="btn-preset-size" data-preset-eu="38.5">+ 38.5 EU (US 5.5)</button>
+                </div>
+              </div>
+
+              <div class="toolbar-sub-group">
+                <span class="toolbar-caption">Tallas Grandes:</span>
+                <div class="preset-chips-row">
+                  <button type="button" class="btn-preset-size" data-preset-eu="45.5">+ 45.5 EU (US 12.5)</button>
+                  <button type="button" class="btn-preset-size" data-preset-eu="46">+ 46 EU (US 13)</button>
+                  <button type="button" class="btn-preset-size" data-preset-eu="47">+ 47 EU (US 14)</button>
+                  <button type="button" class="btn-preset-size" data-preset-eu="48">+ 48 EU (US 15)</button>
+                </div>
+              </div>
+            </div>
+          </details>
+        </div>
+
+        <!-- GRILLA DE TARJETAS DE TALLAS -->
+        <div class="admin-sizes-grid" id="admin-sizes-cards-grid">
+          ${this.renderSizeCardsHtml()}
+        </div>
+      </div>
+    `;
+  }
+
+  private renderSizeCardsHtml(): string {
+    return this.formSizes
+      .map((item) => {
+        const eq = getSizeEquivalence(item.size);
+        const displaySize = formatSizeDisplay(item.size, this.adminSizeUnit);
+        return `
+          <div class="admin-size-stock-card" data-card-size="${item.size}">
+            <div class="card-size-top">
+              <div class="size-header-info">
+                <span class="size-group-badge size-group-${eq.group.toLowerCase()}">${eq.group}</span>
+                <strong class="size-primary-number">${this.adminSizeUnit === 'US' ? 'USA' : this.adminSizeUnit} ${displaySize}</strong>
+              </div>
+              <button 
+                type="button" 
+                class="btn-remove-size" 
+                data-remove-size="${item.size}" 
+                title="Quitar talla ${item.size} del producto"
+              >
+                ${Icons.close('w-3.5 h-3.5')}
+              </button>
+            </div>
+
+            ${this.showEquivalences
+              ? `
+                <div class="size-equivalents-sub">
+                  <span>EU ${eq.eu} • US ${eq.us} • UK ${eq.uk} • ${eq.cm} CM</span>
+                </div>
+              `
+              : ''
+            }
+
+            <div class="size-stock-controls-row">
+              <label class="stock-input-label">Stock:</label>
+              <div class="stock-stepper">
+                <button type="button" class="btn-step-stock step-minus" data-step-size="${item.size}" data-delta="-1">-</button>
+                <input 
+                  type="number" 
+                  min="0" 
+                  class="input-size-stock" 
+                  data-size="${item.size}" 
+                  value="${item.stock}" 
+                />
+                <button type="button" class="btn-step-stock step-plus" data-step-size="${item.size}" data-delta="1">+</button>
+              </div>
+              <div class="stock-quick-buttons">
+                <button type="button" class="btn-quick-add" data-quick-size="${item.size}" data-add="5">+5</button>
+                <button type="button" class="btn-quick-add" data-quick-size="${item.size}" data-add="10">+10</button>
+              </div>
+            </div>
+          </div>
+        `;
+      })
+      .join('');
+  }
+
+  private refreshSizeCardsOnly(): void {
+    const grid = this.container.querySelector('#admin-sizes-cards-grid');
+    if (grid) {
+      grid.innerHTML = this.renderSizeCardsHtml();
+      this.bindSizeCardEvents();
+    }
+  }
+
+  private syncSizesFromDom(): void {
+    const inputs = this.container.querySelectorAll('.input-size-stock');
+    inputs.forEach((inp) => {
+      const size = Number((inp as HTMLElement).dataset.size);
+      const stock = Math.max(0, parseInt((inp as HTMLInputElement).value || '0', 10) || 0);
+      const found = this.formSizes.find((s) => s.size === size);
+      if (found) {
+        found.stock = stock;
+      }
+    });
+  }
+
+  private setupSizesSectionEvents(): void {
+    // 1. Selector de unidad activa en Admin (EU, US, UK, CM)
+    this.container.querySelectorAll('[data-admin-unit]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const unit = (btn as HTMLElement).dataset.adminUnit as SizeUnit;
+        if (unit && unit !== this.adminSizeUnit) {
+          this.syncSizesFromDom();
+          this.adminSizeUnit = unit;
+          this.container.querySelectorAll('[data-admin-unit]').forEach((b) => {
+            b.classList.toggle('active', (b as HTMLElement).dataset.adminUnit === unit);
+          });
+          const selectUnit = this.container.querySelector('#select-custom-size-unit') as HTMLSelectElement | null;
+          if (selectUnit) selectUnit.value = unit;
+          this.refreshSizeCardsOnly();
+        }
+      });
+    });
+
+    // Toggle para mostrar/ocultar equivalencias completas (EU, US, UK, CM) en las tarjetas
+    this.container.querySelector('#btn-toggle-equivalences')?.addEventListener('click', () => {
+      this.syncSizesFromDom();
+      this.showEquivalences = !this.showEquivalences;
+      const eyeBtn = this.container.querySelector('#btn-toggle-equivalences');
+      if (eyeBtn) {
+        eyeBtn.classList.toggle('is-active', this.showEquivalences);
+        eyeBtn.innerHTML = this.showEquivalences ? Icons.eye('w-4 h-4') : Icons.eyeOff('w-4 h-4');
+        eyeBtn.setAttribute(
+          'title',
+          this.showEquivalences
+            ? 'Ocultar equivalencias en tarjetas'
+            : 'Mostrar equivalencias en tarjetas (EU • US • UK • CM)'
+        );
+      }
+      this.refreshSizeCardsOnly();
+    });
+
+    // 2. Chips de tallas preestablecidas pequeñas y grandes
+    this.container.querySelectorAll('[data-preset-eu]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const euSize = Number((btn as HTMLElement).dataset.presetEu);
+        if (!euSize) return;
+        this.syncSizesFromDom();
+        if (this.formSizes.some((s) => s.size === euSize)) {
+          Toast.show(`La talla EU ${euSize} ya está agregada.`, 'Aviso', 'info');
+          return;
+        }
+        this.formSizes.push({ size: euSize, stock: 0 });
+        this.formSizes.sort((a, b) => a.size - b.size);
+        this.refreshSizeCardsOnly();
+        Toast.show(`Talla EU ${euSize} agregada con stock 0.`, 'Tallas', 'success');
+      });
+    });
+
+    // 3. Botón para poner todo el stock en 0 (con confirmación de seguridad)
+    this.container.querySelector('#btn-reset-all-stock-zero')?.addEventListener('click', () => {
+      const confirmed = window.confirm('¿Estás seguro de que deseas poner el stock de todas las tallas en 0?');
+      if (!confirmed) return;
+      this.syncSizesFromDom();
+      this.formSizes.forEach((s) => (s.stock = 0));
+      this.refreshSizeCardsOnly();
+      Toast.show('Stock de todas las tallas establecido en 0.', 'Stock', 'info');
+    });
+
+    // 4. Botón para incorporar las 13 tallas de la tabla oficial sin borrar las existentes
+    this.container.querySelector('#btn-restore-official-sizes')?.addEventListener('click', () => {
+      this.syncSizesFromDom();
+      const currentMap = new Map<number, number>();
+      this.formSizes.forEach((s) => currentMap.set(s.size, s.stock));
+
+      let addedCount = 0;
+      STANDARD_CHART_SIZES.forEach((sz) => {
+        if (!currentMap.has(sz)) {
+          currentMap.set(sz, 0);
+          addedCount++;
+        }
+      });
+
+      this.formSizes = Array.from(currentMap.entries())
+        .map(([size, stock]) => ({ size, stock }))
+        .sort((a, b) => a.size - b.size);
+
+      this.refreshSizeCardsOnly();
+      if (addedCount > 0) {
+        Toast.show(`Se incorporaron ${addedCount} tallas oficiales faltantes conservando las existentes.`, 'Tallas', 'success');
+      } else {
+        Toast.show('Todas las tallas oficiales ya están presentes en la lista.', 'Tallas', 'info');
+      }
+    });
+
+    // 5. Agregar talla personalizada por input
+    this.container.querySelector('#btn-add-custom-size')?.addEventListener('click', () => {
+      const valInput = this.container.querySelector('#input-custom-size-val') as HTMLInputElement | null;
+      const unitSelect = this.container.querySelector('#select-custom-size-unit') as HTMLSelectElement | null;
+      const stockInput = this.container.querySelector('#input-custom-size-stock') as HTMLInputElement | null;
+
+      const rawVal = parseFloat(valInput?.value || '');
+      if (isNaN(rawVal) || rawVal <= 0) {
+        Toast.show('Por favor ingresa un número de talla válido.', 'Atención', 'warning');
+        valInput?.focus();
+        return;
+      }
+
+      const unit = (unitSelect?.value as SizeUnit) || this.adminSizeUnit || 'EU';
+      const euSize = unitToEu(rawVal, unit);
+      const stock = Math.max(0, parseInt(stockInput?.value || '0', 10) || 0);
+
+      this.syncSizesFromDom();
+      if (this.formSizes.some((s) => s.size === euSize)) {
+        Toast.show(`La talla EU ${euSize} (${unit} ${rawVal}) ya está en la lista.`, 'Aviso', 'info');
+        return;
+      }
+
+      this.formSizes.push({ size: euSize, stock });
+      this.formSizes.sort((a, b) => a.size - b.size);
+      this.refreshSizeCardsOnly();
+
+      if (valInput) valInput.value = '';
+      Toast.show(`Talla ${unit} ${rawVal} (EU ${euSize}) agregada con éxito.`, 'Tallas', 'success');
+    });
+
+    // 6. Bindear eventos internos de las tarjetas
+    this.bindSizeCardEvents();
+  }
+
+  private bindSizeCardEvents(): void {
+    // Inputs de stock
+    this.container.querySelectorAll('.input-size-stock').forEach((input) => {
+      input.addEventListener('change', () => {
+        const size = Number((input as HTMLElement).dataset.size);
+        const val = Math.max(0, parseInt((input as HTMLInputElement).value || '0', 10) || 0);
+        (input as HTMLInputElement).value = String(val);
+        const item = this.formSizes.find((s) => s.size === size);
+        if (item) item.stock = val;
+      });
+    });
+
+    // Steppers +/-
+    this.container.querySelectorAll('.btn-step-stock').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const size = Number((btn as HTMLElement).dataset.stepSize);
+        const delta = Number((btn as HTMLElement).dataset.delta) || 0;
+        const item = this.formSizes.find((s) => s.size === size);
+        if (item) {
+          item.stock = Math.max(0, item.stock + delta);
+          const inp = this.container.querySelector(`.input-size-stock[data-size="${size}"]`) as HTMLInputElement | null;
+          if (inp) inp.value = String(item.stock);
+        }
+      });
+    });
+
+    // Botones rápidos +5 / +10
+    this.container.querySelectorAll('.btn-quick-add').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const size = Number((btn as HTMLElement).dataset.quickSize);
+        const add = Number((btn as HTMLElement).dataset.add) || 0;
+        const item = this.formSizes.find((s) => s.size === size);
+        if (item) {
+          item.stock = Math.max(0, item.stock + add);
+          const inp = this.container.querySelector(`.input-size-stock[data-size="${size}"]`) as HTMLInputElement | null;
+          if (inp) inp.value = String(item.stock);
+        }
+      });
+    });
+
+    // Botón eliminar talla
+    this.container.querySelectorAll('.btn-remove-size').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const size = Number((btn as HTMLElement).dataset.removeSize);
+        this.syncSizesFromDom();
+        this.formSizes = this.formSizes.filter((s) => s.size !== size);
+        this.refreshSizeCardsOnly();
+      });
+    });
   }
 
   // ==========================================================================
@@ -949,6 +1490,7 @@ export class AdminPanel {
         if (tab) {
           if (tab === 'products-create' && this.activeTab !== 'products-create') {
             this.editingProduct = null;
+            this.initFormSizes();
           }
           if (tab === 'promos-create' && this.activeTab !== 'promos-create') {
             this.editingPromo = null;
@@ -980,9 +1522,17 @@ export class AdminPanel {
     const userId = this.store.currentUser?.id;
     if (!userId) return;
 
+    // Si estamos en la pestaña de crear/editar producto, enlazar eventos de tallas y recursos
+    if (this.activeTab === 'products-create') {
+      this.setupSizesSectionEvents();
+      this.bindGalleryEvents();
+      this.bind3dStatusEvents();
+    }
+
     // --- TAB 1: PRODUCTOS LIST ---
     this.container.querySelector('#btn-admin-goto-create-prod')?.addEventListener('click', () => {
       this.editingProduct = null;
+      this.initFormSizes();
       this.activeTab = 'products-create';
       this.updateMainContentOnly();
     });
@@ -1026,6 +1576,7 @@ export class AdminPanel {
         const prod = this.products.find((x) => x.id === pId);
         if (prod) {
           this.editingProduct = prod;
+          this.initFormSizes();
           this.activeTab = 'products-create';
           this.updateMainContentOnly();
         }
@@ -1055,49 +1606,68 @@ export class AdminPanel {
     // --- TAB 2: PRODUCTO FORM ---
     this.container.querySelector('#btn-cancel-edit-prod')?.addEventListener('click', () => {
       this.editingProduct = null;
+      this.formSizes = [];
+      this.formGallery = [];
+      this.formModel3dUrl = null;
       this.activeTab = 'products-list';
       this.updateMainContentOnly();
     });
 
     this.container.querySelector('#btn-cancel-prod-form')?.addEventListener('click', () => {
       this.editingProduct = null;
+      this.formSizes = [];
+      this.formGallery = [];
+      this.formModel3dUrl = null;
       this.activeTab = 'products-list';
       this.updateMainContentOnly();
     });
 
-    // Subida de imagen a MinIO desde el formulario
-    const imgFile = this.container.querySelector('#file-hidden-image') as HTMLInputElement | null;
-    this.container.querySelector('#btn-trigger-upload-image')?.addEventListener('click', () => {
-      imgFile?.click();
+    // Subida múltiple de imágenes a MinIO desde el formulario
+    const galleryInput = this.container.querySelector('#file-hidden-gallery') as HTMLInputElement | null;
+    this.container.querySelector('#btn-trigger-upload-gallery')?.addEventListener('click', () => {
+      galleryInput?.click();
     });
 
-    imgFile?.addEventListener('change', async () => {
-      const file = imgFile.files?.[0];
-      if (!file) return;
+    galleryInput?.addEventListener('change', async () => {
+      const files = galleryInput.files;
+      if (!files || files.length === 0) return;
 
-      Toast.show('Subiendo imagen a MinIO...', 'MinIO Storage', 'info');
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const base64 = reader.result as string;
-        const uploadRes = await ApiService.uploadAssetToMinio(userId, {
-          filename: file.name,
-          contentType: file.type || 'image/png',
-          base64
-        });
+      Toast.show(`Subiendo ${files.length} imagen(es) a MinIO...`, 'MinIO Storage', 'info');
+      let successCount = 0;
 
-        if (uploadRes.success && uploadRes.url) {
-          Toast.show('¡Imagen subida a MinIO con éxito!', 'MinIO', 'success');
-          const inputImg = this.container.querySelector('#prod-image') as HTMLInputElement | null;
-          if (inputImg) inputImg.value = uploadRes.url;
-          const previewBox = this.container.querySelector('#preview-image-box');
-          if (previewBox) {
-            previewBox.innerHTML = `<img src="${uploadRes.url}" alt="Vista previa" class="admin-preview-img" />`;
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        try {
+          const base64 = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+
+          const uploadRes = await ApiService.uploadAssetToMinio(userId, {
+            filename: file.name,
+            contentType: file.type || 'image/png',
+            base64
+          });
+
+          if (uploadRes.success && uploadRes.url) {
+            this.formGallery.push(uploadRes.url);
+            successCount++;
           }
-        } else {
-          Toast.show(uploadRes.message || 'Error al subir a MinIO.', 'Error', 'warning');
+        } catch (e) {
+          console.error('Error subiendo archivo', file.name, e);
         }
-      };
-      reader.readAsDataURL(file);
+      }
+
+      galleryInput.value = '';
+      this.refreshGalleryOnly();
+
+      if (successCount > 0) {
+        Toast.show(`¡${successCount} imagen(es) subida(s) con éxito a MinIO!`, 'MinIO', 'success');
+      } else {
+        Toast.show('No se pudieron subir las imágenes a MinIO.', 'MinIO', 'warning');
+      }
     });
 
     // Subida de modelo 3D a MinIO desde el formulario
@@ -1110,7 +1680,7 @@ export class AdminPanel {
       const file = modelFile.files?.[0];
       if (!file) return;
 
-      Toast.show('Subiendo modelo 3D a MinIO...', 'MinIO Storage', 'info');
+      Toast.show('Subiendo modelo 3D (.GLB) a MinIO...', 'MinIO Storage', 'info');
       const reader = new FileReader();
       reader.onload = async () => {
         const base64 = reader.result as string;
@@ -1121,20 +1691,26 @@ export class AdminPanel {
         });
 
         if (uploadRes.success && uploadRes.url) {
-          Toast.show('¡Modelo 3D subido a MinIO!', 'MinIO', 'success');
-          const input3D = this.container.querySelector('#prod-model3d') as HTMLInputElement | null;
-          if (input3D) input3D.value = uploadRes.url;
+          Toast.show('¡Modelo 3D subido a MinIO con éxito!', 'MinIO', 'success');
+          this.formModel3dUrl = uploadRes.url;
+          this.refresh3dStatusOnly();
         } else {
           Toast.show(uploadRes.message || 'Error al subir modelo a MinIO.', 'Error', 'warning');
         }
       };
       reader.readAsDataURL(file);
+      modelFile.value = '';
     });
 
     // Submit del formulario de producto
     const prodForm = this.container.querySelector('#form-admin-product');
     prodForm?.addEventListener('submit', async (e) => {
       e.preventDefault();
+
+      if (this.formGallery.length === 0) {
+        Toast.show('Por favor sube al menos una imagen para el producto (portada).', 'Imagen Requerida', 'warning');
+        return;
+      }
 
       const name = (this.container.querySelector('#prod-name') as HTMLInputElement)?.value.trim();
       const subtitle = (this.container.querySelector('#prod-subtitle') as HTMLInputElement)?.value.trim();
@@ -1145,19 +1721,18 @@ export class AdminPanel {
       const price = Number((this.container.querySelector('#prod-price') as HTMLInputElement)?.value);
       const origPriceInput = (this.container.querySelector('#prod-orig-price') as HTMLInputElement)?.value;
       const originalPrice = origPriceInput ? Number(origPriceInput) : null;
-      const image = (this.container.querySelector('#prod-image') as HTMLInputElement)?.value.trim();
-      const model3dUrl = (this.container.querySelector('#prod-model3d') as HTMLInputElement)?.value.trim() || null;
+      const image = this.formGallery[0];
+      const gallery = [...this.formGallery];
+      const model3dUrl = this.formModel3dUrl;
       const inStock = (this.container.querySelector('#prod-instock') as HTMLInputElement)?.checked ?? true;
       const featured = (this.container.querySelector('#prod-featured') as HTMLInputElement)?.checked ?? false;
 
       // Recolectar tallas y stock
-      const sizeInputs = this.container.querySelectorAll('.input-size-stock');
-      const sizes: Array<{ size: number; stock: number }> = [];
-      sizeInputs.forEach((inp) => {
-        const size = Number((inp as HTMLElement).dataset.size);
-        const stock = Number((inp as HTMLInputElement).value) || 0;
-        sizes.push({ size, stock });
-      });
+      this.syncSizesFromDom();
+      const sizes: Array<{ size: number; stock: number }> = this.formSizes.map((s) => ({
+        size: s.size,
+        stock: Math.max(0, s.stock)
+      }));
 
       const submitBtn = this.container.querySelector('#btn-save-product') as HTMLButtonElement | null;
       if (submitBtn) {
@@ -1179,6 +1754,7 @@ export class AdminPanel {
             price,
             originalPrice,
             image,
+            gallery,
             model3dUrl,
             inStock,
             featured,
@@ -1188,6 +1764,9 @@ export class AdminPanel {
           if (res.success) {
             Toast.show('Producto actualizado correctamente.', 'Inventario', 'success');
             this.editingProduct = null;
+            this.formSizes = [];
+            this.formGallery = [];
+            this.formModel3dUrl = null;
             await this.loadInitialData();
             this.store.loadProducts();
             this.activeTab = 'products-list';
@@ -1207,6 +1786,7 @@ export class AdminPanel {
             price,
             originalPrice,
             image,
+            gallery,
             model3dUrl,
             inStock,
             featured,
@@ -1215,6 +1795,10 @@ export class AdminPanel {
 
           if (res.success) {
             Toast.show('¡Producto creado y publicado en la tienda!', 'Inventario', 'success');
+            this.editingProduct = null;
+            this.formSizes = [];
+            this.formGallery = [];
+            this.formModel3dUrl = null;
             await this.loadInitialData();
             this.store.loadProducts();
             this.activeTab = 'products-list';

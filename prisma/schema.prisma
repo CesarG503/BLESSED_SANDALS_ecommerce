@@ -126,6 +126,7 @@ model Product {
   gender        String         @default("Unisex")
   height        String?
   image         String
+  gallery       String[]       @default([])
   model3dUrl    String?
   inStock       Boolean        @default(true)
   featured      Boolean        @default(false)

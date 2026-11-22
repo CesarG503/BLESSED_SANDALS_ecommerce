@@ -5,6 +5,7 @@ import { PromoCode } from '../types/promo';
 import { StorageService } from '../services/storageService';
 import { ProductService } from '../services/productService';
 import { ApiService } from '../services/apiService';
+import { SizeUnit } from '../utils/sizeConverter';
 
 type Listener = () => void;
 
@@ -113,6 +114,9 @@ export class Store {
   public activeQuickViewProduct: Product | null = null;
   public active3DProduct: Product | null = null;
 
+  // Formato activo de medidas de calzado (EU, US, UK, CM)
+  public activeSizeUnit: SizeUnit = 'EU';
+
   private listeners: Set<Listener> = new Set();
 
   private constructor() {
@@ -120,6 +124,11 @@ export class Store {
     this.wishlist = StorageService.getWishlist();
     this.currentUser = StorageService.getUser();
     this.appliedPromo = StorageService.getPromo();
+
+    const savedSizeUnit = StorageService.getSizeUnit() as SizeUnit;
+    if (savedSizeUnit && ['EU', 'US', 'UK', 'CM'].includes(savedSizeUnit)) {
+      this.activeSizeUnit = savedSizeUnit;
+    }
 
     // Cargar cupones reales y estado de cuenta desde la base de datos
     this.loadPromos();
@@ -321,6 +330,12 @@ export class Store {
       this.products,
       this.filters
     );
+  }
+
+  public setSizeUnit(unit: SizeUnit): void {
+    this.activeSizeUnit = unit;
+    StorageService.saveSizeUnit(unit);
+    this.notify();
   }
 
   // --- ACCIONES DEL CARRITO (PERSISTENCIA CON LA CUENTA) ---

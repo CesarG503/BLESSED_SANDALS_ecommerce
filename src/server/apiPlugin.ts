@@ -1398,9 +1398,11 @@ export function apiPlugin(): Plugin {
                 .filter((img): img is string => Boolean(img));
               
               const defaultGallery = Array.from(new Set([p.image, ...colorImages]));
-              const gallery = mockMatch?.gallery && mockMatch.gallery.length > 0
-                ? mockMatch.gallery
-                : (defaultGallery.length > 0 ? defaultGallery : [p.image]);
+              const gallery = (p.gallery && p.gallery.length > 0)
+                ? p.gallery
+                : (mockMatch?.gallery && mockMatch.gallery.length > 0
+                    ? mockMatch.gallery
+                    : (defaultGallery.length > 0 ? defaultGallery : [p.image]));
 
               return {
                 id: p.id,
@@ -1476,6 +1478,7 @@ export function apiPlugin(): Plugin {
                   badge: p.badge,
                   gender: p.gender,
                   image: p.image,
+                  gallery: p.gallery && p.gallery.length > 0 ? p.gallery : (p.image ? [p.image] : []),
                   model3dUrl: p.model3dUrl,
                   categoryId: p.categoryId,
                   categoryName: p.category.name,
@@ -1509,6 +1512,7 @@ export function apiPlugin(): Plugin {
               badge,
               gender = 'Unisex',
               image,
+              gallery,
               model3dUrl,
               categoryId,
               inStock = true,
@@ -1517,7 +1521,12 @@ export function apiPlugin(): Plugin {
               colors = []
             } = body;
 
-            if (!name || price === undefined || !image) {
+            const finalGallery: string[] = Array.isArray(gallery) && gallery.length > 0
+              ? gallery
+              : (image ? [image] : []);
+            const finalImage: string = finalGallery.length > 0 ? finalGallery[0] : (image || '');
+
+            if (!name || price === undefined || !finalImage) {
               return sendJson(res, 400, {
                 success: false,
                 message: 'Nombre, precio e imagen principal son requeridos.'
@@ -1562,18 +1571,20 @@ export function apiPlugin(): Plugin {
                 originalPrice: originalPrice ? Number(originalPrice) : null,
                 badge: badge ? badge.trim() : null,
                 gender,
-                image: image.trim(),
+                image: finalImage.trim(),
+                gallery: finalGallery,
                 model3dUrl: model3dUrl ? model3dUrl.trim() : null,
                 categoryId: finalCategoryId,
                 inStock: Boolean(inStock),
                 featured: Boolean(featured),
                 sizes: {
-                  create: (Array.isArray(sizes) && sizes.length > 0 ? sizes : [38, 39, 40, 41, 42, 43, 44]).map(
-                    (s: any) => ({
-                      size: typeof s === 'number' ? s : Number(s.size),
-                      stock: typeof s === 'object' && s.stock !== undefined ? Number(s.stock) : 15
-                    })
-                  )
+                  create: (Array.isArray(sizes) && sizes.length > 0
+                    ? sizes
+                    : [39, 39.5, 40, 40.5, 41, 41.5, 42, 42.5, 43, 43.5, 44, 44.5, 45]
+                  ).map((s: any) => ({
+                    size: typeof s === 'number' ? s : Number(s.size),
+                    stock: typeof s === 'object' && s.stock !== undefined ? Math.max(0, Number(s.stock)) : 0
+                  }))
                 },
                 colors: {
                   create: (Array.isArray(colors) && colors.length > 0
@@ -1618,6 +1629,7 @@ export function apiPlugin(): Plugin {
               badge,
               gender,
               image,
+              gallery,
               model3dUrl,
               categoryId,
               inStock,
@@ -1628,6 +1640,12 @@ export function apiPlugin(): Plugin {
 
             if (!id) {
               return sendJson(res, 400, { success: false, message: 'ID del producto requerido para actualizar.' });
+            }
+
+            let finalImage = image;
+            let finalGallery = Array.isArray(gallery) ? gallery : undefined;
+            if (finalGallery && finalGallery.length > 0) {
+              finalImage = finalGallery[0];
             }
 
             // Actualizar datos base del producto
@@ -1641,7 +1659,8 @@ export function apiPlugin(): Plugin {
                 originalPrice: originalPrice !== undefined ? (originalPrice ? Number(originalPrice) : null) : undefined,
                 badge: badge !== undefined ? (badge ? badge.trim() : null) : undefined,
                 ...(gender ? { gender } : {}),
-                ...(image ? { image: image.trim() } : {}),
+                ...(finalImage ? { image: finalImage.trim() } : {}),
+                ...(finalGallery !== undefined ? { gallery: finalGallery } : {}),
                 model3dUrl: model3dUrl !== undefined ? (model3dUrl ? model3dUrl.trim() : null) : undefined,
                 ...(categoryId ? { categoryId } : {}),
                 ...(inStock !== undefined ? { inStock: Boolean(inStock) } : {}),
@@ -1650,15 +1669,17 @@ export function apiPlugin(): Plugin {
             });
 
             // Si se enviaron tallas, refrescarlas
-            if (Array.isArray(sizes) && sizes.length > 0) {
+            if (Array.isArray(sizes)) {
               await prisma.productSize.deleteMany({ where: { productId: id } });
-              await prisma.productSize.createMany({
-                data: sizes.map((s: any) => ({
-                  productId: id,
-                  size: typeof s === 'number' ? s : Number(s.size),
-                  stock: typeof s === 'object' && s.stock !== undefined ? Number(s.stock) : 15
-                }))
-              });
+              if (sizes.length > 0) {
+                await prisma.productSize.createMany({
+                  data: sizes.map((s: any) => ({
+                    productId: id,
+                    size: typeof s === 'number' ? s : Number(s.size),
+                    stock: typeof s === 'object' && s.stock !== undefined ? Math.max(0, Number(s.stock)) : 0
+                  }))
+                });
+              }
             }
 
             // Si se enviaron colores, refrescarlos

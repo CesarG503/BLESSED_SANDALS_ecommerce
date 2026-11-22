@@ -99,4 +99,20 @@ export class StorageService {
       console.error('Error saving welcome promo status', e);
     }
   }
+
+  static getSizeUnit(): string | null {
+    try {
+      return localStorage.getItem('blessed_size_unit');
+    } catch {
+      return null;
+    }
+  }
+
+  static saveSizeUnit(unit: string): void {
+    try {
+      localStorage.setItem('blessed_size_unit', unit);
+    } catch (e) {
+      console.error('Error saving size unit', e);
+    }
+  }
 }

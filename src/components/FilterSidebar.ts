@@ -1,10 +1,17 @@
 import { Store } from '../state/store';
 import { Icons } from './Icons';
 import { ProductGender, ShoeHeight, ProductCategory } from '../types/product';
+import {
+  SizeUnit,
+  formatSizeDisplay,
+  formatFullEquivalence,
+  STANDARD_CHART_SIZES
+} from '../utils/sizeConverter';
 
 export class FilterSidebar {
   private container: HTMLElement;
   private store: Store;
+  private lastKnownProductsCount: number = 0;
 
   constructor(containerId: string) {
     this.store = Store.getInstance();
@@ -12,13 +19,32 @@ export class FilterSidebar {
     if (!el) throw new Error(`Element #${containerId} not found`);
     this.container = el;
 
+    this.lastKnownProductsCount = this.store.products.length;
     this.store.subscribe(() => this.syncUI());
     this.render();
     this.setupEvents();
   }
 
+  /**
+   * Obtiene la lista combinada de tallas canónicas (EU) incluyendo
+   * la tabla oficial y cualquier talla personalizada de los productos
+   */
+  private getAvailableSizes(): number[] {
+    const set = new Set<number>(STANDARD_CHART_SIZES);
+    if (this.store.products && this.store.products.length > 0) {
+      this.store.products.forEach((p) => {
+        if (p.sizes && Array.isArray(p.sizes)) {
+          p.sizes.forEach((s) => set.add(Number(s)));
+        }
+      });
+    }
+    return Array.from(set).sort((a, b) => a - b);
+  }
+
   private render(): void {
     const filters = this.store.filters;
+    const activeUnit = this.store.activeSizeUnit || 'EU';
+    const sizes = this.getAvailableSizes();
 
     this.container.innerHTML = `
       <aside class="filters-sidebar" id="filters-sidebar">
@@ -74,21 +100,40 @@ export class FilterSidebar {
           </div>
         </div>
 
-        <!-- ACORDEÓN: TALLA -->
+        <!-- ACORDEÓN: TALLA Y MEDIDAS EQUIVALENTES (EU, US, UK, CM) -->
         <div class="filter-group open" data-group="size">
           <div class="filter-group-header">
-            <span class="group-title">TALLA (EU)</span>
+            <span class="group-title" id="filter-size-header-title">TALLA (${activeUnit})</span>
             <span class="group-arrow">${Icons.chevronDown()}</span>
           </div>
           <div class="filter-group-body">
-            <div class="sizes-grid">
-              ${[36, 37, 38, 39, 40, 41, 42, 43, 44, 45].map(
-                (size) => `
-                <button type="button" class="size-pill ${filters.sizes.includes(size) ? 'is-selected' : ''}" data-size="${size}">
-                  ${size}
-                </button>
-              `
-              ).join('')}
+            <!-- SELECTOR SEGMENTADO DE FORMATO DE MEDIDA -->
+            <div class="size-unit-selector" role="tablist" aria-label="Formato de Talla">
+              <button type="button" class="unit-toggle-btn ${activeUnit === 'EU' ? 'active' : ''}" data-unit="EU" title="Talla Europea (EU)">EU</button>
+              <button type="button" class="unit-toggle-btn ${activeUnit === 'US' ? 'active' : ''}" data-unit="US" title="Talla Estados Unidos (US)">USA</button>
+              <button type="button" class="unit-toggle-btn ${activeUnit === 'UK' ? 'active' : ''}" data-unit="UK" title="Talla Reino Unido (UK)">UK</button>
+              <button type="button" class="unit-toggle-btn ${activeUnit === 'CM' ? 'active' : ''}" data-unit="CM" title="Centímetros (CM)">CM</button>
+            </div>
+
+            <!-- GRILLA DE TALLAS -->
+            <div class="sizes-grid" id="filter-sizes-grid">
+              ${sizes
+                .map((size) => {
+                  const isSelected = filters.sizes.includes(size);
+                  const label = formatSizeDisplay(size, activeUnit);
+                  const fullEq = formatFullEquivalence(size);
+                  return `
+                    <button 
+                      type="button" 
+                      class="size-pill ${isSelected ? 'is-selected' : ''}" 
+                      data-size="${size}"
+                      title="${fullEq}"
+                    >
+                      <span class="size-pill-number">${label}</span>
+                    </button>
+                  `;
+                })
+                .join('')}
             </div>
           </div>
         </div>
@@ -117,15 +162,17 @@ export class FilterSidebar {
             <span class="group-arrow">${Icons.chevronDown()}</span>
           </div>
           <div class="filter-group-body">
-            ${(['Alta', 'Media', 'Baja'] as ShoeHeight[]).map(
-              (h) => `
+            ${(['Alta', 'Media', 'Baja'] as ShoeHeight[])
+              .map(
+                (h) => `
               <label class="custom-checkbox">
                 <input type="checkbox" name="filter-height" value="${h}" ${filters.heights.includes(h) ? 'checked' : ''} />
                 <span class="checkbox-indicator"></span>
                 <span class="checkbox-label">${h} (${h === 'Alta' ? 'High' : h === 'Media' ? 'Mid' : 'Low'})</span>
               </label>
             `
-            ).join('')}
+              )
+              .join('')}
           </div>
         </div>
 
@@ -186,21 +233,11 @@ export class FilterSidebar {
       });
     });
 
-    // Filtro Talla
-    this.container.querySelectorAll('.size-pill').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const size = parseInt((btn as HTMLElement).dataset.size || '0', 10);
-        let newSizes = [...this.store.filters.sizes];
-        if (newSizes.includes(size)) {
-          newSizes = newSizes.filter((s) => s !== size);
-          btn.classList.remove('is-selected');
-        } else {
-          newSizes.push(size);
-          btn.classList.add('is-selected');
-        }
-        this.store.setFilter('sizes', newSizes);
-      });
-    });
+    // Selector de Formato de Medida (EU, US, UK, CM)
+    this.bindUnitSelectorEvents();
+
+    // Filtro Tallas
+    this.bindSizePillsEvents();
 
     // Filtro Precio
     const priceInput = this.container.querySelector('#price-range-input') as HTMLInputElement | null;
@@ -231,8 +268,46 @@ export class FilterSidebar {
     });
   }
 
+  private bindUnitSelectorEvents(): void {
+    this.container.querySelectorAll('.unit-toggle-btn').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const unit = (btn as HTMLElement).dataset.unit as SizeUnit;
+        if (unit && unit !== this.store.activeSizeUnit) {
+          this.store.setSizeUnit(unit);
+        }
+      });
+    });
+  }
+
+  private bindSizePillsEvents(): void {
+    this.container.querySelectorAll('.size-pill').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const size = parseFloat((btn as HTMLElement).dataset.size || '0');
+        let newSizes = [...this.store.filters.sizes];
+        if (newSizes.includes(size)) {
+          newSizes = newSizes.filter((s) => s !== size);
+          btn.classList.remove('is-selected');
+        } else {
+          newSizes.push(size);
+          btn.classList.add('is-selected');
+        }
+        this.store.setFilter('sizes', newSizes);
+      });
+    });
+  }
+
   private syncUI(): void {
     const filters = this.store.filters;
+    const activeUnit = this.store.activeSizeUnit || 'EU';
+
+    // Si la lista de productos cambió (ej. tras cargar API), refrescar tallas si es necesario
+    if (this.store.products.length !== this.lastKnownProductsCount) {
+      this.lastKnownProductsCount = this.store.products.length;
+      this.render();
+      this.setupEvents();
+      return;
+    }
 
     // Sincronizar radio categoría
     const activeRadio = this.container.querySelector(
@@ -246,9 +321,31 @@ export class FilterSidebar {
       el.checked = filters.genders.includes(el.value as ProductGender);
     });
 
-    // Sincronizar botones de talla
+    // Sincronizar botones del selector de unidad
+    this.container.querySelectorAll('.unit-toggle-btn').forEach((btn) => {
+      const u = (btn as HTMLElement).dataset.unit;
+      if (u === activeUnit) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    });
+
+    // Sincronizar título del acordeón de tallas
+    const titleEl = this.container.querySelector('#filter-size-header-title');
+    if (titleEl) {
+      titleEl.textContent = `TALLA (${activeUnit === 'US' ? 'USA' : activeUnit})`;
+    }
+
+    // Sincronizar botones de talla (texto y estado seleccionado)
     this.container.querySelectorAll('.size-pill').forEach((btn) => {
-      const size = parseInt((btn as HTMLElement).dataset.size || '0', 10);
+      const size = parseFloat((btn as HTMLElement).dataset.size || '0');
+      const numberSpan = btn.querySelector('.size-pill-number');
+      if (numberSpan) {
+        numberSpan.textContent = formatSizeDisplay(size, activeUnit);
+      }
+      (btn as HTMLElement).title = formatFullEquivalence(size);
+
       if (filters.sizes.includes(size)) {
         btn.classList.add('is-selected');
       } else {

@@ -2,6 +2,7 @@ import { Store } from '../state/store';
 import { Icons } from './Icons';
 import { Toast } from './Toast';
 import { Product, ColorVariant } from '../types/product';
+import { formatSizeDisplay, formatFullEquivalence } from '../utils/sizeConverter';
 
 export class QuickViewModal {
   private container: HTMLElement;
@@ -147,11 +148,11 @@ export class QuickViewModal {
                 </div>
               </div>
 
-              <!-- SELECTOR DE TALLA -->
+              <!-- SELECTOR DE TALLA CON FORMATO ACTIVO -->
               <div class="quickview-section">
                 <div class="size-header-row">
-                  <label class="section-label">Seleccionar Talla (EU):</label>
-                  <span class="size-guide-link">Guía de tallas</span>
+                  <label class="section-label">Seleccionar Talla (${this.store.activeSizeUnit === 'US' ? 'USA' : this.store.activeSizeUnit}):</label>
+                  <span class="size-guide-link" id="btn-qv-size-guide">Guía de tallas</span>
                 </div>
                 <div class="quickview-sizes-grid">
                   ${sizes
@@ -161,8 +162,9 @@ export class QuickViewModal {
                       type="button" 
                       class="qv-size-pill ${size === this.selectedSize ? 'is-selected' : ''}" 
                       data-size="${size}"
+                      title="${formatFullEquivalence(size)}"
                     >
-                      ${size}
+                      ${formatSizeDisplay(size, this.store.activeSizeUnit)}
                     </button>
                   `
                     )
@@ -235,7 +237,7 @@ export class QuickViewModal {
     // Selección de Talla
     this.container.querySelectorAll('.qv-size-pill').forEach((btn) => {
       btn.addEventListener('click', () => {
-        this.selectedSize = parseInt((btn as HTMLElement).dataset.size || '40', 10);
+        this.selectedSize = parseFloat((btn as HTMLElement).dataset.size || '40');
         this.container.querySelectorAll('.qv-size-pill').forEach((b) => b.classList.remove('is-selected'));
         btn.classList.add('is-selected');
       });
