@@ -145,7 +145,9 @@ export class ShowcasePromo {
           originalPrice: promoOriginalPrice,
           price: promoPrice,
           colors: updatedColors,
-          badge: (item.badgeLabel as any) || 'DESCUENTO'
+          badge: (item.badgeLabel as any) || 'DESCUENTO',
+          isPromoItem: true,
+          promoStoreCode: unlocked?.code || 'TIENDA-PROMO'
         };
 
         const count = storeItems.length;
@@ -176,7 +178,9 @@ export class ShowcasePromo {
           price: promoPrice,
           originalPrice: promoOriginalPrice,
           colors: updatedColors,
-          badge: badge as any
+          badge: badge as any,
+          isPromoItem: true,
+          promoStoreCode: 'BLESSED-PROMO'
         };
       };
 

@@ -40,6 +40,8 @@ export interface Product {
   carouselImage?: string | null;
   showcaseActive?: boolean;
   showcaseOrder?: number;
+  isPromoItem?: boolean;
+  promoStoreCode?: string;
   createdAt: string;
 }
 

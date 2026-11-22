@@ -115,4 +115,22 @@ export class StorageService {
       console.error('Error saving size unit', e);
     }
   }
+
+  static getBlockPromoStacking(): boolean {
+    try {
+      const val = localStorage.getItem('blessed_block_promo_stacking');
+      // Activa predeterminadamente (true por defecto)
+      return val === null ? true : val === 'true';
+    } catch {
+      return true;
+    }
+  }
+
+  static saveBlockPromoStacking(enabled: boolean): void {
+    try {
+      localStorage.setItem('blessed_block_promo_stacking', enabled ? 'true' : 'false');
+    } catch (e) {
+      console.error('Error saving block promo stacking setting', e);
+    }
+  }
 }

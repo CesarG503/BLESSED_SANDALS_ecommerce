@@ -1741,6 +1741,35 @@ export class AdminPanel {
           </div>
         </div>
 
+        <!-- POLÍTICA DE TIENDA: RESTRICCIÓN DE MEZCLA DE PROMOCIONES -->
+        <div class="admin-store-policy-card" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px 20px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+          <div style="display: flex; flex-direction: column; gap: 4px; max-width: 680px;">
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+              <strong style="font-size: 0.88rem; color: #0f172a; text-transform: uppercase; letter-spacing: 0.03em;">
+                Regla de Tienda: No mezclar cupones con artículos promocionales
+              </strong>
+              <span class="badge-policy-default" style="font-size: 0.65rem; font-weight: 700; background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; padding: 2px 7px; border-radius: 9999px;">
+                ACTIVA PREDETERMINADA
+              </span>
+            </div>
+            <p style="font-size: 0.78rem; color: #64748b; margin: 0; line-height: 1.4;">
+              Impide que los clientes mezclen cupones de descuento con calzados en oferta de tiendas promocionales en el mismo carrito para no acumular descuentos ni bajarle más el precio.
+            </p>
+          </div>
+
+          <label class="admin-switch-label" title="Activar o desactivar restricción de mezclar cupones con artículos en promoción" style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+            <input 
+              type="checkbox" 
+              id="toggle-block-promo-stacking" 
+              ${this.store.blockPromoStacking ? 'checked' : ''} 
+            />
+            <span class="switch-ui"></span>
+            <span id="label-block-promo-stacking" style="font-size: 0.80rem; font-weight: 600; color: ${this.store.blockPromoStacking ? '#0f172a' : '#64748b'};">
+              ${this.store.blockPromoStacking ? 'Restricción Activa' : 'Permitir Mezcla'}
+            </span>
+          </label>
+        </div>
+
         ${this.promos.length === 0
         ? `
             <div class="admin-empty-state">
@@ -3432,6 +3461,24 @@ export class AdminPanel {
       this.promoStoreItems = [];
       this.activeTab = 'promos-store-create';
       this.updateMainContentOnly();
+    });
+
+    // Control de Política de Tienda: No mezclar cupones con artículos promocionales
+    this.container.querySelector('#toggle-block-promo-stacking')?.addEventListener('change', (e) => {
+      const checked = (e.target as HTMLInputElement).checked;
+      this.store.setBlockPromoStacking(checked);
+      Toast.show(
+        checked
+          ? 'Regla activada: no se pueden mezclar cupones con artículos promocionales.'
+          : 'Regla desactivada: se permite mezclar cupones con artículos promocionales.',
+        'Configuración de Tienda',
+        checked ? 'success' : 'info'
+      );
+      const label = this.container.querySelector('#label-block-promo-stacking');
+      if (label) {
+        label.textContent = checked ? 'Restricción Activa' : 'Permitir Mezcla';
+        (label as HTMLElement).style.color = checked ? '#0f172a' : '#64748b';
+      }
     });
 
     // Toggle estado de cupón

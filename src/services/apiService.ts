@@ -121,13 +121,15 @@ export class ApiService {
   static async applyCoupon(
     userId: string | null,
     code: string,
-    subtotal: number = 0
+    subtotal: number = 0,
+    hasPromoItems: boolean = false,
+    blockPromoStacking: boolean = true
   ): Promise<ApiResponse<{ promo: PromoCode }>> {
     try {
       const res = await fetch('/api/coupons/apply', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, code, subtotal })
+        body: JSON.stringify({ userId, code, subtotal, hasPromoItems, blockPromoStacking })
       });
       return await res.json();
     } catch {

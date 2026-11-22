@@ -91,6 +91,17 @@ export class PromoModal {
         : ''
       }
 
+        <!-- ADVERTENCIA DE REGLA: NO MEZCLAR CON ARTÍCULOS PROMO -->
+        ${this.store.blockPromoStacking && this.store.hasPromoItemsInCart()
+        ? `
+          <div style="background: #fffbeb; border: 1px solid #fef3c7; border-radius: 6px; padding: 6px 10px; margin-bottom: 8px; font-size: 0.70rem; color: #92400e; display: flex; align-items: center; gap: 6px;">
+            <span>🔒</span>
+            <span>Bolsa con artículos promocionales: no acumulables con cupones.</span>
+          </div>
+        `
+        : ''
+      }
+
         <!-- FORMULARIO ULTRA-COMPACTO DE CUPÓN CON LÍNEA FINA -->
         <div class="promo-popover-input-area">
           <div class="promo-input-compact-row">

@@ -167,6 +167,14 @@ export class CartDrawer {
               <button class="btn-apply-promo" id="btn-apply-promo">${appliedPromo ? 'Cambiar' : 'Aplicar'}</button>
             </div>
             ${
+              this.store.blockPromoStacking && this.store.hasPromoItemsInCart()
+                ? `<div class="promo-mix-alert" style="display: flex; align-items: center; gap: 6px; padding: 6px 10px; margin-top: 6px; background: #fffbeb; border: 1px solid #fef3c7; border-radius: 6px; font-size: 0.70rem; color: #92400e;">
+                    <span>🔒</span>
+                    <span>Tu bolsa contiene artículos promocionales (no acumulables con cupones).</span>
+                  </div>`
+                : ''
+            }
+            ${
               appliedPromo
                 ? `<div class="promo-applied-badge-row">
                     <span class="promo-success-msg">✓ Cupón activo: <strong>${appliedPromo.code}</strong> (${appliedPromo.description})</span>

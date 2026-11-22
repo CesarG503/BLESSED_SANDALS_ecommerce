@@ -1246,6 +1246,14 @@ export function apiPlugin(): Plugin {
               });
             }
 
+            // REGLA DE TIENDA: No mezclar cupones de descuento con artículos promocionales
+            if (body.blockPromoStacking !== false && body.hasPromoItems) {
+              return sendJson(res, 400, {
+                success: false,
+                message: 'Tu bolsa contiene calzados de una tienda promocional. No se pueden mezclar cupones de descuento adicionales con artículos en promoción.'
+              });
+            }
+
             // Compra mínima
             if (promo.minPurchase && subtotal > 0 && subtotal < promo.minPurchase) {
               // Aseguramos que quede agregado a la cuenta del usuario para que lo tenga disponible

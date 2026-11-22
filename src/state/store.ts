@@ -6,6 +6,7 @@ import { StorageService } from '../services/storageService';
 import { ProductService } from '../services/productService';
 import { ApiService } from '../services/apiService';
 import { SizeUnit } from '../utils/sizeConverter';
+import { Toast } from '../components/Toast';
 
 type Listener = () => void;
 
@@ -118,6 +119,9 @@ export class Store {
   // Formato activo de medidas de calzado (EU, US, UK, CM)
   public activeSizeUnit: SizeUnit = 'EU';
 
+  // Configuración de Tienda: Regla de no mezclar cupones con artículos promocionales (activa por defecto)
+  public blockPromoStacking: boolean = true;
+
   private listeners: Set<Listener> = new Set();
 
   private constructor() {
@@ -125,6 +129,7 @@ export class Store {
     this.wishlist = StorageService.getWishlist();
     this.currentUser = StorageService.getUser();
     this.appliedPromo = StorageService.getPromo();
+    this.blockPromoStacking = StorageService.getBlockPromoStacking();
 
     try {
       if (typeof window !== 'undefined') {
@@ -350,6 +355,19 @@ export class Store {
 
   // --- ACCIONES DEL CARRITO (PERSISTENCIA CON LA CUENTA) ---
   public addToCart(product: Product, size: number, colorName?: string): void {
+    // Si la regla de no mezclar está activa y se añade un producto promocional con un cupón ya aplicado:
+    const isAddingPromo = Boolean(product.isPromoItem || (product.originalPrice && product.originalPrice > product.price));
+    if (this.blockPromoStacking && this.appliedPromo && isAddingPromo) {
+      const removedCode = this.appliedPromo.code;
+      this.appliedPromo = null;
+      StorageService.savePromo(null);
+      Toast.show(
+        `Se retiró el cupón "${removedCode}": no se puede mezclar con artículos promocionales.`,
+        'Promoción Exclusiva',
+        'info'
+      );
+    }
+
     const selectedColor = colorName
       ? product.colors.find((c) => c.name === colorName) || product.colors[0]
       : product.colors[0];
@@ -452,15 +470,60 @@ export class Store {
     return this.cart.reduce((total, item) => total + item.product.price * item.quantity, 0);
   }
 
+  /**
+   * Determina si la bolsa contiene calzados de tienda promocional o con descuento exclusivo
+   */
+  public hasPromoItemsInCart(): boolean {
+    return this.cart.some(
+      (item) => item.product.isPromoItem || (item.product.originalPrice && item.product.originalPrice > item.product.price)
+    );
+  }
+
+  /**
+   * Configura la política de la tienda sobre mezclar cupones con artículos promocionales
+   */
+  public setBlockPromoStacking(enabled: boolean): void {
+    this.blockPromoStacking = enabled;
+    StorageService.saveBlockPromoStacking(enabled);
+
+    // Si se activa y ya hay tanto cupón como calzados promocionales en la bolsa, se retira el cupón
+    if (enabled && this.appliedPromo && this.hasPromoItemsInCart()) {
+      const removedCode = this.appliedPromo.code;
+      this.appliedPromo = null;
+      StorageService.savePromo(null);
+      Toast.show(
+        `Se retiró el cupón "${removedCode}": política activa de no mezclar promociones.`,
+        'Políticas de Tienda',
+        'info'
+      );
+    }
+
+    this.notify();
+  }
+
   public getDiscountAmount(): number {
-    const subtotal = this.getCartSubtotal();
-    if (!this.appliedPromo || subtotal === 0) return 0;
-    if (this.appliedPromo.minPurchase && subtotal < this.appliedPromo.minPurchase) return 0;
+    if (!this.appliedPromo) return 0;
+
+    // REGLA DE TIENDA: Si no se permite mezclar cupones con artículos promocionales,
+    // únicamente los artículos regulares (a precio estándar de catálogo) son elegibles
+    // para recibir el descuento adicional del cupón.
+    const eligibleItems = this.blockPromoStacking
+      ? this.cart.filter(
+          (item) =>
+            !item.product.isPromoItem &&
+            (!item.product.originalPrice || item.product.originalPrice <= item.product.price)
+        )
+      : this.cart;
+
+    const eligibleSubtotal = eligibleItems.reduce((total, item) => total + item.product.price * item.quantity, 0);
+    if (eligibleSubtotal === 0) return 0;
+
+    if (this.appliedPromo.minPurchase && eligibleSubtotal < this.appliedPromo.minPurchase) return 0;
 
     if (this.appliedPromo.discountType === 'PERCENTAGE') {
-      return (subtotal * this.appliedPromo.discountValue) / 100;
+      return (eligibleSubtotal * this.appliedPromo.discountValue) / 100;
     } else {
-      return Math.min(subtotal, this.appliedPromo.discountValue);
+      return Math.min(eligibleSubtotal, this.appliedPromo.discountValue);
     }
   }
 
@@ -484,6 +547,7 @@ export class Store {
    * 2. Si no está logueado y trata de aplicar BIENVENIDA5 (o cualquier cupón),
    *    lo manda inmediatamente al login / register y guarda el código pendiente.
    * 3. Valida en la base de datos las relaciones de 1 solo uso por persona.
+   * 4. Política de no mezclar cupones con artículos promocionales para no rebajar más el precio.
    */
   public async applyPromo(code: string): Promise<{ success: boolean; message: string; requireAuth?: boolean }> {
     const clean = code.trim().toUpperCase();
@@ -502,10 +566,13 @@ export class Store {
     }
 
     // 2. Si está logueado: consultar validación y relaciones en PostgreSQL
+    const hasPromoItems = this.hasPromoItemsInCart();
     const res = await ApiService.applyCoupon(
       this.currentUser.id,
       clean,
-      this.getCartSubtotal()
+      this.getCartSubtotal(),
+      hasPromoItems,
+      this.blockPromoStacking
     );
 
     if (res.success && res.promo) {
@@ -521,6 +588,14 @@ export class Store {
         return {
           success: true,
           message: res.message || `¡Tienda Secreta Desbloqueada con el código ${res.promo.code}!`
+        };
+      }
+
+      // REGLA DE TIENDA: No mezclar cupones de descuento con artículos promocionales
+      if (this.blockPromoStacking && hasPromoItems) {
+        return {
+          success: false,
+          message: 'Tu bolsa contiene calzados con descuento de tienda promocional. La política de la tienda no permite mezclar cupones de descuento adicionales con artículos en promoción.'
         };
       }
 
