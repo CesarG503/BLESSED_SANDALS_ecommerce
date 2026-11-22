@@ -2,6 +2,7 @@ import { Store } from '../state/store';
 import { Product } from '../types/product';
 import { MOCK_PRODUCTS } from '../data/mockProducts';
 import { ProductCard } from './ProductCard';
+import { HorseShowcaseSettingsService } from '../data/horseShowcaseSettings';
 
 export class HorseShowcase {
   private container: HTMLElement;
@@ -37,18 +38,25 @@ export class HorseShowcase {
 
     // Sincronizar dinámicamente si los productos cambian en el Store
     this.store.subscribe(() => {
-      if (this.store.products.length > 0 && this.store.products.length !== this.products.length) {
-        this.products = [...this.store.products];
-        this.renderProductGrid();
-      }
+      this.initProducts();
+      this.renderProductGrid();
     });
+
+    // Sincronizar dinámicamente si cambia la configuración de Horse Showcase
+    if (typeof window !== 'undefined') {
+      window.addEventListener('blessed:horse_showcase_settings_changed', () => {
+        this.initProducts();
+        this.renderProductGrid();
+      });
+    }
   }
 
   /**
-   * Carga los 9 productos estándar del catálogo
+   * Carga los productos ordenados y filtrados según la configuración de Horse Showcase
    */
   private initProducts(): void {
-    this.products = this.store.products.length > 0 ? [...this.store.products] : [...MOCK_PRODUCTS];
+    const raw = this.store.products.length > 0 ? [...this.store.products] : [...MOCK_PRODUCTS];
+    this.products = HorseShowcaseSettingsService.getOrderedVisibleProducts(raw);
   }
 
   /**
@@ -103,9 +111,23 @@ export class HorseShowcase {
    */
   private renderProductGrid(): void {
     const gridEl = this.container.querySelector('#horse-products-grid') as HTMLElement | null;
+    const endNote = this.container.querySelector('.horse-catalog-end-note p') as HTMLElement | null;
     if (!gridEl) return;
-    gridEl.innerHTML = this.products.map((p, idx) => new ProductCard(p).render(idx)).join('');
-    ProductCard.attachListeners(gridEl);
+
+    if (this.products.length === 0) {
+      gridEl.innerHTML = `
+        <div style="grid-column: 1 / -1; text-align: center; padding: 48px 20px; color: #64748b; font-size: 0.9rem;">
+          No hay pares configurados actualmente para mostrar en Horse Showcase.
+        </div>
+      `;
+    } else {
+      gridEl.innerHTML = this.products.map((p, idx) => new ProductCard(p).render(idx)).join('');
+      ProductCard.attachListeners(gridEl);
+    }
+
+    if (endNote) {
+      endNote.textContent = `Has visto todos los ${this.products.length} productos disponibles.`;
+    }
   }
 
   /**

@@ -14,6 +14,7 @@ import {
   DEFAULT_SHOWCASE_DEMOS,
   ShowcaseSettingsService
 } from '../data/showcaseDemoItems';
+import { HorseShowcaseSettingsService } from '../data/horseShowcaseSettings';
 
 export type AdminTab =
   | 'products-list'
@@ -21,7 +22,8 @@ export type AdminTab =
   | 'promos-list'
   | 'promos-create'
   | 'minio-storage'
-  | 'circular-showcase';
+  | 'circular-showcase'
+  | 'horse-showcase';
 
 export interface ProductVariantForm {
   id: string;
@@ -63,6 +65,7 @@ export class AdminPanel {
   private adminSizeUnit: SizeUnit = 'EU';
   private showEquivalences: boolean = false;
   private showcaseSearchTerm: string = '';
+  private horseShowcaseSearchTerm: string = '';
   private demosAccordionOpen: boolean = false;
   private activeModalProductId: string | null = null;
 
@@ -403,6 +406,9 @@ export class AdminPanel {
                 <button type="button" class="admin-tab-btn ${this.activeTab === 'circular-showcase' ? 'active' : ''}" data-tab="circular-showcase">
                   Circular Showcase
                 </button>
+                <button type="button" class="admin-tab-btn ${this.activeTab === 'horse-showcase' ? 'active' : ''}" data-tab="horse-showcase">
+                  Horse Showcase
+                </button>
               </nav>
             </div>
 
@@ -439,6 +445,8 @@ export class AdminPanel {
         return this.renderMinioStorageTab();
       case 'circular-showcase':
         return this.renderCircularShowcaseTab();
+      case 'horse-showcase':
+        return this.renderHorseShowcaseTab();
       default:
         return this.renderProductsListTab();
     }
@@ -554,7 +562,7 @@ export class AdminPanel {
                         <tr data-product-id="${p.id}">
                           <td class="table-col-product">
                             <div class="table-prod-cell">
-                              <img src="${p.image || '/assets/logo/Isotipo.png'}" alt="${p.name}" class="table-prod-thumb" />
+                              <img src="${p.image || '/assets/logo/Isotipo.png'}" alt="${p.name}" class="table-prod-thumb" style="width: 48px; height: 48px; min-width: 48px; max-width: 48px; max-height: 48px; object-fit: contain; border-radius: 6px; background: #f8fafc; border: 1px solid #e2e8f0; flex-shrink: 0;" />
                               <div class="table-prod-meta">
                                 <strong class="table-prod-name">${p.name}</strong>
                                 <span class="table-prod-sub">${p.subtitle || 'Blessed Sandals'}</span>
@@ -2228,7 +2236,7 @@ export class AdminPanel {
                         <!-- 2. PRODUCTO -->
                         <td class="table-col-product">
                           <div class="table-prod-cell admin-prod-cell">
-                            <img src="${thumbImg}" alt="${p.name}" class="table-prod-thumb admin-prod-thumb" />
+                            <img src="${thumbImg}" alt="${p.name}" class="table-prod-thumb admin-prod-thumb" style="width: 48px; height: 48px; min-width: 48px; max-width: 48px; max-height: 48px; object-fit: contain; border-radius: 6px; background: #f8fafc; border: 1px solid #e2e8f0; flex-shrink: 0;" />
                             <div class="table-prod-meta admin-prod-info">
                               <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
                                 <strong class="table-prod-name admin-prod-name">${p.name}</strong>
@@ -2440,6 +2448,188 @@ export class AdminPanel {
   }
 
   // ==========================================================================
+  // TAB: APARIENCIA HORSE SHOWCASE
+  // ==========================================================================
+  private renderHorseShowcaseTab(): string {
+    const allProducts = this.products.length > 0 ? this.products : (this.store.products.length > 0 ? this.store.products : []);
+    const orderedList = HorseShowcaseSettingsService.getOrderedProducts(allProducts);
+
+    const totalCount = allProducts.length;
+    const visibleCount = orderedList.filter((item) => item.isVisible).length;
+    const hiddenCount = totalCount - visibleCount;
+
+    // Filtrar por término de búsqueda si existe
+    const filteredList = orderedList.filter(({ product }) => {
+      if (!this.horseShowcaseSearchTerm) return true;
+      const term = this.horseShowcaseSearchTerm.toLowerCase();
+      return (
+        product.name.toLowerCase().includes(term) ||
+        (product.subtitle && product.subtitle.toLowerCase().includes(term)) ||
+        (product.categoryName && product.categoryName.toLowerCase().includes(term))
+      );
+    });
+
+    return `
+      <div class="admin-view-panel">
+        <div class="admin-view-header">
+          <div class="admin-view-header-main">
+            <h2 class="admin-view-title">Apariencia: Horse Showcase</h2>
+            <p class="admin-view-subtitle">
+              Controla qué pares de calzados se muestran en el escaparate Blessed Wild (Horse Showcase) y en qué orden aparecen automáticamente en la tienda.
+            </p>
+          </div>
+        </div>
+
+        <!-- TARJETAS DE MÉTRICAS -->
+        <div class="admin-kpi-grid admin-metrics-grid">
+          <div class="admin-kpi-card admin-metric-card">
+            <span class="kpi-label metric-lbl">PARES VISIBLES EN HORSE SHOWCASE</span>
+            <strong class="kpi-number metric-val text-emerald" id="horse-kpi-visible">${visibleCount} / ${totalCount}</strong>
+          </div>
+          <div class="admin-kpi-card admin-metric-card">
+            <span class="kpi-label metric-lbl">PARES OCULTOS</span>
+            <strong class="kpi-number metric-val" id="horse-kpi-hidden">${hiddenCount}</strong>
+          </div>
+          <div class="admin-kpi-card admin-metric-card">
+            <span class="kpi-label metric-lbl">TOTAL EN CATÁLOGO</span>
+            <strong class="kpi-number metric-val">${totalCount}</strong>
+          </div>
+        </div>
+
+        <!-- BARRA DE BÚSQUEDA Y ACCIONES RÁPIDAS -->
+        <div class="admin-filter-bar admin-table-toolbar" style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
+          <div class="admin-search-input-wrap admin-search-wrap" style="flex: 1; min-width: 260px;">
+            ${Icons.search('w-4 h-4')}
+            <input 
+              type="text" 
+              class="admin-search-input" 
+              id="horse-search-input" 
+              placeholder="Buscar calzado por nombre o categoría..." 
+              value="${this.horseShowcaseSearchTerm}" 
+            />
+          </div>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <button type="button" class="btn-table-action" id="btn-horse-show-all" title="Hacer visibles todos los pares en Horse Showcase">
+              Mostrar todos los pares
+            </button>
+            <button type="button" class="btn-table-action danger" id="btn-horse-hide-all" title="Ocultar todos los pares de Horse Showcase">
+              Ocultar todos
+            </button>
+          </div>
+        </div>
+
+        <!-- TABLA DE GESTIÓN DE HORSE SHOWCASE -->
+        <div class="admin-products-table-wrap admin-table-container">
+          <table class="admin-table admin-data-table">
+            <thead>
+              <tr>
+                <th style="width: 75px;">ORDEN</th>
+                <th class="table-col-product" style="min-width: 280px;">PRODUCTO</th>
+                <th style="width: 190px;">EN HORSE SHOWCASE</th>
+                <th style="width: 90px; text-align: right;">ACCIONES</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${filteredList.length === 0
+                ? `
+                  <tr>
+                    <td colspan="4" class="admin-table-empty" style="text-align: center; padding: 36px 20px; color: #64748b;">
+                      No se encontraron calzados coincidentes en el catálogo.
+                    </td>
+                  </tr>
+                `
+                : filteredList.map(({ product, isVisible, orderIndex }, idx) => {
+                    const thumbImg = product.image || product.colors?.[0]?.image || '/assets/slide/slide.png';
+                    const isFirst = idx === 0;
+                    const isLast = idx === filteredList.length - 1;
+
+                    return `
+                      <tr class="${isVisible ? 'row-showcase-active' : ''}">
+                        <!-- 1. ORDEN -->
+                        <td>
+                          <div class="showcase-order-cell">
+                            <span class="showcase-order-num">#${orderIndex}</span>
+                            <div class="showcase-order-arrows">
+                              <button 
+                                type="button" 
+                                class="btn-order-arrow btn-horse-up" 
+                                data-id="${product.id}" 
+                                ${isFirst ? 'disabled style="opacity: 0.3; cursor: not-allowed;"' : ''}
+                                title="Mover arriba en el escaparate"
+                              >▲</button>
+                              <button 
+                                type="button" 
+                                class="btn-order-arrow btn-horse-down" 
+                                data-id="${product.id}" 
+                                ${isLast ? 'disabled style="opacity: 0.3; cursor: not-allowed;"' : ''}
+                                title="Mover abajo en el escaparate"
+                              >▼</button>
+                            </div>
+                          </div>
+                        </td>
+
+                        <!-- 2. PRODUCTO -->
+                        <td class="table-col-product">
+                          <div class="table-prod-cell admin-prod-cell">
+                            <img 
+                              src="${thumbImg}" 
+                              alt="${product.name}" 
+                              class="table-prod-thumb admin-prod-thumb"
+                              style="width: 48px; height: 48px; min-width: 48px; max-width: 48px; max-height: 48px; object-fit: contain; border-radius: 6px; background: #f8fafc; border: 1px solid #e2e8f0; flex-shrink: 0;"
+                            />
+                            <div class="table-prod-meta admin-prod-info">
+                              <strong class="table-prod-name admin-prod-name">${product.name}</strong>
+                              <span class="table-prod-sub admin-prod-sub">${product.subtitle || product.categoryName || 'Calzado oficial'}</span>
+                              <div class="table-price-col">
+                                <strong>$${Number(product.price).toFixed(2)}</strong>
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+
+                        <!-- 3. EN HORSE SHOWCASE (TOGGLE SWITCH) -->
+                        <td>
+                          <div style="display: flex; align-items: center; gap: 10px;">
+                            <label class="admin-switch-label" title="${isVisible ? 'Ocultar de Horse Showcase' : 'Mostrar en Horse Showcase'}">
+                              <input 
+                                type="checkbox" 
+                                class="toggle-horse-active" 
+                                data-id="${product.id}" 
+                                ${isVisible ? 'checked' : ''} 
+                              />
+                              <span class="switch-ui"></span>
+                            </label>
+                            <span class="showcase-status-label" style="color: ${isVisible ? '#059669' : '#94a3b8'}; font-weight: ${isVisible ? '600' : '400'};">
+                              ${isVisible ? 'Visible en escaparate' : 'Oculto'}
+                            </span>
+                          </div>
+                        </td>
+
+                        <!-- 4. ACCIONES -->
+                        <td style="text-align: right;">
+                          <div class="table-actions-row">
+                            <button 
+                              type="button" 
+                              class="btn-table-action btn-edit-from-horse" 
+                              data-id="${product.id}"
+                              title="Editar calzado en el catálogo"
+                            >
+                              Editar
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    `;
+                  }).join('')
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
+  // ==========================================================================
   // CONFIGURACIÓN DE EVENTOS GENERALES Y POR TAB
   // ==========================================================================
   private setupEvents(): void {
@@ -2506,6 +2696,11 @@ export class AdminPanel {
     // Si estamos en la pestaña de Circular Showcase
     if (this.activeTab === 'circular-showcase') {
       this.setupCircularShowcaseEvents();
+    }
+
+    // Si estamos en la pestaña de Horse Showcase
+    if (this.activeTab === 'horse-showcase') {
+      this.setupHorseShowcaseEvents();
     }
 
     // --- TAB 1: PRODUCTOS LIST ---
@@ -3567,6 +3762,136 @@ export class AdminPanel {
       btn.addEventListener('click', () => {
         const pId = (btn as HTMLElement).dataset.id;
         const product = this.products.find((p) => p.id === pId);
+        if (product) {
+          this.editingProduct = product;
+          this.initFormSizes();
+          this.activeTab = 'products-create';
+          this.updateMainContentOnly();
+        }
+      });
+    });
+  }
+
+  // ==========================================================================
+  // EVENTOS: TAB APARIENCIA HORSE SHOWCASE
+  // ==========================================================================
+  private setupHorseShowcaseEvents(): void {
+    const allProducts = this.products.length > 0 ? this.products : (this.store.products.length > 0 ? this.store.products : []);
+
+    // 1. Buscador en tiempo real
+    const searchInput = this.container.querySelector('#horse-search-input') as HTMLInputElement | null;
+    searchInput?.addEventListener('input', () => {
+      this.horseShowcaseSearchTerm = searchInput.value;
+      const main = this.container.querySelector('#admin-main-viewport');
+      if (main) {
+        main.innerHTML = this.renderHorseShowcaseTab();
+        this.setupHorseShowcaseEvents();
+      }
+    });
+
+    // 2. Botón "Mostrar todos los pares"
+    const btnShowAll = this.container.querySelector('#btn-horse-show-all');
+    btnShowAll?.addEventListener('click', () => {
+      HorseShowcaseSettingsService.setAllProductsVisible(allProducts, true);
+      Toast.show('Todos los pares ahora son visibles en Horse Showcase.', 'Horse Showcase', 'success');
+      const main = this.container.querySelector('#admin-main-viewport');
+      if (main) {
+        main.innerHTML = this.renderHorseShowcaseTab();
+        this.setupHorseShowcaseEvents();
+      }
+    });
+
+    // 3. Botón "Ocultar todos"
+    const btnHideAll = this.container.querySelector('#btn-horse-hide-all');
+    btnHideAll?.addEventListener('click', () => {
+      HorseShowcaseSettingsService.setAllProductsVisible(allProducts, false);
+      Toast.show('Todos los pares han sido ocultados de Horse Showcase.', 'Horse Showcase', 'info');
+      const main = this.container.querySelector('#admin-main-viewport');
+      if (main) {
+        main.innerHTML = this.renderHorseShowcaseTab();
+        this.setupHorseShowcaseEvents();
+      }
+    });
+
+    // 4. Toggle switch de visibilidad individual
+    this.container.querySelectorAll('.toggle-horse-active').forEach((chk) => {
+      chk.addEventListener('change', (e) => {
+        const input = e.currentTarget as HTMLInputElement;
+        const productId = input.dataset.id;
+        if (!productId) return;
+
+        const isChecked = input.checked;
+        HorseShowcaseSettingsService.setProductVisible(productId, isChecked);
+
+        // Actualizar visualmente la fila
+        const tr = input.closest('tr');
+        if (tr) {
+          tr.classList.toggle('row-showcase-active', isChecked);
+        }
+
+        const label = input.closest('td')?.querySelector('.showcase-status-label') as HTMLElement | null;
+        if (label) {
+          label.textContent = isChecked ? 'Visible en escaparate' : 'Oculto';
+          label.style.color = isChecked ? '#059669' : '#94a3b8';
+          label.style.fontWeight = isChecked ? '600' : '400';
+        }
+
+        // Actualizar métricas KPI en pantalla
+        const s = HorseShowcaseSettingsService.getSettings();
+        const visibleCount = allProducts.length - s.hiddenProductIds.length;
+        const hiddenCount = s.hiddenProductIds.length;
+        const visibleKpi = this.container.querySelector('#horse-kpi-visible');
+        const hiddenKpi = this.container.querySelector('#horse-kpi-hidden');
+        if (visibleKpi) visibleKpi.textContent = `${visibleCount} / ${allProducts.length}`;
+        if (hiddenKpi) hiddenKpi.textContent = String(hiddenCount);
+
+        Toast.show(
+          isChecked ? 'Par visible en Horse Showcase.' : 'Par ocultado de Horse Showcase.',
+          'Horse Showcase',
+          'info'
+        );
+      });
+    });
+
+    // 5. Botones mover arriba / abajo (▲ / ▼)
+    this.container.querySelectorAll('.btn-horse-up').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        const target = e.currentTarget as HTMLButtonElement;
+        const productId = target.dataset.id;
+        if (!productId) return;
+
+        HorseShowcaseSettingsService.moveProduct(allProducts, productId, 'up');
+        const main = this.container.querySelector('#admin-main-viewport');
+        if (main) {
+          main.innerHTML = this.renderHorseShowcaseTab();
+          this.setupHorseShowcaseEvents();
+        }
+      });
+    });
+
+    this.container.querySelectorAll('.btn-horse-down').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        const target = e.currentTarget as HTMLButtonElement;
+        const productId = target.dataset.id;
+        if (!productId) return;
+
+        HorseShowcaseSettingsService.moveProduct(allProducts, productId, 'down');
+        const main = this.container.querySelector('#admin-main-viewport');
+        if (main) {
+          main.innerHTML = this.renderHorseShowcaseTab();
+          this.setupHorseShowcaseEvents();
+        }
+      });
+    });
+
+    // 6. Botón Editar producto desde Horse Showcase
+    this.container.querySelectorAll('.btn-edit-from-horse').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        const target = e.currentTarget as HTMLButtonElement;
+        const productId = target.dataset.id;
+        if (!productId) return;
+
+        const product = allProducts.find((p) => p.id === productId);
         if (product) {
           this.editingProduct = product;
           this.initFormSizes();
