@@ -113,6 +113,19 @@ export class Header {
               </span>
             </button>
 
+            <!-- ACCESO PANEL ADMIN (SOLO VISIBLE CON ROL ADMIN) -->
+            <div id="header-admin-btn-container" class="admin-action-wrap">
+              ${this.store.currentUser?.role === 'ADMIN'
+                ? `
+                  <button class="action-btn admin-btn ${this.store.isAdminOpen ? 'is-active' : ''}" id="header-admin-btn" title="Panel de Administración (CRUD & MinIO)" aria-label="Panel de Administración">
+                    ${Icons.admin('w-4 h-4')}
+                    <span class="admin-badge-dot"></span>
+                  </button>
+                `
+                : ''
+              }
+            </div>
+
             <!-- USUARIO / LOGIN / PERFIL (AL FINAL) -->
             <button class="action-btn user-btn ${this.store.currentUser ? 'is-authenticated' : ''}" id="header-user-btn" title="${this.store.currentUser ? 'Mi perfil (' + this.store.currentUser.name + ')' : 'Iniciar sesión / Mi cuenta'}" aria-label="Cuenta de usuario">
               ${Icons.user('w-4 h-4')}
@@ -143,6 +156,11 @@ export class Header {
     // Búsqueda
     this.container.querySelector('#header-search-btn')?.addEventListener('click', () => {
       this.store.toggleSearch(true);
+    });
+
+    // Panel Admin
+    this.container.querySelector('#header-admin-btn')?.addEventListener('click', () => {
+      this.store.toggleAdmin(true);
     });
 
     // Usuario / Login / Perfil (al final)
@@ -241,6 +259,23 @@ export class Header {
         userBtn.classList.remove('is-authenticated');
         userDot.classList.remove('is-online');
         userBtn.setAttribute('title', 'Iniciar sesión / Mi cuenta');
+      }
+    }
+
+    const adminContainer = this.container.querySelector('#header-admin-btn-container');
+    if (adminContainer) {
+      if (user?.role === 'ADMIN') {
+        adminContainer.innerHTML = `
+          <button class="action-btn admin-btn ${this.store.isAdminOpen ? 'is-active' : ''}" id="header-admin-btn" title="Panel de Administración (CRUD & MinIO)" aria-label="Panel de Administración">
+            ${Icons.admin('w-4 h-4')}
+            <span class="admin-badge-dot"></span>
+          </button>
+        `;
+        adminContainer.querySelector('#header-admin-btn')?.addEventListener('click', () => {
+          this.store.toggleAdmin(true);
+        });
+      } else {
+        adminContainer.innerHTML = '';
       }
     }
   }

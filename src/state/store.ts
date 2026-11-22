@@ -34,6 +34,7 @@ export class Store {
   public currentUser: User | null = null;
   public isAuthOpen: boolean = false;
   public isProfileOpen: boolean = false;
+  public isAdminOpen: boolean = false;
 
   // Promociones y Descuentos conectados a BD
   public isPromoOpen: boolean = false;
@@ -565,8 +566,8 @@ export class Store {
   /**
    * Inicia sesión conectando a PostgreSQL
    */
-  public async login(email: string): Promise<{ success: boolean; message: string; requireRegister?: boolean }> {
-    const res = await ApiService.login(email);
+  public async login(email: string, password?: string): Promise<{ success: boolean; message: string; requireRegister?: boolean }> {
+    const res = await ApiService.login(email, password);
 
     if (res.success && res.user) {
       this.currentUser = res.user;
@@ -664,6 +665,18 @@ export class Store {
 
   public toggleProfile(open?: boolean): void {
     this.isProfileOpen = open !== undefined ? open : !this.isProfileOpen;
+    this.notify();
+  }
+
+  public toggleAdmin(open?: boolean): void {
+    const shouldOpen = open !== undefined ? open : !this.isAdminOpen;
+    if (shouldOpen && (!this.currentUser || this.currentUser.role !== 'ADMIN')) {
+      this.isAdminOpen = false;
+      this.toggleAuth(true);
+      this.notify();
+      return;
+    }
+    this.isAdminOpen = shouldOpen;
     this.notify();
   }
 

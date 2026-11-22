@@ -722,14 +722,16 @@ export class AuthModal {
     formLogin?.addEventListener('submit', async (e) => {
       e.preventDefault();
       const emailInput = this.container.querySelector('#login-email') as HTMLInputElement | null;
+      const passInput = this.container.querySelector('#login-pass') as HTMLInputElement | null;
       const email = emailInput?.value.trim() || '';
+      const password = passInput?.value || '';
 
       if (!email) {
         Toast.show('Por favor ingresa tu correo electrónico.', 'Iniciar Sesión', 'warning');
         return;
       }
 
-      const res = await this.store.login(email);
+      const res = await this.store.login(email, password);
       if (res.success) {
         Toast.show(res.message, 'Sesión Iniciada', 'success');
         this.closeView();

@@ -79,6 +79,25 @@ async function main() {
 
   console.log(`✅ Usuario demo creado: ${user.email}`);
 
+  // 3.1. Crear Usuario Administrador
+  const adminUser = await prisma.user.upsert({
+    where: { email: 'admin@blessed.com' },
+    update: {
+      name: 'Admin Blessed',
+      role: 'ADMIN',
+      passwordHash: 'admin'
+    },
+    create: {
+      email: 'admin@blessed.com',
+      name: 'Admin Blessed',
+      role: 'ADMIN',
+      passwordHash: 'admin',
+      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+      phone: '+503 7777-7777'
+    }
+  });
+  console.log(`✅ Usuario administrador creado: ${adminUser.email}`);
+
   // 4. Crear Códigos Promocionales
   const promos = [
     {

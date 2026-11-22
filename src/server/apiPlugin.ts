@@ -3,6 +3,25 @@ import { prisma } from '../lib/prisma';
 import { MOCK_PRODUCTS } from '../data/mockProducts';
 import type { IncomingMessage, ServerResponse } from 'http';
 import { URL } from 'url';
+import { S3Client, PutObjectCommand, ListObjectsV2Command, DeleteObjectCommand } from '@aws-sdk/client-s3';
+
+const s3Client = new S3Client({
+  endpoint: process.env.S3_ENDPOINT || 'http://localhost:9002',
+  region: process.env.S3_REGION || 'us-east-1',
+  credentials: {
+    accessKeyId: process.env.S3_ACCESS_KEY_ID || 'minioadmin',
+    secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || 'minioadmin123'
+  },
+  forcePathStyle: true
+});
+const S3_BUCKET = process.env.S3_BUCKET || 'ecommerce-assets';
+
+async function checkIsAdmin(req: IncomingMessage, parsedUrl: URL, bodyUserId?: string): Promise<boolean> {
+  const userId = (req.headers['x-user-id'] as string) || parsedUrl.searchParams.get('userId') || bodyUserId;
+  if (!userId) return false;
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+  return user?.role === 'ADMIN';
+}
 
 function parseBody(req: IncomingMessage): Promise<any> {
   return new Promise((resolve) => {
@@ -63,6 +82,7 @@ export function apiPlugin(): Plugin {
           if (pathname === '/api/auth/login' && req.method === 'POST') {
             const body = await parseBody(req);
             const email = (body.email || '').trim().toLowerCase();
+            const password = (body.password || '').trim();
 
             if (!email) {
               return sendJson(res, 400, { success: false, message: 'El correo electrónico es requerido.' });
@@ -84,6 +104,14 @@ export function apiPlugin(): Plugin {
                 success: false,
                 requireRegister: true,
                 message: 'No encontramos una cuenta con este correo. Por favor regístrate para crear tu cuenta y desbloquear tu cupón de bienvenida BIENVENIDA5.'
+              });
+            }
+
+            // Si es usuario admin y se envió contraseña, verificar que coincida
+            if (user.role === 'ADMIN' && password && user.passwordHash && password !== user.passwordHash) {
+              return sendJson(res, 401, {
+                success: false,
+                message: 'Contraseña incorrecta para el usuario administrador.'
               });
             }
 
@@ -1409,6 +1437,581 @@ export function apiPlugin(): Plugin {
             });
 
             return sendJson(res, 200, { success: true, products: mapped });
+          }
+
+          // ==================================================================
+          // RUTAS ADMINISTRATIVAS PROTEGIDAS (PANEL CRUD ADMIN & MINIO)
+          // ==================================================================
+
+          // 1. GET /api/admin/products (Listar inventario completo para administración)
+          if (pathname === '/api/admin/products' && req.method === 'GET') {
+            const isAdmin = await checkIsAdmin(req, parsedUrl);
+            if (!isAdmin) {
+              return sendJson(res, 403, { success: false, message: 'Acceso no autorizado. Se requieren permisos de administrador.' });
+            }
+
+            const products = await prisma.product.findMany({
+              include: {
+                category: true,
+                sizes: { orderBy: { size: 'asc' } },
+                colors: true,
+                reviews: true,
+                orderItems: true
+              },
+              orderBy: { createdAt: 'desc' }
+            });
+
+            return sendJson(res, 200, {
+              success: true,
+              products: products.map((p) => {
+                const totalStock = p.sizes.reduce((acc, s) => acc + s.stock, 0);
+                return {
+                  id: p.id,
+                  name: p.name,
+                  slug: p.slug,
+                  subtitle: p.subtitle || '',
+                  description: p.description || '',
+                  price: p.price,
+                  originalPrice: p.originalPrice,
+                  badge: p.badge,
+                  gender: p.gender,
+                  image: p.image,
+                  model3dUrl: p.model3dUrl,
+                  categoryId: p.categoryId,
+                  categoryName: p.category.name,
+                  inStock: p.inStock,
+                  featured: p.featured,
+                  totalStock,
+                  sizes: p.sizes.map((s) => ({ id: s.id, size: s.size, stock: s.stock })),
+                  colors: p.colors.map((c) => ({ id: c.id, name: c.name, hex: c.hex, image: c.image })),
+                  reviewCount: p.reviews.length,
+                  orderCount: p.orderItems.length,
+                  createdAt: p.createdAt.toISOString()
+                };
+              })
+            });
+          }
+
+          // 2. POST /api/admin/products (Crear nuevo producto en el catálogo)
+          if (pathname === '/api/admin/products' && req.method === 'POST') {
+            const body = await parseBody(req);
+            const isAdmin = await checkIsAdmin(req, parsedUrl, body.userId);
+            if (!isAdmin) {
+              return sendJson(res, 403, { success: false, message: 'Acceso no autorizado. Se requieren permisos de administrador.' });
+            }
+
+            const {
+              name,
+              subtitle,
+              description,
+              price,
+              originalPrice,
+              badge,
+              gender = 'Unisex',
+              image,
+              model3dUrl,
+              categoryId,
+              inStock = true,
+              featured = false,
+              sizes = [],
+              colors = []
+            } = body;
+
+            if (!name || price === undefined || !image) {
+              return sendJson(res, 400, {
+                success: false,
+                message: 'Nombre, precio e imagen principal son requeridos.'
+              });
+            }
+
+            // Resolver categoría
+            let finalCategoryId = categoryId;
+            if (!finalCategoryId) {
+              const defaultCat = await prisma.category.findFirst();
+              finalCategoryId = defaultCat?.id;
+            }
+
+            if (!finalCategoryId) {
+              const newCat = await prisma.category.create({
+                data: {
+                  name: 'Calzado General',
+                  slug: 'general',
+                  description: 'Categoría principal de calzado'
+                }
+              });
+              finalCategoryId = newCat.id;
+            }
+
+            const slug =
+              name
+                .toLowerCase()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/(^-|-$)/g, '') +
+              '-' +
+              Date.now().toString(36);
+
+            const newProduct = await prisma.product.create({
+              data: {
+                name: name.trim(),
+                slug,
+                subtitle: subtitle ? subtitle.trim() : null,
+                description: description ? description.trim() : null,
+                price: Number(price),
+                originalPrice: originalPrice ? Number(originalPrice) : null,
+                badge: badge ? badge.trim() : null,
+                gender,
+                image: image.trim(),
+                model3dUrl: model3dUrl ? model3dUrl.trim() : null,
+                categoryId: finalCategoryId,
+                inStock: Boolean(inStock),
+                featured: Boolean(featured),
+                sizes: {
+                  create: (Array.isArray(sizes) && sizes.length > 0 ? sizes : [38, 39, 40, 41, 42, 43, 44]).map(
+                    (s: any) => ({
+                      size: typeof s === 'number' ? s : Number(s.size),
+                      stock: typeof s === 'object' && s.stock !== undefined ? Number(s.stock) : 15
+                    })
+                  )
+                },
+                colors: {
+                  create: (Array.isArray(colors) && colors.length > 0
+                    ? colors
+                    : [{ name: 'Original', hex: '#111827', image }]
+                  ).map((c: any) => ({
+                    name: c.name || 'Color Principal',
+                    hex: c.hex || '#000000',
+                    image: c.image || null
+                  }))
+                }
+              },
+              include: {
+                category: true,
+                sizes: true,
+                colors: true
+              }
+            });
+
+            return sendJson(res, 201, {
+              success: true,
+              message: `Producto "${newProduct.name}" agregado exitosamente al catálogo.`,
+              product: newProduct
+            });
+          }
+
+          // 3. PUT /api/admin/products (Actualizar producto existente)
+          if (pathname === '/api/admin/products' && req.method === 'PUT') {
+            const body = await parseBody(req);
+            const isAdmin = await checkIsAdmin(req, parsedUrl, body.userId);
+            if (!isAdmin) {
+              return sendJson(res, 403, { success: false, message: 'Acceso no autorizado. Se requieren permisos de administrador.' });
+            }
+
+            const {
+              id,
+              name,
+              subtitle,
+              description,
+              price,
+              originalPrice,
+              badge,
+              gender,
+              image,
+              model3dUrl,
+              categoryId,
+              inStock,
+              featured,
+              sizes,
+              colors
+            } = body;
+
+            if (!id) {
+              return sendJson(res, 400, { success: false, message: 'ID del producto requerido para actualizar.' });
+            }
+
+            // Actualizar datos base del producto
+            await prisma.product.update({
+              where: { id },
+              data: {
+                ...(name ? { name: name.trim() } : {}),
+                subtitle: subtitle !== undefined ? (subtitle ? subtitle.trim() : null) : undefined,
+                description: description !== undefined ? (description ? description.trim() : null) : undefined,
+                ...(price !== undefined ? { price: Number(price) } : {}),
+                originalPrice: originalPrice !== undefined ? (originalPrice ? Number(originalPrice) : null) : undefined,
+                badge: badge !== undefined ? (badge ? badge.trim() : null) : undefined,
+                ...(gender ? { gender } : {}),
+                ...(image ? { image: image.trim() } : {}),
+                model3dUrl: model3dUrl !== undefined ? (model3dUrl ? model3dUrl.trim() : null) : undefined,
+                ...(categoryId ? { categoryId } : {}),
+                ...(inStock !== undefined ? { inStock: Boolean(inStock) } : {}),
+                ...(featured !== undefined ? { featured: Boolean(featured) } : {})
+              }
+            });
+
+            // Si se enviaron tallas, refrescarlas
+            if (Array.isArray(sizes) && sizes.length > 0) {
+              await prisma.productSize.deleteMany({ where: { productId: id } });
+              await prisma.productSize.createMany({
+                data: sizes.map((s: any) => ({
+                  productId: id,
+                  size: typeof s === 'number' ? s : Number(s.size),
+                  stock: typeof s === 'object' && s.stock !== undefined ? Number(s.stock) : 15
+                }))
+              });
+            }
+
+            // Si se enviaron colores, refrescarlos
+            if (Array.isArray(colors) && colors.length > 0) {
+              await prisma.productColor.deleteMany({ where: { productId: id } });
+              await prisma.productColor.createMany({
+                data: colors.map((c: any) => ({
+                  productId: id,
+                  name: c.name || 'Color',
+                  hex: c.hex || '#000000',
+                  image: c.image || null
+                }))
+              });
+            }
+
+            return sendJson(res, 200, {
+              success: true,
+              message: 'Producto actualizado con éxito.'
+            });
+          }
+
+          // 4. DELETE /api/admin/products (Eliminar producto del catálogo)
+          if (pathname === '/api/admin/products' && req.method === 'DELETE') {
+            const body = await parseBody(req);
+            const id = parsedUrl.searchParams.get('id') || body.id;
+            const isAdmin = await checkIsAdmin(req, parsedUrl, body.userId);
+            if (!isAdmin) {
+              return sendJson(res, 403, { success: false, message: 'Acceso no autorizado. Se requieren permisos de administrador.' });
+            }
+
+            if (!id) {
+              return sendJson(res, 400, { success: false, message: 'ID del producto requerido para eliminar.' });
+            }
+
+            // Eliminar dependencias primero
+            await prisma.cartItem.deleteMany({ where: { productId: id } });
+            await prisma.wishlist.deleteMany({ where: { productId: id } });
+            await prisma.review.deleteMany({ where: { productId: id } });
+            await prisma.productSize.deleteMany({ where: { productId: id } });
+            await prisma.productColor.deleteMany({ where: { productId: id } });
+            await prisma.orderItem.deleteMany({ where: { productId: id } });
+            await prisma.product.delete({ where: { id } });
+
+            return sendJson(res, 200, {
+              success: true,
+              message: 'Producto eliminado exitosamente del catálogo.'
+            });
+          }
+
+          // 5. PATCH /api/admin/products/stock (Modificar disponibilidad rápida o stock de talla)
+          if (pathname === '/api/admin/products/stock' && req.method === 'PATCH') {
+            const body = await parseBody(req);
+            const isAdmin = await checkIsAdmin(req, parsedUrl, body.userId);
+            if (!isAdmin) {
+              return sendJson(res, 403, { success: false, message: 'Acceso no autorizado.' });
+            }
+
+            const { id, inStock, sizeId, stock } = body;
+            if (!id) {
+              return sendJson(res, 400, { success: false, message: 'ID de producto requerido.' });
+            }
+
+            if (inStock !== undefined) {
+              await prisma.product.update({
+                where: { id },
+                data: { inStock: Boolean(inStock) }
+              });
+            }
+
+            if (sizeId && stock !== undefined) {
+              await prisma.productSize.update({
+                where: { id: sizeId },
+                data: { stock: Number(stock) }
+              });
+            }
+
+            return sendJson(res, 200, {
+              success: true,
+              message: 'Existencias actualizadas correctamente.'
+            });
+          }
+
+          // 6. GET /api/admin/promos (Listar todos los códigos de promoción)
+          if (pathname === '/api/admin/promos' && req.method === 'GET') {
+            const isAdmin = await checkIsAdmin(req, parsedUrl);
+            if (!isAdmin) {
+              return sendJson(res, 403, { success: false, message: 'Acceso no autorizado.' });
+            }
+
+            const promos = await prisma.promoCode.findMany({
+              include: {
+                userCoupons: true,
+                usages: true
+              },
+              orderBy: { createdAt: 'desc' }
+            });
+
+            return sendJson(res, 200, {
+              success: true,
+              promos: promos.map((p) => ({
+                id: p.id,
+                code: p.code,
+                description: p.description,
+                discountType: p.discountType,
+                discountValue: p.discountValue,
+                minPurchase: p.minPurchase,
+                onePerUser: p.onePerUser,
+                isWelcomeOnly: p.isWelcomeOnly,
+                isActive: p.isActive,
+                expiresAt: p.expiresAt?.toISOString() || null,
+                createdAt: p.createdAt.toISOString(),
+                totalClaimed: p.userCoupons.length,
+                totalUsed: p.usages.length
+              }))
+            });
+          }
+
+          // 7. POST /api/admin/promos (Crear nuevo código promocional)
+          if (pathname === '/api/admin/promos' && req.method === 'POST') {
+            const body = await parseBody(req);
+            const isAdmin = await checkIsAdmin(req, parsedUrl, body.userId);
+            if (!isAdmin) {
+              return sendJson(res, 403, { success: false, message: 'Acceso no autorizado.' });
+            }
+
+            const {
+              code,
+              description,
+              discountType = 'PERCENTAGE',
+              discountValue,
+              minPurchase = 0,
+              onePerUser = true,
+              isWelcomeOnly = false,
+              isActive = true,
+              expiresAt
+            } = body;
+
+            if (!code || discountValue === undefined) {
+              return sendJson(res, 400, { success: false, message: 'Código y valor de descuento son requeridos.' });
+            }
+
+            const cleanCode = code.trim().toUpperCase();
+            const existing = await prisma.promoCode.findUnique({ where: { code: cleanCode } });
+            if (existing) {
+              return sendJson(res, 409, { success: false, message: `El código "${cleanCode}" ya existe.` });
+            }
+
+            const promo = await prisma.promoCode.create({
+              data: {
+                code: cleanCode,
+                description: (description || `Descuento ${discountValue}% en tu compra`).trim(),
+                discountType,
+                discountValue: Number(discountValue),
+                minPurchase: Number(minPurchase) || 0,
+                onePerUser: Boolean(onePerUser),
+                isWelcomeOnly: Boolean(isWelcomeOnly),
+                isActive: Boolean(isActive),
+                expiresAt: expiresAt ? new Date(expiresAt) : null
+              }
+            });
+
+            return sendJson(res, 201, {
+              success: true,
+              message: `Código promocional "${cleanCode}" creado exitosamente.`,
+              promo
+            });
+          }
+
+          // 8. PUT /api/admin/promos (Actualizar código promocional)
+          if (pathname === '/api/admin/promos' && req.method === 'PUT') {
+            const body = await parseBody(req);
+            const isAdmin = await checkIsAdmin(req, parsedUrl, body.userId);
+            if (!isAdmin) {
+              return sendJson(res, 403, { success: false, message: 'Acceso no autorizado.' });
+            }
+
+            const {
+              id,
+              description,
+              discountType,
+              discountValue,
+              minPurchase,
+              onePerUser,
+              isWelcomeOnly,
+              isActive,
+              expiresAt
+            } = body;
+
+            if (!id) {
+              return sendJson(res, 400, { success: false, message: 'ID del cupón requerido.' });
+            }
+
+            const updated = await prisma.promoCode.update({
+              where: { id },
+              data: {
+                ...(description ? { description: description.trim() } : {}),
+                ...(discountType ? { discountType } : {}),
+                ...(discountValue !== undefined ? { discountValue: Number(discountValue) } : {}),
+                ...(minPurchase !== undefined ? { minPurchase: Number(minPurchase) } : {}),
+                ...(onePerUser !== undefined ? { onePerUser: Boolean(onePerUser) } : {}),
+                ...(isWelcomeOnly !== undefined ? { isWelcomeOnly: Boolean(isWelcomeOnly) } : {}),
+                ...(isActive !== undefined ? { isActive: Boolean(isActive) } : {}),
+                expiresAt: expiresAt ? new Date(expiresAt) : null
+              }
+            });
+
+            return sendJson(res, 200, {
+              success: true,
+              message: `Cupón "${updated.code}" actualizado con éxito.`,
+              promo: updated
+            });
+          }
+
+          // 9. DELETE /api/admin/promos (Eliminar código promocional)
+          if (pathname === '/api/admin/promos' && req.method === 'DELETE') {
+            const body = await parseBody(req);
+            const id = parsedUrl.searchParams.get('id') || body.id;
+            const isAdmin = await checkIsAdmin(req, parsedUrl, body.userId);
+            if (!isAdmin) {
+              return sendJson(res, 403, { success: false, message: 'Acceso no autorizado.' });
+            }
+
+            if (!id) {
+              return sendJson(res, 400, { success: false, message: 'ID del cupón requerido.' });
+            }
+
+            await prisma.userCoupon.deleteMany({ where: { promoCodeId: id } });
+            await prisma.promoUsage.deleteMany({ where: { promoCodeId: id } });
+            await prisma.promoCode.delete({ where: { id } });
+
+            return sendJson(res, 200, {
+              success: true,
+              message: 'Código promocional eliminado exitosamente.'
+            });
+          }
+
+          // 10. PATCH /api/admin/promos/toggle (Activar/Desactivar código rápidamente)
+          if (pathname === '/api/admin/promos/toggle' && req.method === 'PATCH') {
+            const body = await parseBody(req);
+            const isAdmin = await checkIsAdmin(req, parsedUrl, body.userId);
+            if (!isAdmin) {
+              return sendJson(res, 403, { success: false, message: 'Acceso no autorizado.' });
+            }
+
+            const { id, isActive } = body;
+            if (!id || isActive === undefined) {
+              return sendJson(res, 400, { success: false, message: 'ID y estado isActive requeridos.' });
+            }
+
+            const updated = await prisma.promoCode.update({
+              where: { id },
+              data: { isActive: Boolean(isActive) }
+            });
+
+            return sendJson(res, 200, {
+              success: true,
+              message: `Cupón ${updated.code} ${updated.isActive ? 'activado' : 'desactivado'}.`,
+              isActive: updated.isActive
+            });
+          }
+
+          // 11. POST /api/admin/upload (Subir archivos directamente a MinIO Storage)
+          if (pathname === '/api/admin/upload' && req.method === 'POST') {
+            const body = await parseBody(req);
+            const isAdmin = await checkIsAdmin(req, parsedUrl, body.userId);
+            if (!isAdmin) {
+              return sendJson(res, 403, { success: false, message: 'Acceso no autorizado para subida de recursos.' });
+            }
+
+            const { filename, contentType = 'image/png', base64 } = body;
+            if (!filename || !base64) {
+              return sendJson(res, 400, { success: false, message: 'filename y contenido base64 son requeridos.' });
+            }
+
+            // Limpiar cabecera Data-URI si viene presente (ej. data:image/png;base64,...)
+            const rawBase64 = base64.includes(';base64,') ? base64.split(';base64,')[1] : base64;
+            const buffer = Buffer.from(rawBase64, 'base64');
+
+            // Nombre de archivo sanitizado y con timestamp único
+            const cleanName = filename
+              .toLowerCase()
+              .replace(/[^a-z0-9._-]/g, '_')
+              .replace(/_+/g, '_');
+            const objectKey = `${Date.now()}-${cleanName}`;
+
+            await s3Client.send(
+              new PutObjectCommand({
+                Bucket: S3_BUCKET,
+                Key: objectKey,
+                Body: buffer,
+                ContentType: contentType
+              })
+            );
+
+            const fileUrl = `http://localhost:9002/${S3_BUCKET}/${objectKey}`;
+
+            return sendJson(res, 201, {
+              success: true,
+              message: `Recurso "${cleanName}" subido exitosamente a MinIO.`,
+              url: fileUrl,
+              filename: objectKey,
+              size: buffer.length,
+              contentType
+            });
+          }
+
+          // 12. GET /api/admin/assets (Listar recursos guardados en MinIO)
+          if (pathname === '/api/admin/assets' && req.method === 'GET') {
+            const isAdmin = await checkIsAdmin(req, parsedUrl);
+            if (!isAdmin) {
+              return sendJson(res, 403, { success: false, message: 'Acceso no autorizado.' });
+            }
+
+            try {
+              const s3Res = await s3Client.send(new ListObjectsV2Command({ Bucket: S3_BUCKET }));
+              const assets = (s3Res.Contents || []).map((c) => ({
+                key: c.Key || '',
+                url: `http://localhost:9002/${S3_BUCKET}/${c.Key}`,
+                size: c.Size || 0,
+                lastModified: c.LastModified ? c.LastModified.toISOString() : null
+              }));
+
+              return sendJson(res, 200, { success: true, assets });
+            } catch (err: any) {
+              return sendJson(res, 500, { success: false, message: 'Error al listar recursos de MinIO.', error: err.message });
+            }
+          }
+
+          // 13. DELETE /api/admin/assets (Eliminar recurso de MinIO)
+          if (pathname === '/api/admin/assets' && req.method === 'DELETE') {
+            const body = await parseBody(req);
+            const key = parsedUrl.searchParams.get('key') || body.key;
+            const isAdmin = await checkIsAdmin(req, parsedUrl, body.userId);
+            if (!isAdmin) {
+              return sendJson(res, 403, { success: false, message: 'Acceso no autorizado.' });
+            }
+
+            if (!key) {
+              return sendJson(res, 400, { success: false, message: 'Clave del recurso en MinIO requerida.' });
+            }
+
+            await s3Client.send(new DeleteObjectCommand({ Bucket: S3_BUCKET, Key: key }));
+
+            return sendJson(res, 200, {
+              success: true,
+              message: `Recurso "${key}" eliminado de MinIO exitosamente.`
+            });
+          }
+
+          // 14. GET /api/admin/categories (Listar categorías para selector de productos)
+          if (pathname === '/api/admin/categories' && req.method === 'GET') {
+            const categories = await prisma.category.findMany({ orderBy: { name: 'asc' } });
+            return sendJson(res, 200, { success: true, categories });
           }
 
           // Ruta no encontrada
