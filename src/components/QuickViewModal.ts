@@ -128,8 +128,12 @@ export class QuickViewModal {
 
                 <div class="quickview-price-rating">
                   <div class="price-box">
-                    <span class="quickview-price">$${displayPrice}</span>
-                    ${displayOriginalPrice ? `<span class="quickview-original-price">$${displayOriginalPrice}</span>` : ''}
+                    <span class="quickview-price">$${typeof displayPrice === 'number' ? displayPrice.toFixed(2) : displayPrice}</span>
+                    ${
+                      displayOriginalPrice && Number(displayOriginalPrice) > Number(displayPrice)
+                        ? `<span class="quickview-original-price">$${typeof displayOriginalPrice === 'number' ? Number(displayOriginalPrice).toFixed(2) : displayOriginalPrice}</span>`
+                        : ''
+                    }
                   </div>
                   <div class="quickview-rating">
                     <span class="star-icon">★</span>

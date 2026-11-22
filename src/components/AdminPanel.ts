@@ -21,6 +21,7 @@ export type AdminTab =
   | 'products-create'
   | 'promos-list'
   | 'promos-create'
+  | 'promos-store-create'
   | 'minio-storage'
   | 'circular-showcase'
   | 'horse-showcase';
@@ -68,6 +69,7 @@ export class AdminPanel {
   private horseShowcaseSearchTerm: string = '';
   private demosAccordionOpen: boolean = false;
   private activeModalProductId: string | null = null;
+  private promoStoreItems: Array<{ productId: string; promoPrice: number; badgeLabel: string }> = [];
 
   private initFormVariants(): void {
     if (this.editingProduct) {
@@ -380,7 +382,10 @@ export class AdminPanel {
                   Cupones Activos
                 </button>
                 <button type="button" class="admin-tab-btn ${this.activeTab === 'promos-create' ? 'active' : ''}" data-tab="promos-create">
-                  ${this.editingPromo ? 'Editar Código' : 'Nuevo Código Promocional'}
+                  ${this.editingPromo && this.editingPromo.discountType !== 'HIDDEN_STORE' ? 'Editar Código' : 'Nuevo Código Promocional'}
+                </button>
+                <button type="button" class="admin-tab-btn ${this.activeTab === 'promos-store-create' ? 'active' : ''}" data-tab="promos-store-create">
+                  ${this.editingPromo && this.editingPromo.discountType === 'HIDDEN_STORE' ? 'Editar Tienda Promo' : 'Nuevo Código Tienda Promo'}
                 </button>
               </nav>
             </div>
@@ -441,6 +446,8 @@ export class AdminPanel {
         return this.renderPromosListTab();
       case 'promos-create':
         return this.renderPromoFormTab();
+      case 'promos-store-create':
+        return this.renderPromoStoreFormTab();
       case 'minio-storage':
         return this.renderMinioStorageTab();
       case 'circular-showcase':
@@ -1720,45 +1727,64 @@ export class AdminPanel {
         <div class="admin-view-header">
           <div>
             <h2 class="admin-view-title">Códigos de Promoción & Cupones</h2>
-            <p class="admin-view-subtitle">Supervisa los códigos promocionales vigentes, porcentajes de descuento y usos registrados.</p>
+            <p class="admin-view-subtitle">Supervisa los códigos promocionales vigentes, porcentajes de descuento, tiendas promo ocultas y usos registrados.</p>
           </div>
-          <button type="button" class="btn-admin-action-primary" id="btn-admin-goto-create-promo">
-            ${Icons.plus('w-4 h-4')}
-            <span>Nuevo Código</span>
-          </button>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button type="button" class="btn-table-action" id="btn-admin-goto-create-store-promo" style="background: #0f172a; color: #ffffff; border-color: #0f172a; font-weight: 700; padding: 0 14px; height: 38px;">
+              ${Icons.plus('w-4 h-4')}
+              <span>Nuevo Código Tienda Promo</span>
+            </button>
+            <button type="button" class="btn-admin-action-primary" id="btn-admin-goto-create-promo" style="height: 38px;">
+              ${Icons.plus('w-4 h-4')}
+              <span>Nuevo Código Regular</span>
+            </button>
+          </div>
         </div>
 
         ${this.promos.length === 0
         ? `
             <div class="admin-empty-state">
               <h4>No hay cupones creados</h4>
-              <p>Crea el primer código promocional para que tus clientes puedan redimirlo.</p>
+              <p>Crea el primer código promocional o una tienda promo para que tus clientes puedan redimirlo.</p>
             </div>
           `
         : `
             <div class="admin-promos-grid">
               ${this.promos
           .map((promo) => {
+            const isStore = promo.discountType === 'HIDDEN_STORE';
             const isPercentage = promo.discountType === 'PERCENTAGE';
-            const discountLabel = isPercentage ? `${promo.discountValue}%` : `$${promo.discountValue}`;
+            const storeCount = Array.isArray(promo.storeItems) ? promo.storeItems.length : 0;
+            const discountLabel = isStore
+              ? 'TIENDA PROMO'
+              : (isPercentage ? `-${promo.discountValue}%` : `-$${promo.discountValue}`);
 
             return `
-                    <div class="admin-promo-card ${promo.isActive ? 'is-active' : 'is-inactive'}">
+                    <div class="admin-promo-card ${promo.isActive ? 'is-active' : 'is-inactive'} ${isStore ? 'is-store-promo-card' : ''}">
                       <div class="admin-promo-header">
                         <div class="admin-promo-code-wrap">
                           <strong class="admin-promo-code">${promo.code}</strong>
+                          ${isStore ? `<span class="badge-welcome-pill" style="background: #0f172a; color: #38bdf8;#1e293b;"> </span>` : ''}
                           ${promo.isWelcomeOnly ? `<span class="badge-welcome-pill">Bienvenida</span>` : ''}
                         </div>
-                        <span class="admin-promo-discount">-${discountLabel}</span>
+                        <span class="admin-promo-discount" style="${isStore ? 'background: #059669; color: #ffffff; font-size: 0.72rem; padding: 4px 8px; border-radius: 6px;' : ''}">
+                          ${discountLabel}
+                        </span>
                       </div>
 
                       <p class="admin-promo-desc">${promo.description || 'Sin descripción'}</p>
 
                       <div class="admin-promo-meta-list">
-                        <span>• Compra mínima: <strong>${promo.minPurchase > 0 ? `$${promo.minPurchase}` : 'Sin mínimo'}</strong></span>
+                        ${isStore ? `
+                          <span>• Contenido: <strong>${storeCount} calzado(s) en descuento</strong></span>
+                          <span>• Inicio: <strong>${promo.startsAt ? new Date(promo.startsAt).toLocaleDateString() : 'Inmediato'}</strong></span>
+                          <span>• Fin: <strong>${promo.expiresAt ? new Date(promo.expiresAt).toLocaleDateString() : 'Sin caducidad'}</strong></span>
+                        ` : `
+                          <span>• Compra mínima: <strong>${promo.minPurchase > 0 ? `$${promo.minPurchase}` : 'Sin mínimo'}</strong></span>
+                        `}
                         <span>• Límite: <strong>${promo.onePerUser ? '1 uso por persona' : 'Ilimitado'}</strong></span>
                         <span>• Asignado a cuentas: <strong>${promo.totalClaimed || 0}</strong></span>
-                        <span>• Canjeado en órdenes: <strong>${promo.totalUsed || 0}</strong></span>
+                        <span>• Canjeado: <strong>${promo.totalUsed || 0} ${promo.usageLimit ? `/ ${promo.usageLimit}` : ''}</strong></span>
                       </div>
 
                       <div class="admin-promo-footer">
@@ -1778,7 +1804,7 @@ export class AdminPanel {
                             class="btn-promo-edit"
                             data-action="edit-promo"
                             data-id="${promo.id}"
-                            title="Editar cupón"
+                            title="${isStore ? 'Editar Tienda Promo' : 'Editar cupón'}"
                           >
                             ${Icons.edit('w-4 h-4')}
                           </button>
@@ -1902,6 +1928,278 @@ export class AdminPanel {
             </button>
             <button type="submit" class="btn-admin-submit" id="btn-save-promo">
               ${isEdit ? 'Actualizar Cupón' : 'Crear y Habilitar Cupón'}
+            </button>
+          </div>
+        </form>
+      </div>
+    `;
+  }
+
+  // ==========================================================================
+  // TAB 4B: CREAR O EDITAR CÓDIGO TIENDA PROMO OCULTA (SHOWCASEPROMO)
+  // ==========================================================================
+  private renderPromoStoreFormTab(): string {
+    const isEdit = !!(this.editingPromo && this.editingPromo.discountType === 'HIDDEN_STORE');
+    const promo = this.editingPromo || {};
+    const allProducts = this.products.length > 0 ? this.products : (this.store.products.length > 0 ? this.store.products : []);
+
+    const formatForDatetimeLocal = (dateVal?: string | Date | null): string => {
+      if (!dateVal) return '';
+      const d = new Date(dateVal);
+      if (isNaN(d.getTime())) return '';
+      const pad = (n: number) => n.toString().padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    };
+
+    const startsAtVal = promo.startsAt
+      ? formatForDatetimeLocal(promo.startsAt)
+      : formatForDatetimeLocal(new Date());
+
+    const expiresAtVal = promo.expiresAt
+      ? formatForDatetimeLocal(promo.expiresAt)
+      : formatForDatetimeLocal(new Date(Date.now() + 30 * 24 * 3600 * 1000));
+
+    const configuredIds = new Set(this.promoStoreItems.map((item) => item.productId));
+    const availableProducts = allProducts.filter((p) => !configuredIds.has(p.id));
+
+    return `
+      <div class="admin-view-panel">
+        <div class="admin-view-header">
+          <div>
+            <h2 class="admin-view-title">${isEdit ? `Editar Código Tienda Promo: ${promo.code}` : 'Nuevo Código Tienda Promo'}</h2>
+            <p class="admin-view-subtitle">
+              Configura un código especial que activará la tienda oculta interactiva (ShowcasePromo) con calzados seleccionados del stock y precios exclusivos rebajados.
+            </p>
+          </div>
+          ${isEdit
+        ? `
+              <button type="button" class="btn-admin-action-secondary" id="btn-cancel-edit-promo-store">
+                Cancelar Edición
+              </button>
+            `
+        : ''
+      }
+        </div>
+
+        <form id="form-admin-promo-store" class="admin-editor-form">
+          <!-- SECCIÓN 1: DATOS BÁSICOS DEL CÓDIGO -->
+          <div class="admin-form-section">
+            <h3 class="admin-section-heading">CÓDIGO DE TIENDA PROMO</h3>
+            <div class="admin-form-grid-2">
+              <div class="admin-input-group">
+                <label for="promo-store-code">Código en Mayúsculas *</label>
+                <input
+                  type="text"
+                  id="promo-store-code"
+                  value="${promo.code || ''}"
+                  placeholder="Ej: BLESSEDVIP, SECRETO2026"
+                  style="text-transform: uppercase; font-weight: 700; letter-spacing: 1px;"
+                  ${isEdit ? 'readonly' : ''}
+                  required
+                />
+              </div>
+
+              <div class="admin-input-group">
+                <label for="promo-store-desc">Lema / Título de la Tienda Oculta *</label>
+                <input
+                  type="text"
+                  id="promo-store-desc"
+                  value="${promo.description || ''}"
+                  placeholder="Ej: Colección Secreta Blessed Slides 2026"
+                  required
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- SECCIÓN 2: VIGENCIA Y FECHAS (CUÁNDO EMPIEZA Y CUÁNDO TERMINA) -->
+          <div class="admin-form-section">
+            <h3 class="admin-section-heading">VIGENCIA Y FECHAS DE LA TIENDA PROMO</h3>
+            <p class="admin-section-sub">Define el rango de tiempo en que la tienda oculta estará disponible al canjear el código.</p>
+            <div class="admin-form-grid-2">
+              <div class="admin-input-group">
+                <label for="promo-store-starts">¿Cuándo empieza? (Fecha y Hora de Inicio) *</label>
+                <input
+                  type="datetime-local"
+                  id="promo-store-starts"
+                  value="${startsAtVal}"
+                  required
+                />
+              </div>
+
+              <div class="admin-input-group">
+                <label for="promo-store-expires">¿Cuándo termina? (Fecha y Hora de Finalización) *</label>
+                <input
+                  type="datetime-local"
+                  id="promo-store-expires"
+                  value="${expiresAtVal}"
+                  required
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- SECCIÓN 3: OBJETOS EN DESCUENTO (SALDRÁN DEL STOCK) -->
+          <div class="admin-form-section">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
+              <div>
+                <h3 class="admin-section-heading" style="margin-bottom: 4px;">CALZADOS EN DESCUENTO (SELECCIONADOS DEL STOCK)</h3>
+                <p class="admin-section-sub" style="margin: 0;">
+                  Estos calzados saldrán directamente del stock disponible. Puedes cambiar el precio promocional en este formulario.
+                </p>
+              </div>
+              <span class="showcase-count-pill" style="font-weight: 700;">
+                ${this.promoStoreItems.length} calzados en tienda promo
+              </span>
+            </div>
+
+            <!-- SELECTOR PARA AGREGAR PRODUCTOS DEL CATÁLOGO -->
+            <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 18px; flex-wrap: wrap; background: #f8fafc; padding: 14px; border-radius: 8px; border: 1px solid #e2e8f0;">
+              <div style="flex: 1; min-width: 260px;">
+                <select id="promo-store-add-select" style="width: 100%; height: 40px; border: 1px solid #cbd5e1; border-radius: 8px; padding: 0 12px; font-size: 0.85rem; background: #ffffff;">
+                  <option value="">-- Seleccionar calzado del stock para agregar --</option>
+                  ${availableProducts.map((p) => {
+        const totalStock = Array.isArray(p.sizes) ? p.sizes.reduce((sum: number, s: any) => sum + (s.stock || 0), 0) : 0;
+        return `<option value="${p.id}">${p.name} • Stock: ${totalStock} pares • Regular: $${Number(p.price).toFixed(2)}</option>`;
+      }).join('')}
+                </select>
+              </div>
+              <button type="button" class="btn-table-action" id="btn-add-product-to-promo-store" style="height: 40px; background: #0f172a; color: #ffffff; border-color: #0f172a; padding: 0 18px; font-weight: 700;">
+                + Agregar Calzado
+              </button>
+            </div>
+
+            <!-- LISTA / TABLA DE PRODUCTOS EN DESCUENTO -->
+            ${this.promoStoreItems.length === 0
+        ? `
+                <div style="text-align: center; padding: 36px 16px; border: 2px dashed #cbd5e1; border-radius: 10px; color: #64748b; font-size: 0.88rem;">
+                  Aún no has agregado calzados a esta tienda promo.<br/>
+                  Selecciona un calzado del menú superior para añadirlo y definir su precio con descuento.
+                </div>
+              `
+        : `
+                <div class="admin-products-table-wrap admin-table-container" style="margin-bottom: 0;">
+                  <table class="admin-table admin-data-table">
+                    <thead>
+                      <tr>
+                        <th style="width: 45px;">#</th>
+                        <th style="min-width: 240px;">CALZADO EN STOCK</th>
+                        <th style="width: 130px;">PRECIO REGULAR</th>
+                        <th style="width: 180px;">PRECIO PROMO ($ USD) *</th>
+                        <th style="width: 180px;">ETIQUETA (BADGE)</th>
+                        <th style="width: 80px; text-align: right;">QUITAR</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${this.promoStoreItems.map((item, idx) => {
+          const prod = allProducts.find((p) => p.id === item.productId);
+          if (!prod) return '';
+          const thumb = prod.image || prod.colors?.[0]?.image || '/assets/slide/slide.png';
+          const totalStock = Array.isArray(prod.sizes) ? prod.sizes.reduce((sum: number, s: any) => sum + (s.stock || 0), 0) : 0;
+
+          return `
+                          <tr>
+                            <td style="font-weight: 700; color: #64748b;">${idx + 1}</td>
+                            <td>
+                              <div class="table-prod-cell admin-prod-cell">
+                                <img src="${thumb}" alt="${prod.name}" class="table-prod-thumb admin-prod-thumb" style="width: 44px; height: 44px; min-width: 44px; max-width: 44px; object-fit: contain; border-radius: 6px; background: #f8fafc; border: 1px solid #e2e8f0;" />
+                                <div class="table-prod-meta admin-prod-info">
+                                  <strong class="table-prod-name admin-prod-name">${prod.name}</strong>
+                                  <span class="table-prod-sub admin-prod-sub">Stock: ${totalStock} pares • ${prod.categoryName || 'Calzado'}</span>
+                                </div>
+                              </div>
+                            </td>
+                            <td>
+                              <span style="font-weight: 600; color: #94a3b8; text-decoration: line-through;">$${Number(prod.price).toFixed(2)}</span>
+                            </td>
+                            <td>
+                              <div style="display: flex; align-items: center; gap: 6px;">
+                                <span style="font-weight: 700; color: #059669;">$</span>
+                                <input 
+                                  type="number" 
+                                  step="0.5" 
+                                  min="1" 
+                                  class="input-promo-store-item-price" 
+                                  data-index="${idx}" 
+                                  value="${item.promoPrice}" 
+                                  placeholder="Ej: 79.99" 
+                                  style="width: 110px; height: 34px; padding: 0 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: 700; color: #059669;"
+                                  required
+                                />
+                              </div>
+                            </td>
+                            <td>
+                              <input 
+                                type="text" 
+                                class="input-promo-store-item-badge" 
+                                data-index="${idx}" 
+                                value="${item.badgeLabel || 'EDICIÓN PROMO'}" 
+                                placeholder="Ej: OFERTA VIP"
+                                style="width: 140px; height: 34px; padding: 0 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.78rem;"
+                              />
+                            </td>
+                            <td style="text-align: right;">
+                              <button 
+                                type="button" 
+                                class="btn-remove-promo-store-item btn-table-action danger" 
+                                data-index="${idx}" 
+                                title="Quitar este calzado de la tienda promo"
+                              >
+                                ✕
+                              </button>
+                            </td>
+                          </tr>
+                        `;
+        }).join('')}
+                    </tbody>
+                  </table>
+                </div>
+              `
+      }
+          </div>
+
+          <!-- SECCIÓN 4: RESTRICCIONES Y ESTADO -->
+          <div class="admin-form-section">
+            <h3 class="admin-section-heading">RESTRICCIONES Y ESTADO</h3>
+            <div class="admin-form-grid-2">
+              <div class="admin-input-group">
+                <label for="promo-store-usagelimit">Límite Total de Usos</label>
+                <input type="number" min="1" step="1" id="promo-store-usagelimit" value="${promo.usageLimit || ''}" placeholder="Ej: 50 (vacío para ilimitado)" />
+              </div>
+              <div class="admin-input-group">
+                <label for="promo-store-minpurchase">Compra Mínima Requerida ($ USD)</label>
+                <input type="number" step="1" min="0" id="promo-store-minpurchase" value="${promo.minPurchase || 0}" placeholder="0 para sin mínimo" />
+              </div>
+            </div>
+
+            <div class="admin-toggles-row" style="margin-top: 14px;">
+              <label class="admin-switch-label">
+                <input type="checkbox" id="promo-store-oneperuser" ${promo.onePerUser !== false ? 'checked' : ''} />
+                <span class="switch-ui"></span>
+                <span>Límite de 1 uso por persona (Garantía de cuenta)</span>
+              </label>
+
+              <label class="admin-switch-label">
+                <input type="checkbox" id="promo-store-iswelcome" ${promo.isWelcomeOnly ? 'checked' : ''} />
+                <span class="switch-ui"></span>
+                <span>Exclusivo para Bienvenida de Nuevas Cuentas</span>
+              </label>
+
+              <label class="admin-switch-label">
+                <input type="checkbox" id="promo-store-isactive" ${promo.isActive !== false ? 'checked' : ''} />
+                <span class="switch-ui"></span>
+                <span>Tienda Promo Activa para Redención</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- BOTONES DE ACCIÓN -->
+          <div class="admin-form-actions">
+            <button type="button" class="btn-admin-cancel" id="btn-cancel-promo-store">
+              Cancelar
+            </button>
+            <button type="submit" class="btn-admin-submit" id="btn-save-promo-store" style="background: #0f172a;">
+              ${isEdit ? 'Actualizar Tienda Promo' : 'Crear y Habilitar Tienda Promo'}
             </button>
           </div>
         </form>
@@ -2118,8 +2416,8 @@ export class AdminPanel {
 
             <div class="showcase-demos-grid">
               ${DEFAULT_SHOWCASE_DEMOS.map((demo) => {
-                const isDemoActive = settings.enabledDemoIds.includes(demo.id);
-                return `
+      const isDemoActive = settings.enabledDemoIds.includes(demo.id);
+      return `
                   <div class="showcase-demo-card ${isDemoActive ? 'is-active' : 'is-inactive'}" id="demo-card-${demo.id}">
                     <div class="showcase-demo-thumb-wrap">
                       <img src="${demo.image}" alt="${demo.name}" />
@@ -2139,7 +2437,7 @@ export class AdminPanel {
                     </label>
                   </div>
                 `;
-              }).join('')}
+    }).join('')}
             </div>
           </div>
         </div>
@@ -2300,14 +2598,14 @@ export class AdminPanel {
                         <!-- 4. CONTROL VISUAL Y PROPORCIONES (836 × 342) INDIVIDUAL -->
                         <td>
                           ${(() => {
-                            const prop = ShowcaseSettingsService.getProductProportion(p.id);
-                            const dimText = prop.customProportionEnabled && prop.customWidth > 0 && prop.customHeight > 0
-                              ? `${prop.customWidth} × ${prop.customHeight} px`
-                              : (prop.adjustTo836x342 ? '836 × 342 px' : '290 × 125 px');
-                            const fitText = prop.preserveWithoutDistortion ? 'Sin distorsión' : 'Ajuste libre';
-                            const previewImgSrc = p.carouselImage || thumbImg;
+              const prop = ShowcaseSettingsService.getProductProportion(p.id);
+              const dimText = prop.customProportionEnabled && prop.customWidth > 0 && prop.customHeight > 0
+                ? `${prop.customWidth} × ${prop.customHeight} px`
+                : (prop.adjustTo836x342 ? '836 × 342 px' : '290 × 125 px');
+              const fitText = prop.preserveWithoutDistortion ? 'Sin distorsión' : 'Ajuste libre';
+              const previewImgSrc = p.carouselImage || thumbImg;
 
-                            return `
+              return `
                               <button 
                                 type="button" 
                                 class="btn-showcase-prop-btn" 
@@ -2323,7 +2621,7 @@ export class AdminPanel {
                                 <span class="prop-btn-sub">Ajustar proporción</span>
                               </button>
                             `;
-                          })()}
+            })()}
                         </td>
 
                         <!-- 5. EN CIRCULAR SHOWCASE -->
@@ -2531,19 +2829,19 @@ export class AdminPanel {
             </thead>
             <tbody>
               ${filteredList.length === 0
-                ? `
+        ? `
                   <tr>
                     <td colspan="4" class="admin-table-empty" style="text-align: center; padding: 36px 20px; color: #64748b;">
                       No se encontraron calzados coincidentes en el catálogo.
                     </td>
                   </tr>
                 `
-                : filteredList.map(({ product, isVisible, orderIndex }, idx) => {
-                    const thumbImg = product.image || product.colors?.[0]?.image || '/assets/slide/slide.png';
-                    const isFirst = idx === 0;
-                    const isLast = idx === filteredList.length - 1;
+        : filteredList.map(({ product, isVisible, orderIndex }, idx) => {
+          const thumbImg = product.image || product.colors?.[0]?.image || '/assets/slide/slide.png';
+          const isFirst = idx === 0;
+          const isLast = idx === filteredList.length - 1;
 
-                    return `
+          return `
                       <tr class="${isVisible ? 'row-showcase-active' : ''}">
                         <!-- 1. ORDEN -->
                         <td>
@@ -2620,8 +2918,8 @@ export class AdminPanel {
                         </td>
                       </tr>
                     `;
-                  }).join('')
-              }
+        }).join('')
+      }
             </tbody>
           </table>
         </div>
@@ -2657,6 +2955,12 @@ export class AdminPanel {
           if (tab === 'promos-create' && this.activeTab !== 'promos-create') {
             this.editingPromo = null;
           }
+          if (tab === 'promos-store-create' && this.activeTab !== 'promos-store-create') {
+            if (!this.editingPromo || this.editingPromo.discountType !== 'HIDDEN_STORE') {
+              this.editingPromo = null;
+              this.promoStoreItems = [];
+            }
+          }
           this.activeTab = tab;
           this.updateMainContentOnly();
         }
@@ -2691,6 +2995,11 @@ export class AdminPanel {
       this.bindGalleryEvents();
       this.bind3dStatusEvents();
       this.bindCarouselResourceEvents();
+    }
+
+    // Si estamos en la pestaña de Crear/Editar Código Tienda Promo
+    if (this.activeTab === 'promos-store-create') {
+      this.setupPromoStoreFormEvents();
     }
 
     // Si estamos en la pestaña de Circular Showcase
@@ -3118,6 +3427,13 @@ export class AdminPanel {
       this.updateMainContentOnly();
     });
 
+    this.container.querySelector('#btn-admin-goto-create-store-promo')?.addEventListener('click', () => {
+      this.editingPromo = null;
+      this.promoStoreItems = [];
+      this.activeTab = 'promos-store-create';
+      this.updateMainContentOnly();
+    });
+
     // Toggle estado de cupón
     this.container.querySelectorAll('[data-action="toggle-promo"]').forEach((btn) => {
       btn.addEventListener('click', async (e) => {
@@ -3145,7 +3461,12 @@ export class AdminPanel {
         const promo = this.promos.find((x) => x.id === pId);
         if (promo) {
           this.editingPromo = promo;
-          this.activeTab = 'promos-create';
+          if (promo.discountType === 'HIDDEN_STORE') {
+            this.promoStoreItems = Array.isArray(promo.storeItems) ? JSON.parse(JSON.stringify(promo.storeItems)) : [];
+            this.activeTab = 'promos-store-create';
+          } else {
+            this.activeTab = 'promos-create';
+          }
           this.updateMainContentOnly();
         }
       });
@@ -3899,6 +4220,193 @@ export class AdminPanel {
           this.updateMainContentOnly();
         }
       });
+    });
+  }
+
+  // ==========================================================================
+  // EVENTOS: FORMULARIO NUEVO / EDITAR CÓDIGO TIENDA PROMO (SHOWCASEPROMO)
+  // ==========================================================================
+  private setupPromoStoreFormEvents(): void {
+    const userId = this.store.currentUser?.id;
+    if (!userId) return;
+
+    const allProducts = this.products.length > 0 ? this.products : (this.store.products.length > 0 ? this.store.products : []);
+
+    // 1. Botones Cancelar
+    const onCancel = () => {
+      this.editingPromo = null;
+      this.promoStoreItems = [];
+      this.activeTab = 'promos-list';
+      this.updateMainContentOnly();
+    };
+    this.container.querySelector('#btn-cancel-promo-store')?.addEventListener('click', onCancel);
+    this.container.querySelector('#btn-cancel-edit-promo-store')?.addEventListener('click', onCancel);
+
+    // 2. Agregar Calzado a la Tienda Promo
+    this.container.querySelector('#btn-add-product-to-promo-store')?.addEventListener('click', () => {
+      const select = this.container.querySelector('#promo-store-add-select') as HTMLSelectElement | null;
+      if (!select || !select.value) {
+        Toast.show('Selecciona un calzado del catálogo primero.', 'Atención', 'warning');
+        return;
+      }
+      const prodId = select.value;
+      const prod = allProducts.find((p) => p.id === prodId);
+      if (!prod) return;
+
+      const discountedPrice = Math.max(1, Math.round(Number(prod.price) * 0.8));
+      this.promoStoreItems.push({
+        productId: prod.id,
+        promoPrice: discountedPrice,
+        badgeLabel: 'EDICIÓN PROMO'
+      });
+
+      const main = this.container.querySelector('#admin-main-viewport');
+      if (main) {
+        main.innerHTML = this.renderPromoStoreFormTab();
+        this.setupPromoStoreFormEvents();
+      }
+    });
+
+    // 3. Modificar precio promocional individual
+    this.container.querySelectorAll('.input-promo-store-item-price').forEach((input) => {
+      input.addEventListener('change', (e) => {
+        const target = e.currentTarget as HTMLInputElement;
+        const idx = Number(target.dataset.index);
+        const val = Number(target.value);
+        if (this.promoStoreItems[idx] && val > 0) {
+          this.promoStoreItems[idx].promoPrice = val;
+        }
+      });
+    });
+
+    // 4. Modificar etiqueta badge individual
+    this.container.querySelectorAll('.input-promo-store-item-badge').forEach((input) => {
+      input.addEventListener('change', (e) => {
+        const target = e.currentTarget as HTMLInputElement;
+        const idx = Number(target.dataset.index);
+        if (this.promoStoreItems[idx]) {
+          this.promoStoreItems[idx].badgeLabel = target.value.trim() || 'EDICIÓN PROMO';
+        }
+      });
+    });
+
+    // 5. Quitar calzado de la lista de tienda promo
+    this.container.querySelectorAll('.btn-remove-promo-store-item').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        const target = e.currentTarget as HTMLElement;
+        const idx = Number(target.dataset.index);
+        this.promoStoreItems.splice(idx, 1);
+        const main = this.container.querySelector('#admin-main-viewport');
+        if (main) {
+          main.innerHTML = this.renderPromoStoreFormTab();
+          this.setupPromoStoreFormEvents();
+        }
+      });
+    });
+
+    // 6. Submit del Formulario
+    const form = this.container.querySelector('#form-admin-promo-store');
+    form?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const code = (this.container.querySelector('#promo-store-code') as HTMLInputElement)?.value.trim().toUpperCase();
+      const description = (this.container.querySelector('#promo-store-desc') as HTMLInputElement)?.value.trim();
+      const startsAt = (this.container.querySelector('#promo-store-starts') as HTMLInputElement)?.value;
+      const expiresAt = (this.container.querySelector('#promo-store-expires') as HTMLInputElement)?.value;
+      const usageLimitStr = (this.container.querySelector('#promo-store-usagelimit') as HTMLInputElement)?.value;
+      const usageLimit = usageLimitStr ? Number(usageLimitStr) : null;
+      const minPurchase = Number((this.container.querySelector('#promo-store-minpurchase') as HTMLInputElement)?.value) || 0;
+      const onePerUser = (this.container.querySelector('#promo-store-oneperuser') as HTMLInputElement)?.checked ?? true;
+      const isWelcomeOnly = (this.container.querySelector('#promo-store-iswelcome') as HTMLInputElement)?.checked ?? false;
+      const isActive = (this.container.querySelector('#promo-store-isactive') as HTMLInputElement)?.checked ?? true;
+
+      if (!code) {
+        Toast.show('Ingresa un código promocional.', 'Atención', 'warning');
+        return;
+      }
+
+      if (this.promoStoreItems.length === 0) {
+        Toast.show('Debes agregar al menos un calzado a la tienda promo.', 'Atención', 'warning');
+        return;
+      }
+
+      const submitBtn = this.container.querySelector('#btn-save-promo-store') as HTMLButtonElement | null;
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Guardando tienda promo...';
+      }
+
+      try {
+        if (this.editingPromo) {
+          const res = await ApiService.updateAdminPromo(userId, {
+            id: this.editingPromo.id,
+            description,
+            discountType: 'HIDDEN_STORE',
+            discountValue: 0,
+            minPurchase,
+            usageLimit,
+            onePerUser,
+            isWelcomeOnly,
+            isActive,
+            startsAt: startsAt ? new Date(startsAt).toISOString() : undefined,
+            expiresAt: expiresAt ? new Date(expiresAt).toISOString() : null,
+            storeItems: this.promoStoreItems
+          });
+
+          if (res.success) {
+            Toast.show('Tienda promo actualizada exitosamente.', 'Promociones', 'success');
+            this.editingPromo = null;
+            this.promoStoreItems = [];
+            await this.loadInitialData();
+            this.store.loadPromos();
+            this.activeTab = 'promos-list';
+            this.updateMainContentOnly();
+          } else {
+            Toast.show(res.message || 'Error al actualizar tienda promo.', 'Atención', 'warning');
+            if (submitBtn) {
+              submitBtn.disabled = false;
+              submitBtn.textContent = 'Actualizar Tienda Promo';
+            }
+          }
+        } else {
+          const res = await ApiService.createAdminPromo(userId, {
+            code,
+            description,
+            discountType: 'HIDDEN_STORE',
+            discountValue: 0,
+            minPurchase,
+            usageLimit,
+            onePerUser,
+            isWelcomeOnly,
+            isActive,
+            startsAt: startsAt ? new Date(startsAt).toISOString() : new Date().toISOString(),
+            expiresAt: expiresAt ? new Date(expiresAt).toISOString() : null,
+            storeItems: this.promoStoreItems
+          });
+
+          if (res.success) {
+            Toast.show(`¡Código Tienda Promo ${code} creado exitosamente!`, 'Promociones', 'success');
+            this.editingPromo = null;
+            this.promoStoreItems = [];
+            await this.loadInitialData();
+            this.store.loadPromos();
+            this.activeTab = 'promos-list';
+            this.updateMainContentOnly();
+          } else {
+            Toast.show(res.message || 'Error al crear código de tienda promo.', 'Atención', 'warning');
+            if (submitBtn) {
+              submitBtn.disabled = false;
+              submitBtn.textContent = 'Crear y Habilitar Tienda Promo';
+            }
+          }
+        }
+      } catch (err: any) {
+        Toast.show(err.message || 'Error en la petición.', 'Atención', 'warning');
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Guardar Código Tienda Promo';
+        }
+      }
     });
   }
 }

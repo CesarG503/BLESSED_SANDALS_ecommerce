@@ -28,6 +28,11 @@ export class ShowcasePromo {
   private targetProgress: number = 0;
   private animationFrameId: number | null = null;
   private pinState: 'before' | 'pinned' | 'after' = 'before';
+  private scrollCleanup: (() => void) | null = null;
+
+  // Seguimiento de tienda promocional montada para evitar destruir el DOM innecesariamente
+  private renderedPromoCode: string | null = null;
+  private isStoreRendered: boolean = false;
 
   // Productos dinámicos revelados por scroll
   private showcaseProducts: ShowcaseProductItem[] = [];
@@ -38,53 +43,193 @@ export class ShowcasePromo {
     if (!el) throw new Error(`Element #${containerId} not found`);
     this.container = el;
 
-    this.initProducts();
-    this.render();
-    this.setupScrollEvents();
+    this.sync(true);
+
+    // Sincronizar reactivamente si el estado del Store cambia (sin re-renderizar todo el DOM si el código ya está montado)
+    this.store.subscribe(() => {
+      this.sync(false);
+    });
+
+    // Escuchar eventos globales de desbloqueo / cierre de tienda oculta
+    if (typeof window !== 'undefined') {
+      window.addEventListener('blessed:promo_store_unlocked', () => {
+        this.sync(true);
+        setTimeout(() => {
+          this.container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
+      });
+
+      window.addEventListener('blessed:promo_store_closed', () => {
+        this.sync(true);
+      });
+    }
+
     this.startLoop();
   }
 
   /**
-   * Carga los 4 productos estelares a mostrar en la experiencia promocional
+   * Sincroniza la visibilidad y contenido según si la tienda promo está desbloqueada.
+   * Si force = false y la tienda ya está renderizada para este código, NO destruye el DOM
+   * para prevenir cualquier salto de scroll durante las interacciones (añadir a favoritos, etc.).
+   */
+  private sync(force: boolean = false): void {
+    const unlocked = this.store.unlockedPromoStore;
+    const isUnlocked = Boolean(unlocked);
+    const code = unlocked?.code || null;
+
+    if (!isUnlocked) {
+      if (this.isStoreRendered) {
+        this.container.style.display = 'none';
+        this.container.innerHTML = '';
+        this.isStoreRendered = false;
+        this.renderedPromoCode = null;
+      }
+      return;
+    }
+
+    // Si ya está renderizada para este código de tienda y no se fuerza un re-render,
+    // únicamente actualizamos estados reactivos (ej. botones de favoritos) sin tocar el scroll
+    if (this.isStoreRendered && this.renderedPromoCode === code && !force) {
+      this.updateWishlistBadges();
+      return;
+    }
+
+    this.isStoreRendered = true;
+    this.renderedPromoCode = code;
+    this.container.style.display = 'block';
+    this.initProducts();
+    this.render();
+    this.setupScrollEvents();
+  }
+
+  /**
+   * Actualiza únicamente las insignias e iconos de favoritos sin recargar el DOM ni alterar el scroll
+   */
+  private updateWishlistBadges(): void {
+    this.container.querySelectorAll('[data-action="wishlist"]').forEach((btn) => {
+      const prodId = (btn as HTMLElement).dataset.prodId;
+      if (!prodId) return;
+      const isFav = this.store.isInWishlist(prodId);
+      btn.classList.toggle('is-active', isFav);
+      btn.innerHTML = Icons.heart('w-4 h-4', isFav);
+    });
+  }
+
+  /**
+   * Carga los productos estelares a mostrar en la experiencia promocional.
+   * Aplica el precio de descuento promocional en el producto principal y en todas sus
+   * variantes de color para que Vista Rápida y el Carrito reflejen siempre el descuento.
    */
   private initProducts(): void {
-    const p1 = MOCK_PRODUCTS.find((p) => p.id === 'prod-003') || MOCK_PRODUCTS[0]; // Blessed Slide Classic
-    const p2 = MOCK_PRODUCTS.find((p) => p.id === 'prod-001') || MOCK_PRODUCTS[1]; // Jordan 1 Retro
-    const p3 = MOCK_PRODUCTS.find((p) => p.id === 'prod-007') || MOCK_PRODUCTS[2]; // Sandal Leather Luxe
-    const p4 = MOCK_PRODUCTS.find((p) => p.id === 'prod-002') || MOCK_PRODUCTS[3]; // Jordan 11 Retro
+    const unlocked = this.store.unlockedPromoStore;
+    const storeItems = unlocked && Array.isArray(unlocked.storeItems) ? unlocked.storeItems : [];
+    const allProducts = this.store.products.length > 0 ? this.store.products : MOCK_PRODUCTS;
 
-    this.showcaseProducts = [
-      { threshold: 0.14, product: p1, badgeLabel: 'MÁS VENDIDO' },
-      { threshold: 0.38, product: p2, badgeLabel: 'EDICIÓN PROMO' },
-      { threshold: 0.62, product: p3, badgeLabel: 'PIEL PREMIUM' },
-      { threshold: 0.84, product: p4, badgeLabel: 'EXCLUSIVO 2026' }
-    ];
+    if (storeItems.length > 0) {
+      this.showcaseProducts = storeItems.map((item, idx) => {
+        const found = allProducts.find((p) => p.id === item.productId) || allProducts[idx % allProducts.length];
+        const promoPrice = Number(item.promoPrice) || found.price;
+        const promoOriginalPrice = found.price;
+
+        // Actualizar variantes de color con el precio de promoción
+        const updatedColors = Array.isArray(found.colors) && found.colors.length > 0
+          ? found.colors.map((c) => ({
+              ...c,
+              price: promoPrice,
+              originalPrice: c.price || promoOriginalPrice
+            }))
+          : found.colors;
+
+        const promoProduct: Product = {
+          ...found,
+          originalPrice: promoOriginalPrice,
+          price: promoPrice,
+          colors: updatedColors,
+          badge: (item.badgeLabel as any) || 'DESCUENTO'
+        };
+
+        const count = storeItems.length;
+        const threshold = Number((0.10 + (idx / Math.max(1, count)) * 0.75).toFixed(2));
+        return {
+          threshold,
+          product: promoProduct,
+          badgeLabel: item.badgeLabel || 'OFERTA PROMO'
+        };
+      });
+    } else {
+      const p1 = allProducts.find((p) => p.id === 'prod-003') || allProducts[0];
+      const p2 = allProducts.find((p) => p.id === 'prod-001') || allProducts[1];
+      const p3 = allProducts.find((p) => p.id === 'prod-007') || allProducts[2];
+      const p4 = allProducts.find((p) => p.id === 'prod-002') || allProducts[3];
+
+      const makePromo = (p: Product, promoPrice: number, badge: string) => {
+        const promoOriginalPrice = p.price;
+        const updatedColors = Array.isArray(p.colors) && p.colors.length > 0
+          ? p.colors.map((c) => ({
+              ...c,
+              price: promoPrice,
+              originalPrice: c.price || promoOriginalPrice
+            }))
+          : p.colors;
+        return {
+          ...p,
+          price: promoPrice,
+          originalPrice: promoOriginalPrice,
+          colors: updatedColors,
+          badge: badge as any
+        };
+      };
+
+      this.showcaseProducts = [
+        { threshold: 0.14, product: makePromo(p1, 89.99, 'MÁS VENDIDO'), badgeLabel: 'MÁS VENDIDO' },
+        { threshold: 0.38, product: makePromo(p2, 99.99, 'EDICIÓN PROMO'), badgeLabel: 'EDICIÓN PROMO' },
+        { threshold: 0.62, product: makePromo(p3, 79.99, 'PIEL PREMIUM'), badgeLabel: 'PIEL PREMIUM' },
+        { threshold: 0.84, product: makePromo(p4, 109.99, 'EXCLUSIVO 2026'), badgeLabel: 'EXCLUSIVO 2026' }
+      ];
+    }
   }
 
   /**
    * Renderiza la estructura base del componente con runway para scroll pinning
    */
   private render(): void {
+    const unlocked = this.store.unlockedPromoStore;
+    const promoCode = unlocked?.code || 'BLESSED PROMO';
+    const promoDesc = unlocked?.description || 'SILUETAS ICÓNICAS & EDICIÓN ESPECIAL';
+    const expiresNote = unlocked?.expiresAt
+      ? `Promoción válida hasta el ${new Date(unlocked.expiresAt).toLocaleDateString()}.`
+      : '';
+
+    const totalCount = this.showcaseProducts.length;
+    // Pacing dinámico según la cantidad de calzados: si son más de 4, ampliamos el runway para scroll suave
+    const runwayHeightVh = Math.max(240, 180 + totalCount * 40);
+
     this.container.innerHTML = `
       <section class="horse-showcase-section promo-showcase-section" id="promo-showcase-section">
         <!-- RUNWAY DE SCROLL PARA PINNING Y CONTROL BIDIRECCIONAL -->
-        <div class="horse-scroll-runway promo-scroll-runway" id="promo-runway">
+        <div class="horse-scroll-runway promo-scroll-runway" id="promo-runway" style="min-height: ${runwayHeightVh}vh;">
           <div class="horse-sticky-viewport is-before promo-sticky-viewport" id="promo-viewport">
             
             <!-- MARCA DE AGUA AMBIENTAL DE FONDO -->
-            <div class="horse-watermark-bg" aria-hidden="true">BLESSED PROMO</div>
+            <div class="horse-watermark-bg" aria-hidden="true">${promoCode}</div>
             <div class="horse-ambient-glow" aria-hidden="true"></div>
 
             <!-- ENCABEZADO Y PROGRESO -->
             <div class="horse-header-box">
-              <div class="horse-badge-pill">
-                <span class="horse-live-pulse"></span>
-                <span>COLECCIÓN EXCLUSIVA • LANZAMIENTO LIMITADO</span>
+              <div class="" style="margin-top:1rem;">
+                <span class="horse-live-pulse" ></span>
+                <span></span>
               </div>
-              <h2 class="horse-title">SILUETAS ICÓNICAS & EDICIÓN ESPECIAL</h2>
+              <h2 class="horse-title">${promoDesc}</h2>
               <p class="horse-subtitle">
-                Desplaza el scroll hacia abajo para explorar la serie exclusiva. Los modelos se revelan dinámicamente en tu recorrido.
+                ${expiresNote} Desplaza el scroll hacia abajo para explorar los calzados con descuento exclusivo asignado en tu compra.
               </p>
+
+              <div style="margin-top: 10px;">
+                <button type="button" class="btn-promo-store-close" id="btn-promo-store-close" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); color: #cbd5e1; padding: 6px 16px; border-radius: 20px; font-size: 0.78rem; cursor: pointer; transition: all 0.2s ease;">
+                  ✕ Ocultar Tienda Promo
+                </button>
+              </div>
 
               <!-- BARRA Y MÉTRICAS DE PROGRESO -->
               <div class="horse-metric-container">
@@ -103,10 +248,10 @@ export class ShowcasePromo {
               
               <div class="horse-products-trail promo-products-trail" id="promo-products-trail">
                 ${this.showcaseProducts
-                  .map(
-                    (item, idx) => `
+        .map(
+          (item, idx) => `
                   <div 
-                    class="horse-product-card ${idx % 2 === 0 ? 'horse-card-upper' : 'horse-card-lower'}" 
+                    class="horse-product-card promo-product-card ${idx % 2 === 0 ? 'promo-card-upper' : 'promo-card-lower'}" 
                     id="promo-card-${idx}" 
                     data-index="${idx}"
                     data-threshold="${item.threshold}"
@@ -141,7 +286,10 @@ export class ShowcasePromo {
                       <!-- FILA INFERIOR: PRECIO, VISTA RÁPIDA Y AÑADIR -->
                       <div class="h-card-bottom">
                         <div class="h-card-price-box">
-                          <span class="h-card-price">$${item.product.price}</span>
+                          <span class="h-card-price">$${Number(item.product.price).toFixed(2)}</span>
+                          ${item.product.originalPrice && Number(item.product.originalPrice) > Number(item.product.price)
+                            ? `<span class="h-card-orig-price">$${Number(item.product.originalPrice).toFixed(2)}</span>`
+                            : ''}
                           <span class="h-card-stock">● En Stock</span>
                         </div>
 
@@ -172,8 +320,8 @@ export class ShowcasePromo {
                     </div>
                   </div>
                 `
-                  )
-                  .join('')}
+        )
+        .join('')}
               </div>
 
             </div>
@@ -190,6 +338,12 @@ export class ShowcasePromo {
    * Conecta los eventos de clic en los botones de productos (Favoritos, QuickView, Añadir)
    */
   private wireCardEvents(): void {
+    // Cerrar / Ocultar Tienda Promo
+    this.container.querySelector('#btn-promo-store-close')?.addEventListener('click', () => {
+      this.store.closePromoStore();
+      Toast.show('Has salido de la tienda promo.', 'Tienda Oculta', 'info');
+    });
+
     // Favoritos
     this.container.querySelectorAll('[data-action="wishlist"]').forEach((btn) => {
       btn.addEventListener('click', (e) => {
@@ -223,7 +377,7 @@ export class ShowcasePromo {
       });
     });
 
-    // Añadir al Carrito
+    // Añadir al Carrito (añade con feedback visual sin forzar drawer para no bloquear el scroll)
     this.container.querySelectorAll('[data-action="add"]').forEach((btn) => {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
@@ -232,8 +386,9 @@ export class ShowcasePromo {
         const item = this.showcaseProducts.find((p) => p.product.id === prodId);
         if (!item) return;
 
-        this.store.addToCart(item.product, 40);
-        this.store.toggleCart(true);
+        const defaultSize = item.product.sizes?.[0] || 40;
+        const defaultColor = item.product.colors?.[0]?.name;
+        this.store.addToCart(item.product, defaultSize, defaultColor);
         Toast.show(`¡${item.product.name} añadido a tu bolsa de compras!`, 'Añadido con Éxito', 'success');
       });
     });
@@ -246,6 +401,11 @@ export class ShowcasePromo {
    * 3. 'is-after': Al llegar al footer, se queda asentado arriba del footer sin ser fixed (position: absolute; bottom: 0).
    */
   private setupScrollEvents(): void {
+    if (this.scrollCleanup) {
+      this.scrollCleanup();
+      this.scrollCleanup = null;
+    }
+
     const runway = this.container.querySelector('#promo-runway') as HTMLElement | null;
     const viewport = this.container.querySelector('#promo-viewport') as HTMLElement | null;
     if (!runway || !viewport) return;
@@ -284,6 +444,11 @@ export class ShowcasePromo {
 
     window.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('resize', onScroll, { passive: true });
+    this.scrollCleanup = () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+    };
+
     onScroll();
   }
 
@@ -309,7 +474,12 @@ export class ShowcasePromo {
   }
 
   /**
-   * Actualiza el progreso de scroll y la revelación de productos en ejes X e Y
+   * Actualiza el progreso de scroll y la revelación de productos en ejes X e Y:
+   * - Distribución horizontal ordenada y separada en slots (sin superponerse).
+   * - Si hay más de 4 calzados (o del límite visible):
+   *   El primer calzado que apareció sale hacia afuera por la izquierda con fade-out,
+   *   dando espacio al siguiente calzado (el 5to calzado entra por la derecha al slot visible),
+   *   y así sucesivamente con soporte bidireccional y suave a 60fps.
    */
   private updateScene(progress: number): void {
     // 1. Actualizar barra de progreso y métricas
@@ -319,59 +489,161 @@ export class ShowcasePromo {
     if (percentEl) percentEl.textContent = `${Math.round(progress * 100)}%`;
     if (barEl) barEl.style.width = `${(progress * 100).toFixed(1)}%`;
 
-    // 2. Revelación dinámica de los productos en HORIZONTAL y VERTICAL
-    const trailEl = this.container.querySelector('#promo-products-trail') as HTMLElement | null;
-    const isMobile = window.innerWidth < 992;
+    const totalCount = this.showcaseProducts.length;
+    if (totalCount === 0) return;
 
-    this.showcaseProducts.forEach((item, idx) => {
+    // Detectar responsividad y límites de capacidad simultánea en pantalla
+    const windowWidth = typeof window !== 'undefined' ? window.innerWidth : 1200;
+    const isMobile = windowWidth < 640;
+    const isTablet = windowWidth >= 640 && windowWidth < 1024;
+
+    const maxVisibleSlots = isMobile ? 1 : (isTablet ? 2 : 4);
+    const slotStep = isMobile ? 90 : (isTablet ? 47 : 24); // Separación horizontal porcentual
+
+    // =========================================================================
+    // CASO 1: LA CANTIDAD TOTAL CABE COMPLETA EN PANTALLA (totalCount <= maxVisibleSlots)
+    // Se distribuyen en slots separados con aparición progresiva y sin desplazarse fuera
+    // =========================================================================
+    if (totalCount <= maxVisibleSlots) {
+      const groupWidth = totalCount * slotStep;
+      const baseLeft = Math.max(2, (100 - groupWidth) / 2);
+
+      this.showcaseProducts.forEach((_, idx) => {
+        const card = this.container.querySelector(`#promo-card-${idx}`) as HTMLElement | null;
+        if (!card) return;
+
+        const targetLeft = baseLeft + idx * slotStep;
+        card.style.left = `${targetLeft.toFixed(2)}%`;
+
+        const enterStart = 0.08 + (idx / totalCount) * 0.65;
+        const enterDur = 0.15;
+
+        if (progress < enterStart) {
+          card.style.opacity = '0';
+          card.style.transform = 'translate3d(0, 30px, 0) scale(0.84)';
+          card.style.pointerEvents = 'none';
+        } else {
+          const factor = Math.min(1, Math.max(0, (progress - enterStart) / enterDur));
+          const ease = 1 - Math.pow(1 - factor, 3);
+          const deltaY = (1 - ease) * 30;
+          const scale = 0.84 + ease * 0.16;
+
+          card.style.opacity = ease.toFixed(3);
+          card.style.transform = `translate3d(0, ${deltaY.toFixed(1)}px, 0) scale(${scale.toFixed(3)})`;
+          card.style.pointerEvents = ease > 0.85 ? 'auto' : 'none';
+        }
+      });
+      return;
+    }
+
+    // =========================================================================
+    // CASO 2: HAY MÁS DE 4 CALZADOS (totalCount > maxVisibleSlots)
+    // 1. Los primeros 4 aparecen poco a poco en orden.
+    // 2. Al continuar el scroll, el calzado más antiguo (el primero) sale hacia afuera por la
+    //    izquierda desvaneciéndose (fade out), y le cede su lugar al siguiente (el 5to entra
+    //    por la derecha al slot 3, luego el 6to, etc.) de forma totalmente reversible.
+    // =========================================================================
+    const extraItems = totalCount - maxVisibleSlots;
+    const baseLeft = isMobile ? 5 : (isTablet ? 3 : 3.5);
+
+    const phase1End = 0.25;
+    const phase2Start = 0.25;
+    const phase2End = 0.88;
+
+    let currentShift = 0;
+    if (progress > phase2Start) {
+      const slideT = Math.min(1, Math.max(0, (progress - phase2Start) / (phase2End - phase2Start)));
+      currentShift = slideT * extraItems;
+    }
+
+    this.showcaseProducts.forEach((_, idx) => {
       const card = this.container.querySelector(`#promo-card-${idx}`) as HTMLElement | null;
       if (!card) return;
 
-      const isUpper = idx % 2 === 0;
+      const currentSlot = idx - currentShift;
+      const targetLeft = baseLeft + currentSlot * slotStep;
+      card.style.left = `${targetLeft.toFixed(2)}%`;
 
-      if (progress >= item.threshold) {
-        const revealFactor = Math.min(1, Math.max(0, (progress - item.threshold) / 0.08));
-        const ease = 1 - Math.pow(1 - revealFactor, 3);
+      // FASE 1: Entrada inicial poco a poco de los primeros pares en pantalla
+      if (progress <= phase1End) {
+        if (idx < maxVisibleSlots) {
+          const enterStart = 0.05 + (idx / maxVisibleSlots) * 0.15;
+          const enterDur = 0.08;
 
-        const deltaX = (1 - ease) * -45;
-        const deltaY = isUpper ? (1 - ease) * 55 : (1 - ease) * 50;
-        const scale = 0.78 + ease * 0.22;
-        const rotate = isUpper ? (1 - ease) * -5 : (1 - ease) * 4;
+          if (progress < enterStart) {
+            card.style.opacity = '0';
+            card.style.transform = 'translate3d(0, 30px, 0) scale(0.84)';
+            card.style.pointerEvents = 'none';
+          } else {
+            const factor = Math.min(1, Math.max(0, (progress - enterStart) / enterDur));
+            const ease = 1 - Math.pow(1 - factor, 3);
+            const deltaY = (1 - ease) * 30;
+            const scale = 0.84 + ease * 0.16;
 
-        card.style.opacity = ease.toFixed(3);
-        card.style.transform = `translate3d(${deltaX}px, ${deltaY}px, 0) scale(${scale}) rotate(${rotate}deg)`;
-        card.style.pointerEvents = ease > 0.85 ? 'auto' : 'none';
-        card.classList.add('is-active-reveal');
-        if (ease >= 0.99) {
-          card.classList.add('is-settled');
+            card.style.opacity = ease.toFixed(3);
+            card.style.transform = `translate3d(0, ${deltaY.toFixed(1)}px, 0) scale(${scale.toFixed(3)})`;
+            card.style.pointerEvents = ease > 0.85 ? 'auto' : 'none';
+          }
         } else {
-          card.classList.remove('is-settled');
+          // El 5to calzado en adelante espera fuera de pantalla a la derecha
+          card.style.opacity = '0';
+          card.style.transform = 'translate3d(30px, 0, 0) scale(0.82)';
+          card.style.pointerEvents = 'none';
         }
-      } else {
-        const deltaX = -45;
-        const deltaY = isUpper ? 55 : 50;
-        const rotate = isUpper ? -5 : 4;
+        return;
+      }
 
+      // FASE 2: Transición fluida con desplazamiento continuo
+      // A) Totalmente fuera de pantalla a la izquierda
+      if (currentSlot <= -1.0) {
         card.style.opacity = '0';
-        card.style.transform = `translate3d(${deltaX}px, ${deltaY}px, 0) scale(0.78) rotate(${rotate}deg)`;
+        card.style.transform = 'translate3d(-30px, 0, 0) scale(0.80)';
         card.style.pointerEvents = 'none';
-        card.classList.remove('is-active-reveal', 'is-settled');
+      }
+      // B) SALIDA POR LA IZQUIERDA: El calzado anterior se desliza y desvanece hacia afuera
+      else if (currentSlot < 0.0) {
+        const exitProgress = -currentSlot; // 0 en slot 0 -> 1 en slot -1
+        const opacity = Math.max(0, 1 - exitProgress);
+        const deltaX = -exitProgress * 30;
+        const scale = 1 - exitProgress * 0.16;
+
+        card.style.opacity = opacity.toFixed(3);
+        card.style.transform = `translate3d(${deltaX.toFixed(1)}px, 0, 0) scale(${scale.toFixed(3)})`;
+        card.style.pointerEvents = 'none';
+      }
+      // C) VISIBLE EN PANTALLA ACTIVA (Slots 0 a 3 en desktop)
+      else if (currentSlot <= maxVisibleSlots - 1) {
+        card.style.opacity = '1';
+        card.style.transform = 'translate3d(0, 0, 0) scale(1)';
+        card.style.pointerEvents = 'auto';
+      }
+      // D) ENTRADA POR LA DERECHA: El siguiente calzado (ej. 5to par) entra suavemente al slot visible
+      else if (currentSlot <= maxVisibleSlots) {
+        const enterProgress = maxVisibleSlots - currentSlot; // 0 en slot 4 -> 1 en slot 3
+        const opacity = Math.min(1, Math.max(0, enterProgress));
+        const deltaX = (1 - enterProgress) * 30;
+        const scale = 0.84 + enterProgress * 0.16;
+
+        card.style.opacity = opacity.toFixed(3);
+        card.style.transform = `translate3d(${deltaX.toFixed(1)}px, 0, 0) scale(${scale.toFixed(3)})`;
+        card.style.pointerEvents = opacity > 0.85 ? 'auto' : 'none';
+      }
+      // E) Calzados futuros esperando a la derecha
+      else {
+        card.style.opacity = '0';
+        card.style.transform = 'translate3d(30px, 0, 0) scale(0.82)';
+        card.style.pointerEvents = 'none';
       }
     });
-
-    // En móviles, desplazar la fila de tarjetas suavemente
-    if (isMobile && trailEl) {
-      const activeIdx = this.showcaseProducts.reduce((acc, curr, i) => (progress >= curr.threshold ? i : acc), 0);
-      const shiftX = activeIdx * 210;
-      trailEl.style.transform = `translateX(-${shiftX}px)`;
-    } else if (trailEl) {
-      trailEl.style.transform = 'none';
-    }
   }
 
   public destroy(): void {
     if (this.animationFrameId) {
       cancelAnimationFrame(this.animationFrameId);
+    }
+    if (this.scrollCleanup) {
+      this.scrollCleanup();
+      this.scrollCleanup = null;
     }
   }
 }

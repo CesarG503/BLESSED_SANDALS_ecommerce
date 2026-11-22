@@ -354,6 +354,9 @@ export class PromoModal {
         origin: { y: 0.15 }
       });
       Toast.show(res.message);
+      if (this.store.unlockedPromoStore) {
+        this.store.togglePromo(false);
+      }
     } else {
       Toast.show(res.message);
     }
@@ -375,6 +378,9 @@ export class PromoModal {
         origin: { y: 0.15 }
       });
       Toast.show(res.message);
+      if (this.store.unlockedPromoStore) {
+        this.store.togglePromo(false);
+      }
     } else {
       Toast.show(res.message);
     }

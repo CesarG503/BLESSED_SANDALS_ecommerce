@@ -40,6 +40,7 @@ export class Store {
   // Promociones y Descuentos conectados a BD
   public isPromoOpen: boolean = false;
   public appliedPromo: PromoCode | null = null;
+  public unlockedPromoStore: PromoCode | null = null;
   public pendingPromoCode: string | null = null;
 
   public welcomePromo: PromoCode = {
@@ -124,6 +125,15 @@ export class Store {
     this.wishlist = StorageService.getWishlist();
     this.currentUser = StorageService.getUser();
     this.appliedPromo = StorageService.getPromo();
+
+    try {
+      if (typeof window !== 'undefined') {
+        const storedStore = localStorage.getItem('blessed_unlocked_promo_store');
+        if (storedStore) {
+          this.unlockedPromoStore = JSON.parse(storedStore);
+        }
+      }
+    } catch {}
 
     const savedSizeUnit = StorageService.getSizeUnit() as SizeUnit;
     if (savedSizeUnit && ['EU', 'US', 'UK', 'CM'].includes(savedSizeUnit)) {
@@ -499,6 +509,21 @@ export class Store {
     );
 
     if (res.success && res.promo) {
+      if ((res as any).isStorePromo || res.promo.discountType === 'HIDDEN_STORE') {
+        this.unlockedPromoStore = res.promo;
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('blessed_unlocked_promo_store', JSON.stringify(res.promo));
+          window.dispatchEvent(new CustomEvent('blessed:promo_store_unlocked', { detail: res.promo }));
+        }
+        await this.loadUserCoupons();
+        await this.loadPromos();
+        this.notify();
+        return {
+          success: true,
+          message: res.message || `¡Tienda Secreta Desbloqueada con el código ${res.promo.code}!`
+        };
+      }
+
       this.appliedPromo = res.promo;
       StorageService.savePromo(res.promo);
       await this.loadUserCoupons();
@@ -566,6 +591,15 @@ export class Store {
   public removePromo(): void {
     this.appliedPromo = null;
     StorageService.savePromo(null);
+    this.notify();
+  }
+
+  public closePromoStore(): void {
+    this.unlockedPromoStore = null;
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('blessed_unlocked_promo_store');
+      window.dispatchEvent(new CustomEvent('blessed:promo_store_closed'));
+    }
     this.notify();
   }
 

@@ -1182,11 +1182,67 @@ export function apiPlugin(): Plugin {
               });
             }
 
-            // Expiración por fecha
+            // Expiración por fecha de inicio
+            if (promo.startsAt && new Date(promo.startsAt) > new Date()) {
+              return sendJson(res, 400, {
+                success: false,
+                message: `El código "${promo.code}" aún no está activo. Comienza el ${new Date(promo.startsAt).toLocaleDateString()}.`
+              });
+            }
+
+            // Expiración por fecha de fin
             if (promo.expiresAt && new Date(promo.expiresAt) < new Date()) {
               return sendJson(res, 400, {
                 success: false,
-                message: `El cupón ${promo.code} ha expirado.`
+                message: `El código "${promo.code}" ha expirado el ${new Date(promo.expiresAt).toLocaleDateString()}.`
+              });
+            }
+
+            // Límite global de usos
+            if (promo.usageLimit && promo.timesUsed >= promo.usageLimit) {
+              return sendJson(res, 400, {
+                success: false,
+                message: `El cupón ${promo.code} ha alcanzado el límite máximo de usos disponibles.`
+              });
+            }
+
+            // Caso especial: Código de Tienda Promo Oculta (HIDDEN_STORE)
+            if (promo.discountType === 'HIDDEN_STORE') {
+              if (userId) {
+                await prisma.userCoupon.upsert({
+                  where: {
+                    userId_promoCodeId: {
+                      userId,
+                      promoCodeId: promo.id
+                    }
+                  },
+                  create: {
+                    userId,
+                    promoCodeId: promo.id,
+                    isUsed: false
+                  },
+                  update: {}
+                });
+              }
+
+              return sendJson(res, 200, {
+                success: true,
+                isStorePromo: true,
+                promo: {
+                  id: promo.id,
+                  code: promo.code,
+                  description: promo.description,
+                  discountType: promo.discountType,
+                  discountValue: promo.discountValue,
+                  minPurchase: promo.minPurchase,
+                  onePerUser: promo.onePerUser,
+                  isWelcomeOnly: promo.isWelcomeOnly,
+                  isActive: promo.isActive,
+                  startsAt: promo.startsAt?.toISOString() || null,
+                  expiresAt: promo.expiresAt?.toISOString() || null,
+                  storeItems: promo.storeItems || []
+                },
+                message: `¡Tienda Secreta Desbloqueada con el código "${promo.code}"! Explora los calzados con descuento especial.`
               });
             }
 
@@ -1873,10 +1929,13 @@ export function apiPlugin(): Plugin {
                 discountType: p.discountType,
                 discountValue: p.discountValue,
                 minPurchase: p.minPurchase,
+                usageLimit: p.usageLimit,
                 onePerUser: p.onePerUser,
                 isWelcomeOnly: p.isWelcomeOnly,
                 isActive: p.isActive,
+                startsAt: p.startsAt?.toISOString() || null,
                 expiresAt: p.expiresAt?.toISOString() || null,
+                storeItems: p.storeItems || null,
                 createdAt: p.createdAt.toISOString(),
                 totalClaimed: p.userCoupons.length,
                 totalUsed: p.usages.length
@@ -1896,15 +1955,22 @@ export function apiPlugin(): Plugin {
               code,
               description,
               discountType = 'PERCENTAGE',
-              discountValue,
+              discountValue = 0,
               minPurchase = 0,
+              usageLimit,
               onePerUser = true,
               isWelcomeOnly = false,
               isActive = true,
-              expiresAt
+              startsAt,
+              expiresAt,
+              storeItems
             } = body;
 
-            if (!code || discountValue === undefined) {
+            if (!code) {
+              return sendJson(res, 400, { success: false, message: 'El código promocional es requerido.' });
+            }
+
+            if (discountType !== 'HIDDEN_STORE' && discountValue === undefined) {
               return sendJson(res, 400, { success: false, message: 'Código y valor de descuento son requeridos.' });
             }
 
@@ -1917,14 +1983,17 @@ export function apiPlugin(): Plugin {
             const promo = await prisma.promoCode.create({
               data: {
                 code: cleanCode,
-                description: (description || `Descuento ${discountValue}% en tu compra`).trim(),
+                description: (description || (discountType === 'HIDDEN_STORE' ? 'Tienda Promo Exclusiva' : `Descuento ${discountValue}% en tu compra`)).trim(),
                 discountType,
-                discountValue: Number(discountValue),
-                minPurchase: Number(minPurchase) || 0,
+                discountValue: Number(discountValue) || 0,
+                minPurchase: minPurchase ? Number(minPurchase) : null,
+                usageLimit: usageLimit ? Number(usageLimit) : null,
                 onePerUser: Boolean(onePerUser),
                 isWelcomeOnly: Boolean(isWelcomeOnly),
                 isActive: Boolean(isActive),
-                expiresAt: expiresAt ? new Date(expiresAt) : null
+                startsAt: startsAt ? new Date(startsAt) : new Date(),
+                expiresAt: expiresAt ? new Date(expiresAt) : null,
+                storeItems: Array.isArray(storeItems) ? (storeItems as any) : undefined
               }
             });
 
@@ -1949,10 +2018,13 @@ export function apiPlugin(): Plugin {
               discountType,
               discountValue,
               minPurchase,
+              usageLimit,
               onePerUser,
               isWelcomeOnly,
               isActive,
-              expiresAt
+              startsAt,
+              expiresAt,
+              storeItems
             } = body;
 
             if (!id) {
@@ -1965,11 +2037,14 @@ export function apiPlugin(): Plugin {
                 ...(description ? { description: description.trim() } : {}),
                 ...(discountType ? { discountType } : {}),
                 ...(discountValue !== undefined ? { discountValue: Number(discountValue) } : {}),
-                ...(minPurchase !== undefined ? { minPurchase: Number(minPurchase) } : {}),
+                ...(minPurchase !== undefined ? { minPurchase: minPurchase ? Number(minPurchase) : null } : {}),
+                ...(usageLimit !== undefined ? { usageLimit: usageLimit ? Number(usageLimit) : null } : {}),
                 ...(onePerUser !== undefined ? { onePerUser: Boolean(onePerUser) } : {}),
                 ...(isWelcomeOnly !== undefined ? { isWelcomeOnly: Boolean(isWelcomeOnly) } : {}),
                 ...(isActive !== undefined ? { isActive: Boolean(isActive) } : {}),
-                expiresAt: expiresAt ? new Date(expiresAt) : null
+                ...(startsAt !== undefined ? { startsAt: startsAt ? new Date(startsAt) : new Date() } : {}),
+                ...(expiresAt !== undefined ? { expiresAt: expiresAt ? new Date(expiresAt) : null } : {}),
+                ...(storeItems !== undefined ? { storeItems: Array.isArray(storeItems) ? (storeItems as any) : undefined } : {})
               }
             });
 
