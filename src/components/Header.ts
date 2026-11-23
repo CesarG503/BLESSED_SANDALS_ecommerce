@@ -1,5 +1,6 @@
 import { Store } from '../state/store';
 import { Icons } from './Icons';
+import { AnnouncementSettingsService } from '../data/announcementSettings';
 
 export class Header {
   private store: Store;
@@ -15,6 +16,48 @@ export class Header {
     this.render();
     this.setupEvents();
     this.setupScrollEffect();
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('blessed:announcements_changed', () => {
+        this.updateAnnouncements();
+      });
+    }
+  }
+
+  private renderAnnouncementTrackHtml(): string {
+    const all = AnnouncementSettingsService.getAnnouncements();
+    const active = all.filter((a) => a.isActive && a.text.trim());
+    if (active.length === 0) {
+      return `
+        <span class="marquee-item">✨ BLESSED SANDALS • CALZADO Y SANDALIAS EXCLUSIVAS</span>
+        <span class="marquee-sep">•</span>
+        <span class="marquee-item">✨ BLESSED SANDALS • CALZADO Y SANDALIAS EXCLUSIVAS</span>
+        <span class="marquee-sep">•</span>
+      `;
+    }
+
+    // Para garantizar el desplazamiento continuo sin saltos con translate3d(-50%, 0, 0)
+    let baseList = [...active];
+    while (baseList.length < 4) {
+      baseList = [...baseList, ...active];
+    }
+    const fullSequence = [...baseList, ...baseList];
+
+    return fullSequence
+      .map(
+        (item) => `
+        <span class="marquee-item">${item.text}</span>
+        <span class="marquee-sep">•</span>
+      `
+      )
+      .join('');
+  }
+
+  public updateAnnouncements(): void {
+    const track = this.container.querySelector('.marquee-track');
+    if (track) {
+      track.innerHTML = this.renderAnnouncementTrackHtml();
+    }
   }
 
   private render(): void {
@@ -26,22 +69,7 @@ export class Header {
       <div class="top-announcement-bar" aria-label="Promociones y Envíos">
         <div class="announcement-marquee">
           <div class="marquee-track">
-            <span class="marquee-item">✨ ENVÍO GRATIS EN PEDIDOS SUPERIORES A $50 • DEVOLUCIONES GRATUITAS EN 30 DÍAS</span>
-            <span class="marquee-sep">•</span>
-            <span class="marquee-item">🔥 NUEVA COLECCIÓN BLESSED SANDALS 2026 DISPONIBLE</span>
-            <span class="marquee-sep">•</span>
-            <span class="marquee-item">✨ ENVÍO GRATIS EN PEDIDOS SUPERIORES A $50 • DEVOLUCIONES GRATUITAS EN 30 DÍAS</span>
-            <span class="marquee-sep">•</span>
-            <span class="marquee-item">⚡ 10% DE DESCUENTO CON EL CÓDIGO BLESSED10</span>
-            <span class="marquee-sep">•</span>
-            <span class="marquee-item">✨ ENVÍO GRATIS EN PEDIDOS SUPERIORES A $50 • DEVOLUCIONES GRATUITAS EN 30 DÍAS</span>
-            <span class="marquee-sep">•</span>
-            <span class="marquee-item">🔥 NUEVA COLECCIÓN BLESSED SANDALS 2026 DISPONIBLE</span>
-            <span class="marquee-sep">•</span>
-            <span class="marquee-item">✨ ENVÍO GRATIS EN PEDIDOS SUPERIORES A $50 • DEVOLUCIONES GRATUITAS EN 30 DÍAS</span>
-            <span class="marquee-sep">•</span>
-            <span class="marquee-item">⚡ 10% DE DESCUENTO CON EL CÓDIGO BLESSED10</span>
-            <span class="marquee-sep">•</span>
+            ${this.renderAnnouncementTrackHtml()}
           </div>
         </div>
       </div>

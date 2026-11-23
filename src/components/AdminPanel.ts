@@ -16,6 +16,10 @@ import {
   ShowcaseSettingsService
 } from '../data/showcaseDemoItems';
 import { HorseShowcaseSettingsService } from '../data/horseShowcaseSettings';
+import {
+  AnnouncementSettingsService,
+  AnnouncementItem
+} from '../data/announcementSettings';
 
 export type AdminTab =
   | 'products-list'
@@ -26,6 +30,7 @@ export type AdminTab =
   | 'minio-storage'
   | 'circular-showcase'
   | 'horse-showcase'
+  | 'announcements'
   | 'stripe-test-cards';
 
 export interface ProductVariantForm {
@@ -72,6 +77,7 @@ export class AdminPanel {
   private demosAccordionOpen: boolean = false;
   private activeModalProductId: string | null = null;
   private promoStoreItems: Array<{ productId: string; promoPrice: number; badgeLabel: string }> = [];
+  private editingAnnouncement: AnnouncementItem | null = null;
   private adminCards: any[] = [];
   private adminUsers: any[] = [];
 
@@ -430,6 +436,9 @@ export class AdminPanel {
                 <button type="button" class="admin-tab-btn ${this.activeTab === 'horse-showcase' ? 'active' : ''}" data-tab="horse-showcase">
                   Horse Showcase
                 </button>
+                <button type="button" class="admin-tab-btn ${this.activeTab === 'announcements' ? 'active' : ''}" data-tab="announcements">
+                  Barra de Anuncios
+                </button>
               </nav>
             </div>
 
@@ -482,6 +491,8 @@ export class AdminPanel {
         return this.renderCircularShowcaseTab();
       case 'horse-showcase':
         return this.renderHorseShowcaseTab();
+      case 'announcements':
+        return this.renderAnnouncementsTab();
       case 'stripe-test-cards':
         return this.renderStripeTestCardsTab();
       default:
@@ -3023,6 +3034,280 @@ export class AdminPanel {
   }
 
   // ==========================================================================
+  // TAB: APARIENCIA BARRA DE ANUNCIOS SUPERIOR (TOP-ANNOUNCEMENT-BAR)
+  // ==========================================================================
+  private renderAnnouncementsTab(): string {
+    const announcements = AnnouncementSettingsService.getAnnouncements();
+    const totalCount = announcements.length;
+    const activeCount = announcements.filter((a) => a.isActive).length;
+    const hiddenCount = totalCount - activeCount;
+    const isEditing = Boolean(this.editingAnnouncement);
+
+    // Marquee preview con los elementos activos
+    const activeAnnouncements = announcements.filter((a) => a.isActive && a.text.trim());
+    let marqueeItemsHtml = '';
+    if (activeAnnouncements.length === 0) {
+      marqueeItemsHtml = `
+        <span class="marquee-item">✨ BLESSED SANDALS • CALZADO Y SANDALIAS EXCLUSIVAS</span>
+        <span class="marquee-sep">•</span>
+        <span class="marquee-item">✨ BLESSED SANDALS • CALZADO Y SANDALIAS EXCLUSIVAS</span>
+        <span class="marquee-sep">•</span>
+      `;
+    } else {
+      let baseList = [...activeAnnouncements];
+      while (baseList.length < 4) {
+        baseList = [...baseList, ...activeAnnouncements];
+      }
+      const fullList = [...baseList, ...baseList];
+      marqueeItemsHtml = fullList
+        .map((item) => `<span class="marquee-item">${item.text}</span><span class="marquee-sep">•</span>`)
+        .join('');
+    }
+
+    return `
+      <div class="admin-view-panel">
+        <div class="admin-view-header">
+          <div class="admin-view-header-main">
+            <h2 class="admin-view-title">Apariencia: Barra de Anuncios Superior</h2>
+            <p class="admin-view-subtitle">
+              Administra los textos, promociones y mensajes que se muestran en movimiento continuo en la barra superior (top-announcement-bar) de la tienda.
+            </p>
+          </div>
+        </div>
+
+        <!-- TARJETAS DE MÉTRICAS -->
+        <div class="admin-kpi-grid admin-metrics-grid">
+          <div class="admin-kpi-card admin-metric-card">
+            <span class="kpi-label metric-lbl">ANUNCIOS ACTIVOS EN BARRA</span>
+            <strong class="kpi-number metric-val text-emerald">${activeCount} / ${totalCount}</strong>
+          </div>
+          <div class="admin-kpi-card admin-metric-card">
+            <span class="kpi-label metric-lbl">MENSAJES OCULTOS</span>
+            <strong class="kpi-number metric-val">${hiddenCount}</strong>
+          </div>
+          <div class="admin-kpi-card admin-metric-card">
+            <span class="kpi-label metric-lbl">TOTAL REGISTRADOS</span>
+            <strong class="kpi-number metric-val">${totalCount}</strong>
+          </div>
+          <div class="admin-kpi-card admin-metric-card">
+            <span class="kpi-label metric-lbl">ESTADO DE ROTACIÓN</span>
+            <strong class="kpi-number metric-val text-emerald" style="font-size: 1.05rem;">
+              ${activeCount > 0 ? '● Bucle Activo (24s)' : '○ Pausado'}
+            </strong>
+          </div>
+        </div>
+
+        <!-- VISTA PREVIA EN VIVO DE LA BARRA -->
+        <div class="admin-announcement-preview-card">
+          <div class="announcement-preview-header">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="preview-badge-live">VISTA PREVIA EN VIVO</span>
+              <span class="preview-hint">Visualización exacta de la barra superior en la tienda</span>
+            </div>
+            <span style="font-size: 0.72rem; color: #64748b; font-weight: 600;">Animación fluida continua</span>
+          </div>
+          <div class="top-announcement-bar announcement-preview-bar" aria-label="Vista previa de barra superior">
+            <div class="announcement-marquee">
+              <div class="marquee-track">
+                ${marqueeItemsHtml}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- FORMULARIO: AGREGAR O EDITAR ANUNCIO -->
+        <div class="admin-announcement-form-card">
+          <div class="admin-section-header" style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <h3 class="admin-section-title" style="font-size: 1.05rem; font-weight: 800; color: #0f172a;">
+                ${isEditing ? '✏️ Editar Anuncio Seleccionado' : '➕ Agregar Nuevo Mensaje a la Barra'}
+              </h3>
+              <p class="admin-section-desc" style="font-size: 0.78rem; color: #64748b; margin-top: 2px;">
+                ${isEditing ? 'Modifica el texto o activa/desactiva este anuncio en la marquesina.' : 'Escribe el texto que deseas mostrar en la barra superior. Puedes incluir emojis llamativos.'}
+              </p>
+            </div>
+            ${isEditing ? `
+              <button type="button" class="btn-table-action" id="btn-cancel-ann-edit">
+                ✕ Cancelar edición
+              </button>
+            ` : ''}
+          </div>
+
+          <form id="form-announcement">
+            <div class="admin-form-group">
+              <div class="ann-emoji-helpers">
+                <span class="emoji-helper-label">Atajos de emoji:</span>
+                <button type="button" class="btn-emoji-tag" data-emoji="✨">✨ Brillo</button>
+                <button type="button" class="btn-emoji-tag" data-emoji="🔥">🔥 Fuego</button>
+                <button type="button" class="btn-emoji-tag" data-emoji="⚡">⚡ Rayo</button>
+                <button type="button" class="btn-emoji-tag" data-emoji="🏷️">🏷️ Oferta</button>
+                <button type="button" class="btn-emoji-tag" data-emoji="🚚">🚚 Envío</button>
+                <button type="button" class="btn-emoji-tag" data-emoji="👟">👟 Calzado</button>
+                <button type="button" class="btn-emoji-tag" data-emoji="🎁">🎁 Regalo</button>
+                <button type="button" class="btn-emoji-tag" data-emoji="💥">💥 Descuento</button>
+              </div>
+
+              <textarea 
+                id="input-ann-text" 
+                class="admin-textarea" 
+                rows="2" 
+                placeholder="Ejemplo: ✨ ENVÍO GRATIS EN PEDIDOS SUPERIORES A $50 • DEVOLUCIONES GRATUITAS EN 30 DÍAS" 
+                required
+                style="font-size: 0.85rem; font-weight: 600; letter-spacing: 0.04em;"
+              >${isEditing ? this.editingAnnouncement!.text : ''}</textarea>
+            </div>
+
+            <div class="ann-form-actions-row">
+              <label class="admin-switch-label" style="cursor: pointer; user-select: none;">
+                <input 
+                  type="checkbox" 
+                  id="check-ann-active" 
+                  ${isEditing ? (this.editingAnnouncement!.isActive ? 'checked' : '') : 'checked'} 
+                />
+                <span class="switch-ui"></span>
+                <span style="font-size: 0.85rem; font-weight: 600; color: #0f172a;">
+                  Mostrar de inmediato en la barra superior
+                </span>
+              </label>
+
+              <div style="display: flex; gap: 8px;">
+                ${isEditing ? `
+                  <button type="button" class="btn-admin-cancel" id="btn-cancel-ann-bottom">
+                    Cancelar
+                  </button>
+                ` : ''}
+                <button type="submit" class="btn-admin-submit" id="btn-save-ann">
+                  ${isEditing ? 'Guardar Cambios' : '+ Agregar Anuncio a la Barra'}
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+
+        <!-- LISTA Y TABLA DE ANUNCIOS -->
+        <div class="showcase-catalog-section-header" style="margin-top: 26px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+          <div>
+            <h3 class="showcase-section-title">Anuncios en el Sistema (${totalCount})</h3>
+            <p class="showcase-section-desc">
+              Usa las flechas para reordenar la secuencia de rotación o el interruptor para ocultar y mostrar anuncios.
+            </p>
+          </div>
+          <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <button type="button" class="btn-table-action" id="btn-ann-enable-all" title="Activar todos los mensajes">
+              Mostrar todos
+            </button>
+            <button type="button" class="btn-table-action" id="btn-ann-disable-all" title="Ocultar todos los mensajes">
+              Ocultar todos
+            </button>
+            <button type="button" class="btn-table-action danger" id="btn-ann-reset-defaults" title="Restablecer los 3 anuncios originales">
+              Restablecer originales
+            </button>
+          </div>
+        </div>
+
+        <div class="admin-products-table-wrap admin-table-container">
+          <table class="admin-table admin-data-table">
+            <thead>
+              <tr>
+                <th style="width: 75px;">ORDEN</th>
+                <th>TEXTO DEL ANUNCIO</th>
+                <th style="width: 170px;">EN BARRA SUPERIOR</th>
+                <th style="width: 140px; text-align: right;">ACCIONES</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${announcements.length === 0
+                ? `
+                  <tr>
+                    <td colspan="4" class="admin-table-empty" style="text-align: center; padding: 36px 20px; color: #64748b;">
+                      No hay anuncios registrados. Agrega uno con el formulario superior o haz clic en "Restablecer originales".
+                    </td>
+                  </tr>
+                `
+                : announcements.map((a, idx) => {
+                  const isFirst = idx === 0;
+                  const isLast = idx === announcements.length - 1;
+                  return `
+                    <tr class="${a.isActive ? 'row-showcase-active' : ''}">
+                      <!-- 1. ORDEN -->
+                      <td>
+                        <div class="showcase-order-cell">
+                          <span class="showcase-order-num">#${idx + 1}</span>
+                          <div class="showcase-order-arrows">
+                            <button 
+                              type="button" 
+                              class="btn-order-arrow btn-ann-up" 
+                              data-id="${a.id}" 
+                              ${isFirst ? 'disabled style="opacity: 0.3; cursor: not-allowed;"' : ''}
+                              title="Mover antes en la rotación"
+                            >▲</button>
+                            <button 
+                              type="button" 
+                              class="btn-order-arrow btn-ann-down" 
+                              data-id="${a.id}" 
+                              ${isLast ? 'disabled style="opacity: 0.3; cursor: not-allowed;"' : ''}
+                              title="Mover después en la rotación"
+                            >▼</button>
+                          </div>
+                        </div>
+                      </td>
+
+                      <!-- 2. TEXTO -->
+                      <td>
+                        <div class="ann-text-preview ${!a.isActive ? 'is-inactive' : ''}">
+                          ${a.text}
+                        </div>
+                      </td>
+
+                      <!-- 3. INTERRUPTOR ACTIVO/OCULTO -->
+                      <td>
+                        <label class="admin-switch-label" title="${a.isActive ? 'Ocultar de la barra' : 'Mostrar en la barra'}">
+                          <input 
+                            type="checkbox" 
+                            class="toggle-ann-active" 
+                            data-id="${a.id}" 
+                            ${a.isActive ? 'checked' : ''} 
+                          />
+                          <span class="switch-ui"></span>
+                          <span class="showcase-status-label" style="font-size: 0.78rem; font-weight: 500; color: ${a.isActive ? '#0f172a' : '#64748b'};">
+                            ${a.isActive ? 'Visible en barra' : 'Oculto'}
+                          </span>
+                        </label>
+                      </td>
+
+                      <!-- 4. ACCIONES -->
+                      <td style="text-align: right;">
+                        <div class="table-actions-row">
+                          <button 
+                            type="button" 
+                            class="btn-table-action btn-edit-ann" 
+                            data-id="${a.id}"
+                            title="Editar texto del anuncio"
+                          >
+                            Editar
+                          </button>
+                          <button 
+                            type="button" 
+                            class="btn-table-action danger btn-delete-ann" 
+                            data-id="${a.id}"
+                            title="Eliminar este anuncio"
+                          >
+                            Quitar
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  `;
+                }).join('')
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
+  // ==========================================================================
   // CONFIGURACIÓN DE EVENTOS GENERALES Y POR TAB
   // ==========================================================================
   private setupEvents(): void {
@@ -3110,6 +3395,11 @@ export class AdminPanel {
     // Si estamos en la pestaña de Horse Showcase
     if (this.activeTab === 'horse-showcase') {
       this.setupHorseShowcaseEvents();
+    }
+
+    // Si estamos en la pestaña de Barra de Anuncios
+    if (this.activeTab === 'announcements') {
+      this.setupAnnouncementsEvents();
     }
 
     // Si estamos en la pestaña de Tarjetas de Prueba Stripe
@@ -4373,6 +4663,175 @@ export class AdminPanel {
           this.updateMainContentOnly();
         }
       });
+    });
+  }
+
+  // ==========================================================================
+  // EVENTOS: ADMINISTRACIÓN DE BARRA DE ANUNCIOS (TOP-ANNOUNCEMENT-BAR)
+  // ==========================================================================
+  private setupAnnouncementsEvents(): void {
+    const refreshView = () => {
+      const main = this.container.querySelector('#admin-main-viewport');
+      if (main) {
+        main.innerHTML = this.renderAnnouncementsTab();
+        this.setupAnnouncementsEvents();
+      }
+    };
+
+    // 1. Inserción rápida de emojis al textarea
+    this.container.querySelectorAll('.btn-emoji-tag').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        const target = e.currentTarget as HTMLButtonElement;
+        const emoji = target.dataset.emoji || '';
+        const input = this.container.querySelector('#input-ann-text') as HTMLTextAreaElement | null;
+        if (input) {
+          const start = input.selectionStart ?? input.value.length;
+          const end = input.selectionEnd ?? input.value.length;
+          input.value = input.value.substring(0, start) + emoji + ' ' + input.value.substring(end);
+          input.focus();
+          const nextPos = start + emoji.length + 1;
+          input.setSelectionRange(nextPos, nextPos);
+        }
+      });
+    });
+
+    // 2. Guardar nuevo o editar anuncio existente
+    const form = this.container.querySelector('#form-announcement') as HTMLFormElement | null;
+    form?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const textarea = this.container.querySelector('#input-ann-text') as HTMLTextAreaElement | null;
+      const activeCheck = this.container.querySelector('#check-ann-active') as HTMLInputElement | null;
+      const text = textarea?.value?.trim() || '';
+
+      if (!text) {
+        Toast.show('Por favor escribe un texto para el anuncio.', 'Campo requerido', 'warning');
+        return;
+      }
+
+      const isActive = activeCheck ? activeCheck.checked : true;
+
+      if (this.editingAnnouncement) {
+        AnnouncementSettingsService.updateAnnouncement(this.editingAnnouncement.id, text, isActive);
+        Toast.show('Anuncio actualizado en la barra con éxito.', 'Guardado', 'success');
+        this.editingAnnouncement = null;
+      } else {
+        AnnouncementSettingsService.addAnnouncement(text, isActive);
+        Toast.show('Nuevo anuncio agregado a la barra superior.', 'Éxito', 'success');
+      }
+
+      refreshView();
+    });
+
+    // 3. Cancelar edición
+    const cancelEdit = () => {
+      this.editingAnnouncement = null;
+      refreshView();
+    };
+    this.container.querySelector('#btn-cancel-ann-edit')?.addEventListener('click', cancelEdit);
+    this.container.querySelector('#btn-cancel-ann-bottom')?.addEventListener('click', cancelEdit);
+
+    // 4. Alternar visibilidad de anuncio individual (Switch checkbox)
+    this.container.querySelectorAll('.toggle-ann-active').forEach((checkbox) => {
+      checkbox.addEventListener('change', (e) => {
+        const target = e.currentTarget as HTMLInputElement;
+        const id = target.dataset.id;
+        if (!id) return;
+
+        const isNowActive = AnnouncementSettingsService.toggleAnnouncement(id);
+        Toast.show(
+          isNowActive ? 'Anuncio visible en la barra superior.' : 'Anuncio ocultado de la rotación.',
+          'Visibilidad',
+          'info'
+        );
+        refreshView();
+      });
+    });
+
+    // 5. Reordenar: Mover arriba
+    this.container.querySelectorAll('.btn-ann-up').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        const target = e.currentTarget as HTMLButtonElement;
+        const id = target.dataset.id;
+        if (!id) return;
+
+        AnnouncementSettingsService.moveAnnouncement(id, 'up');
+        refreshView();
+      });
+    });
+
+    // 6. Reordenar: Mover abajo
+    this.container.querySelectorAll('.btn-ann-down').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        const target = e.currentTarget as HTMLButtonElement;
+        const id = target.dataset.id;
+        if (!id) return;
+
+        AnnouncementSettingsService.moveAnnouncement(id, 'down');
+        refreshView();
+      });
+    });
+
+    // 7. Botón Editar anuncio
+    this.container.querySelectorAll('.btn-edit-ann').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        const target = e.currentTarget as HTMLButtonElement;
+        const id = target.dataset.id;
+        if (!id) return;
+
+        const announcements = AnnouncementSettingsService.getAnnouncements();
+        const found = announcements.find((a) => a.id === id);
+        if (found) {
+          this.editingAnnouncement = found;
+          refreshView();
+          const textarea = this.container.querySelector('#input-ann-text') as HTMLTextAreaElement | null;
+          if (textarea) {
+            textarea.focus();
+            textarea.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }
+      });
+    });
+
+    // 8. Botón Eliminar anuncio
+    this.container.querySelectorAll('.btn-delete-ann').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        const target = e.currentTarget as HTMLButtonElement;
+        const id = target.dataset.id;
+        if (!id) return;
+
+        if (confirm('¿Estás seguro de que deseas eliminar este anuncio de la barra?')) {
+          if (this.editingAnnouncement?.id === id) {
+            this.editingAnnouncement = null;
+          }
+          AnnouncementSettingsService.deleteAnnouncement(id);
+          Toast.show('Anuncio eliminado de la barra.', 'Eliminado', 'info');
+          refreshView();
+        }
+      });
+    });
+
+    // 9. Acciones masivas: Activar todos
+    this.container.querySelector('#btn-ann-enable-all')?.addEventListener('click', () => {
+      AnnouncementSettingsService.setAllAnnouncementsActive(true);
+      Toast.show('Todos los anuncios han sido activados en la barra.', 'Marquesina', 'success');
+      refreshView();
+    });
+
+    // 10. Acciones masivas: Ocultar todos
+    this.container.querySelector('#btn-ann-disable-all')?.addEventListener('click', () => {
+      AnnouncementSettingsService.setAllAnnouncementsActive(false);
+      Toast.show('Todos los anuncios han sido pausados/ocultados.', 'Marquesina', 'info');
+      refreshView();
+    });
+
+    // 11. Acciones masivas: Restablecer originales
+    this.container.querySelector('#btn-ann-reset-defaults')?.addEventListener('click', () => {
+      if (confirm('¿Deseas restablecer los anuncios a los textos iniciales de Blessed Sandals?')) {
+        this.editingAnnouncement = null;
+        AnnouncementSettingsService.resetToDefaults();
+        Toast.show('Anuncios restablecidos a los valores predeterminados.', 'Restablecido', 'success');
+        refreshView();
+      }
     });
   }
 
