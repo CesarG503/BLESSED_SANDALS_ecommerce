@@ -6,25 +6,53 @@ Diseñada bajo una estética moderna, minimalista y responsive inspirada en la t
 
 ---
 
-## 🚀 Inicio Rápido
+## 🚀 Inicio Rápido con Docker (Recomendado)
+
+Todo el proyecto (Frontend Web en Vite, Base de Datos PostgreSQL y Almacenamiento MinIO S3) está totalmente contenedorizado. Al clonar el repositorio en cualquier otra PC, los contenedores arrancan automáticamente con todo el estado y datos actuales.
 
 ### Requisitos
-- Node.js (v18 o superior)
-- npm (v9 o superior)
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) instalado y en ejecución.
 
-### Comandos Disponibles
+### Iniciar todos los servicios
 ```bash
-# Iniciar servidor de desarrollo con Hot Reload (HMR)
-npm run dev
+# 1. Clonar el repositorio y entrar en la carpeta
+git clone <URL_DEL_REPOSITORIO>
+cd e-comerce
 
-# Compilar proyecto para producción (Typecheck con tsc + build con Vite)
-npm run build
+# 2. Copiar variables de entorno (si no existe .env)
+cp .env.example .env
 
-# Previsualizar la versión de producción
-npm run preview
+# 3. Construir y levantar los contenedores
+docker compose up -d
 ```
 
-El servidor local se ejecuta en: [http://localhost:5173/](http://localhost:5173/)
+### Puertos y Accesos
+- 🌐 **Tienda Web (Vite + API Plugin)**: [http://localhost:5173/](http://localhost:5173/)
+- 🗄️ **PostgreSQL**: `localhost:5434` (BD: `ecommerce_db`, User: `ecommerce_user`)
+- 🪣 **MinIO S3 API**: [http://localhost:9002/](http://localhost:9002/)
+- 🎛️ **Consola MinIO Web**: [http://localhost:9003/](http://localhost:9003/) (User: `minioadmin` / Pass: `minioadmin123`)
+
+> 💡 **Nota sobre la persistencia y carga automática en cualquier PC**:
+> - **PostgreSQL**: Se inicializa automáticamente en el primer arranque a partir de `docker/postgres-init/01-init.sql`, cargando todas las tablas, usuarios, productos, categorías, pedidos y cupones.
+> - **MinIO S3**: El contenedor `ecommerce-minio-init` crea automáticamente el bucket público `ecommerce-assets`, sincroniza todas las fotos desde `docker/minio-seed/ecommerce-assets/` y copia el modelo 3D `Nike Air Jordan 1.glb`.
+> - **Servicio Web**: Corre en el contenedor `ecommerce-web`, genera el cliente de Prisma para Linux y se enlaza internamente a PostgreSQL y MinIO.
+
+---
+
+## 💻 Desarrollo Local en Host (Alternativa sin Docker Web)
+
+Si prefieres ejecutar el frontend Vite directamente en tu máquina host y solo usar Docker para PostgreSQL y MinIO:
+
+```bash
+# Iniciar solo PostgreSQL y MinIO
+docker compose up -d postgres minio minio-init
+
+# Instalar dependencias en host
+npm install
+
+# Iniciar servidor de desarrollo
+npm run dev
+```
 
 ---
 
