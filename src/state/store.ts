@@ -877,6 +877,7 @@ export class Store {
     if (res.success) {
       this.clearCart();
       this.removePromo();
+      await this.loadProducts();
       await this.loadUserCoupons();
       await this.loadPromos();
       this.notify();

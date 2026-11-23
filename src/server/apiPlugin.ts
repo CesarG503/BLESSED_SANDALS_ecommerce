@@ -1397,6 +1397,33 @@ export function apiPlugin(): Plugin {
             let cardBrand = 'VISA';
             let cardLast4 = '4242';
 
+            // --- VALIDACIÓN PREVIA DE DISPONIBILIDAD DE STOCK EN BASE DE DATOS ---
+            for (const item of items) {
+              const pId = item.productId || item.product?.id;
+              const sizeNum = Number(item.size);
+              const qty = Math.max(1, Number(item.quantity) || 1);
+
+              if (pId && !isNaN(sizeNum)) {
+                let sizeRecord = await prisma.productSize.findFirst({
+                  where: { productId: pId, size: sizeNum }
+                });
+
+                if (!sizeRecord) {
+                  const allSizes = await prisma.productSize.findMany({ where: { productId: pId } });
+                  sizeRecord = allSizes.find((s) => Math.abs(s.size - sizeNum) < 0.2) || null;
+                }
+
+                if (sizeRecord && sizeRecord.stock < qty) {
+                  const prodName = item.product?.name || 'El calzado seleccionado';
+                  return sendJson(res, 400, {
+                    success: false,
+                    errorType: 'OUT_OF_STOCK',
+                    message: `Stock insuficiente para "${prodName}" en talla ${sizeNum}. Solo quedan ${sizeRecord.stock} par(es) disponibles en inventario.`
+                  });
+                }
+              }
+            }
+
             // --- VALIDACIÓN DE FONDOS Y TARJETA CON STRIPE TEST MODE ---
             if (finalTotal > 0) {
               if (paymentCardId) {
@@ -1566,6 +1593,77 @@ export function apiPlugin(): Plugin {
               }
             });
 
+            // --- DESCONTAR STOCK REAL EN BASE DE DATOS POSTGRESQL POR CADA PAR COMPRADO ---
+            for (const item of items) {
+              const pId = item.productId || item.product?.id;
+              const sizeNum = Number(item.size);
+              const qty = Math.max(1, Number(item.quantity) || 1);
+
+              if (pId && !isNaN(sizeNum)) {
+                // 1. Decrementar existencias en la tabla product_sizes
+                let sizeRecord = await prisma.productSize.findFirst({
+                  where: { productId: pId, size: sizeNum }
+                });
+
+                if (!sizeRecord) {
+                  const allSizes = await prisma.productSize.findMany({ where: { productId: pId } });
+                  sizeRecord = allSizes.find((s) => Math.abs(s.size - sizeNum) < 0.2) || null;
+                }
+
+                if (sizeRecord) {
+                  const updatedStock = Math.max(0, sizeRecord.stock - qty);
+                  await prisma.productSize.update({
+                    where: { id: sizeRecord.id },
+                    data: { stock: updatedStock }
+                  });
+                }
+
+                // 2. Si la variante de color tiene sizes en JSON, decrementar también
+                const colName = item.color?.name;
+                const colId = item.color?.id;
+                if (colName || colId) {
+                  const colRecord = await prisma.productColor.findFirst({
+                    where: {
+                      productId: pId,
+                      OR: [
+                        { id: colId || '' },
+                        { name: colName || '' }
+                      ]
+                    }
+                  });
+
+                  if (colRecord && Array.isArray(colRecord.sizes)) {
+                    const updatedColorSizes = (colRecord.sizes as any[]).map((cs: any) => {
+                      if (Math.abs(Number(cs.size) - sizeNum) < 0.2) {
+                        return {
+                          ...cs,
+                          stock: Math.max(0, (Number(cs.stock) || 0) - qty)
+                        };
+                      }
+                      return cs;
+                    });
+
+                    await prisma.productColor.update({
+                      where: { id: colRecord.id },
+                      data: { sizes: updatedColorSizes }
+                    });
+                  }
+                }
+
+                // 3. Recalcular existencias totales y actualizar inStock en tabla products
+                const remainingSizes = await prisma.productSize.findMany({
+                  where: { productId: pId }
+                });
+                const totalRemaining = remainingSizes.reduce((acc, s) => acc + s.stock, 0);
+                await prisma.product.update({
+                  where: { id: pId },
+                  data: {
+                    inStock: totalRemaining > 0
+                  }
+                });
+              }
+            }
+
             // Si se aplicó un cupón: marcar como usado en la cuenta personal y registrar en promo_usages
             if (promoCodeId) {
               await prisma.userCoupon.updateMany({
@@ -1679,11 +1777,13 @@ export function apiPlugin(): Plugin {
                 sizes: p.sizes.length > 0
                   ? p.sizes.map((s) => s.size)
                   : (mockMatch?.sizes || [38, 39, 40, 41, 42, 43, 44]),
+                totalStock: p.sizes.reduce((acc, s) => acc + s.stock, 0),
+                sizesDetails: p.sizes.map((s) => ({ id: s.id, size: s.size, stock: s.stock })),
                 technology: mockMatch?.technology || ['Amortiguación anatómica', 'Suela antideslizante'],
                 features: mockMatch?.features || ['Diseño ergonómico', 'Ajuste cómodo', 'Material de alta calidad'],
                 rating: avgRating,
                 reviewCount: p.reviews.length || mockMatch?.reviewCount || 18,
-                inStock: p.inStock,
+                inStock: p.inStock && (p.sizes.length === 0 || p.sizes.some((s) => s.stock > 0)),
                 createdAt: p.createdAt.toISOString()
               };
             });

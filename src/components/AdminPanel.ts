@@ -262,6 +262,16 @@ export class AdminPanel {
       this.render();
     } else if (!shouldOpen && this.isOpen && !this.isClosing) {
       this.closeView();
+    } else if (this.isOpen && !this.isClosing) {
+      // Si el panel de administración ya está abierto y ocurre una actualización (ej: compra confirmada), refrescar stock
+      const userId = this.store.currentUser?.id;
+      if (userId) {
+        const prodRes = await ApiService.getAdminProducts(userId);
+        if (prodRes.success && prodRes.products) {
+          this.products = prodRes.products;
+          this.updateMainContentOnly();
+        }
+      }
     }
   }
 
@@ -508,10 +518,16 @@ export class AdminPanel {
             <h2 class="admin-view-title">Inventario de Productos & Existencias</h2>
             <p class="admin-view-subtitle">Administra los modelos oficiales de Blessed Sandals, edita precios y monitorea existencias por talla.</p>
           </div>
-          <button type="button" class="btn-admin-action-primary" id="btn-admin-goto-create-prod">
-            ${Icons.plus('w-4 h-4')}
-            <span>Agregar Producto</span>
-          </button>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button type="button" class="btn-table-action" id="btn-refresh-admin-products" style="display:inline-flex; align-items:center; gap:6px; height:38px; padding:0 14px;">
+              ${Icons.refresh('w-4 h-4')}
+              <span>Actualizar Inventario</span>
+            </button>
+            <button type="button" class="btn-admin-action-primary" id="btn-admin-goto-create-prod">
+              ${Icons.plus('w-4 h-4')}
+              <span>Agregar Producto</span>
+            </button>
+          </div>
         </div>
 
         <!-- TARJETAS DE MÉTRICAS RÁPIDAS -->
@@ -3072,6 +3088,17 @@ export class AdminPanel {
     }
 
     // --- TAB 1: PRODUCTOS LIST ---
+    this.container.querySelector('#btn-refresh-admin-products')?.addEventListener('click', async () => {
+      const userId = this.store.currentUser?.id;
+      if (!userId) return;
+      const prodRes = await ApiService.getAdminProducts(userId);
+      if (prodRes.success && prodRes.products) {
+        this.products = prodRes.products;
+        this.updateMainContentOnly();
+        Toast.show('Inventario de existencias actualizado.', 'Inventario', 'info');
+      }
+    });
+
     this.container.querySelector('#btn-admin-goto-create-prod')?.addEventListener('click', () => {
       this.editingProduct = null;
       this.initFormSizes();

@@ -51,16 +51,28 @@ export class QuickViewModal {
       // Tallas de la variante de color si están definidas, o las tallas generales del producto
       let sizes: number[] = [];
       if (Array.isArray(selectedColor?.sizes) && selectedColor.sizes.length > 0) {
-        const inStockSizes = selectedColor.sizes.filter((s: any) => s.stock > 0).map((s: any) => Number(s.size));
-        sizes = inStockSizes.length > 0 ? inStockSizes : selectedColor.sizes.map((s: any) => Number(s.size));
+        sizes = selectedColor.sizes.map((s: any) => Number(s.size));
       } else if (Array.isArray(product.sizes) && product.sizes.length > 0) {
         sizes = product.sizes;
       } else {
         sizes = [38, 39, 40, 41, 42, 43, 44];
       }
 
-      if (!this.selectedSize || !sizes.includes(this.selectedSize)) {
-        this.selectedSize = sizes[0] || 40;
+      const getSizeStock = (sVal: number): number => {
+        if (Array.isArray(selectedColor?.sizes) && selectedColor.sizes.length > 0) {
+          const match = selectedColor.sizes.find((s: any) => Math.abs(Number(s.size) - sVal) < 0.2);
+          if (match) return Number(match.stock) || 0;
+        }
+        if (Array.isArray(product.sizesDetails) && product.sizesDetails.length > 0) {
+          const match = product.sizesDetails.find((s: any) => Math.abs(Number(s.size) - sVal) < 0.2);
+          if (match) return Number(match.stock) || 0;
+        }
+        return 20;
+      };
+
+      const firstInStock = sizes.find((s) => getSizeStock(s) > 0);
+      if (!this.selectedSize || !sizes.includes(this.selectedSize) || getSizeStock(this.selectedSize) <= 0) {
+        this.selectedSize = firstInStock || sizes[0] || 40;
       }
 
       // Precio según la variante seleccionada
@@ -175,18 +187,22 @@ export class QuickViewModal {
                 </div>
                 <div class="quickview-sizes-grid">
                   ${sizes
-                    .map(
-                      (size) => `
+                    .map((size) => {
+                      const stockVal = getSizeStock(size);
+                      const isOutOfStock = stockVal <= 0;
+                      return `
                     <button 
                       type="button" 
-                      class="qv-size-pill ${size === this.selectedSize ? 'is-selected' : ''}" 
+                      class="qv-size-pill ${size === this.selectedSize ? 'is-selected' : ''} ${isOutOfStock ? 'is-out-of-stock' : ''}" 
                       data-size="${size}"
-                      title="${formatFullEquivalence(size)}"
+                      data-stock="${stockVal}"
+                      ${isOutOfStock ? 'disabled' : ''}
+                      title="${formatFullEquivalence(size)} ${isOutOfStock ? '(Agotado)' : `(${stockVal} disponibles)`}"
                     >
                       ${formatSizeDisplay(size, this.store.activeSizeUnit)}
                     </button>
-                  `
-                    )
+                  `;
+                    })
                     .join('')}
                 </div>
               </div>
@@ -199,8 +215,8 @@ export class QuickViewModal {
                   <button type="button" class="btn-qty" id="qty-plus" aria-label="Más">+</button>
                 </div>
 
-                <button class="btn btn-primary btn-add-bag" id="quickview-add-to-cart">
-                  ${Icons.bag('w-5 h-5')} Añadir a la Bolsa
+                <button class="btn btn-primary btn-add-bag ${getSizeStock(this.selectedSize) <= 0 ? 'is-disabled' : ''}" id="quickview-add-to-cart" ${getSizeStock(this.selectedSize) <= 0 ? 'disabled' : ''}>
+                  ${getSizeStock(this.selectedSize) <= 0 ? 'Agotado en esta Talla' : `${Icons.bag('w-5 h-5')} Añadir a la Bolsa`}
                 </button>
 
                 <button class="btn-icon-square ${isFav ? 'is-active' : ''}" id="quickview-fav-btn" title="Guardar en favoritos">

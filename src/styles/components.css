@@ -2179,6 +2179,22 @@
   border-color: var(--color-primary);
 }
 
+.qv-size-pill.is-out-of-stock,
+.qv-size-pill:disabled {
+  opacity: 0.35;
+  cursor: not-allowed !important;
+  background-color: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+  color: #94a3b8 !important;
+  text-decoration: line-through;
+}
+
+.qv-size-pill.is-out-of-stock:hover,
+.qv-size-pill:disabled:hover {
+  border-color: #cbd5e1 !important;
+  background-color: #f1f5f9 !important;
+}
+
 .quickview-actions-row {
   display: flex;
   align-items: center;

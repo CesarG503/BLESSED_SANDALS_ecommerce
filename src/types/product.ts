@@ -35,6 +35,8 @@ export interface Product {
   rating: number;
   reviewCount: number;
   inStock: boolean;
+  totalStock?: number;
+  sizesDetails?: Array<{ id: string; size: number; stock: number }>;
   has3DModel?: boolean;
   model3dUrl?: string;
   carouselImage?: string | null;

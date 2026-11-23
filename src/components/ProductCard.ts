@@ -105,9 +105,19 @@ export class ProductCard {
               }
             </div>
             
-            <button class="btn-card-add" data-action="quick-add" data-id="${this.product.id}" title="Agregar a la bolsa">
-              + Agregar
-            </button>
+            ${
+              this.product.inStock && (this.product.totalStock === undefined || this.product.totalStock > 0)
+                ? `
+              <button class="btn-card-add" data-action="quick-add" data-id="${this.product.id}" title="Agregar a la bolsa">
+                + Agregar
+              </button>
+            `
+                : `
+              <button class="btn-card-add is-out" disabled title="Producto agotado" style="opacity:0.5; cursor:not-allowed; background:#94a3b8;">
+                Agotado
+              </button>
+            `
+            }
           </div>
         </div>
       </article>
@@ -182,7 +192,13 @@ export class ProductCard {
             image: selectedColor?.image || prod.image
           };
 
-          const defaultSize = prod.sizes[0] || 40;
+          if (prod.totalStock !== undefined && prod.totalStock <= 0) {
+            Toast.show(`${prod.name} se encuentra temporalmente agotado.`, 'Agotado', 'warning');
+            return;
+          }
+
+          const inStockSize = prod.sizesDetails?.find((s) => s.stock > 0)?.size;
+          const defaultSize = inStockSize !== undefined ? inStockSize : (prod.sizes[0] || 40);
           store.addToCart(customProduct, defaultSize, selectedColor?.name);
           Toast.show(`${prod.name} (Talla ${defaultSize}) se añadió a tu bolsa`, '¡Añadido al Carrito!', 'success');
         }
