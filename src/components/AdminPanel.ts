@@ -2668,6 +2668,8 @@ export class AdminPanel {
                 ? `${prop.customWidth} × ${prop.customHeight} px`
                 : (prop.adjustTo836x342 ? '836 × 342 px' : '290 × 125 px');
               const fitText = prop.preserveWithoutDistortion ? 'Sin distorsión' : 'Ajuste libre';
+              const shadowText = prop.showShadow !== false ? 'Con sombra' : 'Sin sombra';
+              const shadowClass = prop.showShadow !== false ? 'is-shadow-on' : 'is-shadow-off';
               const previewImgSrc = p.carouselImage || thumbImg;
 
               return `
@@ -2677,13 +2679,16 @@ export class AdminPanel {
                                 data-id="${p.id}"
                                 data-name="${p.name.replace(/"/g, '&quot;')}"
                                 data-img="${previewImgSrc}"
-                                title="Configurar proporción visual de este calzado"
+                                title="Configurar proporción visual y sombra de este calzado"
                               >
                                 <div class="prop-btn-top">
                                   <span class="prop-btn-dims">${dimText}</span>
                                   <span class="prop-btn-tag">${fitText}</span>
                                 </div>
-                                <span class="prop-btn-sub">Ajustar proporción</span>
+                                <div class="prop-btn-sub-row">
+                                  <span class="prop-btn-shadow ${shadowClass}">${shadowText}</span>
+                                  <span class="prop-btn-sub">Ajustar opciones</span>
+                                </div>
                               </button>
                             `;
             })()}
@@ -2797,6 +2802,31 @@ export class AdminPanel {
                 <button type="button" class="btn-modal-reset-dims" id="btn-modal-reset-dims" disabled>
                   Restablecer a 836 × 342
                 </button>
+              </div>
+
+              <!-- OPCIÓN DE SOMBRA CON RADIO BUTTONS (PREDETERMINADO ACTIVADO) -->
+              <div class="modal-shadow-section">
+                <div class="modal-shadow-section-header">
+                  <span class="modal-shadow-section-title">Efecto de Sombra Inferior en Escaparate</span>
+                  <span class="modal-shadow-section-sub">Permite quitarle la sombra a artículos específicos (por ejemplo aquellos que ya poseen sombra integrada o siluetas recortadas)</span>
+                </div>
+                <div class="modal-shadow-radios-grid">
+                  <label class="modal-prop-option modal-radio-option" for="modal-radio-shadow-on">
+                    <input type="radio" name="modal-choice-shadow" id="modal-radio-shadow-on" value="show" checked />
+                    <div class="modal-option-info">
+                      <span class="modal-option-title">Mostrar sombra <span class="badge-modal-default">Predeterminado</span></span>
+                      <span class="modal-option-desc">Proyecta la sombra elíptica de suelo y el relieve 3D suave sobre el arco del escaparate.</span>
+                    </div>
+                  </label>
+
+                  <label class="modal-prop-option modal-radio-option" for="modal-radio-shadow-off">
+                    <input type="radio" name="modal-choice-shadow" id="modal-radio-shadow-off" value="hide" />
+                    <div class="modal-option-info">
+                      <span class="modal-option-title">No mostrar sombra</span>
+                      <span class="modal-option-desc">Elimina completamente la sombra inferior y el drop-shadow para este artículo en el escaparate.</span>
+                    </div>
+                  </label>
+                </div>
               </div>
             </div>
 
@@ -3847,6 +3877,8 @@ export class AdminPanel {
     const inpW = this.container.querySelector('#modal-input-width') as HTMLInputElement | null;
     const inpH = this.container.querySelector('#modal-input-height') as HTMLInputElement | null;
     const btnResetDims = this.container.querySelector('#btn-modal-reset-dims') as HTMLButtonElement | null;
+    const radioShadowOn = modal?.querySelector('#modal-radio-shadow-on') as HTMLInputElement | null;
+    const radioShadowOff = modal?.querySelector('#modal-radio-shadow-off') as HTMLInputElement | null;
     const btnCloseModal = this.container.querySelector('#btn-close-prop-modal');
     const btnCancelModal = this.container.querySelector('#btn-modal-cancel');
     const btnSaveProp = this.container.querySelector('#btn-modal-save-prop');
@@ -3866,11 +3898,18 @@ export class AdminPanel {
       const ratioDisplay = ratio.toFixed(2);
       const boxHeight = Math.max(50, Math.min(200, Math.round(290 / ratio)));
       const fitMode = chkNoDist?.checked ? 'contain' : 'fill';
+      const showShadow = Boolean(radioShadowOn?.checked);
 
-      if (modalBox) modalBox.style.height = `${boxHeight}px`;
-      if (modalImg) modalImg.style.objectFit = fitMode;
+      if (modalBox) {
+        modalBox.style.height = `${boxHeight}px`;
+        modalBox.classList.toggle('has-no-shadow', !showShadow);
+      }
+      if (modalImg) {
+        modalImg.style.objectFit = fitMode;
+        modalImg.style.filter = showShadow ? 'drop-shadow(0 6px 12px rgba(0,0,0,0.15))' : 'none';
+      }
       if (modalLabel) {
-        modalLabel.textContent = `Marco simulado: 290 × ${boxHeight} px (Proporción ${ratioDisplay}:1 • ${chkNoDist?.checked ? 'Sin distorsión' : 'Ajuste libre'})`;
+        modalLabel.textContent = `Marco simulado: 290 × ${boxHeight} px (Proporción ${ratioDisplay}:1 • ${chkNoDist?.checked ? 'Sin distorsión' : 'Ajuste libre'} • ${showShadow ? 'Con sombra' : 'Sin sombra'})`;
       }
     };
 
@@ -3901,6 +3940,10 @@ export class AdminPanel {
         if (btnResetDims) btnResetDims.disabled = !prop.customProportionEnabled;
         customBox?.classList.toggle('is-disabled', !prop.customProportionEnabled);
 
+        const showShadow = prop.showShadow !== false;
+        if (radioShadowOn) radioShadowOn.checked = showShadow;
+        if (radioShadowOff) radioShadowOff.checked = !showShadow;
+
         updateModalPreview();
         modal?.classList.remove('is-hidden');
       });
@@ -3919,12 +3962,16 @@ export class AdminPanel {
     chkNoDist?.addEventListener('change', updateModalPreview);
     inpW?.addEventListener('input', updateModalPreview);
     inpH?.addEventListener('input', updateModalPreview);
+    radioShadowOn?.addEventListener('change', updateModalPreview);
+    radioShadowOff?.addEventListener('change', updateModalPreview);
 
     btnResetDims?.addEventListener('click', () => {
       if (inpW) inpW.value = '836';
       if (inpH) inpH.value = '342';
       if (chk836) chk836.checked = true;
       if (chkNoDist) chkNoDist.checked = true;
+      if (radioShadowOn) radioShadowOn.checked = true;
+      if (radioShadowOff) radioShadowOff.checked = false;
       updateModalPreview();
     });
 
@@ -3944,16 +3991,18 @@ export class AdminPanel {
 
       const w = Math.max(100, parseInt(inpW?.value || '836', 10) || 836);
       const h = Math.max(50, parseInt(inpH?.value || '342', 10) || 342);
+      const showShadow = Boolean(radioShadowOn?.checked);
 
       ShowcaseSettingsService.saveProductProportion(this.activeModalProductId, {
         adjustTo836x342: Boolean(chk836?.checked),
         preserveWithoutDistortion: Boolean(chkNoDist?.checked),
         customProportionEnabled: Boolean(chkCustom?.checked),
         customWidth: w,
-        customHeight: h
+        customHeight: h,
+        showShadow
       });
 
-      Toast.show('Proporción guardada correctamente para este calzado.', 'Visualización', 'success');
+      Toast.show('Configuración visual y sombra guardadas correctamente.', 'Visualización', 'success');
       closeModal();
 
       const main = this.container.querySelector('#admin-main-viewport');

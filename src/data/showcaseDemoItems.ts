@@ -28,6 +28,7 @@ export interface ProductProportionConfig {
   customProportionEnabled: boolean;
   customWidth: number;
   customHeight: number;
+  showShadow?: boolean;
 }
 
 export const DEFAULT_PRODUCT_PROPORTION: ProductProportionConfig = {
@@ -35,7 +36,8 @@ export const DEFAULT_PRODUCT_PROPORTION: ProductProportionConfig = {
   preserveWithoutDistortion: true,
   customProportionEnabled: false,
   customWidth: 836,
-  customHeight: 342
+  customHeight: 342,
+  showShadow: true
 };
 
 export interface ShowcaseSettings {
@@ -113,7 +115,8 @@ export class ShowcaseSettingsService {
         preserveWithoutDistortion: p.preserveWithoutDistortion !== undefined ? Boolean(p.preserveWithoutDistortion) : true,
         customProportionEnabled: Boolean(p.customProportionEnabled),
         customWidth: Math.max(100, Number(p.customWidth) || 836),
-        customHeight: Math.max(50, Number(p.customHeight) || 342)
+        customHeight: Math.max(50, Number(p.customHeight) || 342),
+        showShadow: p.showShadow !== undefined ? Boolean(p.showShadow) : true
       };
     }
     return { ...DEFAULT_PRODUCT_PROPORTION };
@@ -126,6 +129,14 @@ export class ShowcaseSettingsService {
     }
     s.productProportions[productId] = { ...config };
     this.saveSettings(s);
+  }
+
+  static setProductShadow(productId: string, showShadow: boolean): void {
+    const prop = this.getProductProportion(productId);
+    this.saveProductProportion(productId, {
+      ...prop,
+      showShadow
+    });
   }
 
   static toggleDemoItem(id: string, enable?: boolean): ShowcaseSettings {

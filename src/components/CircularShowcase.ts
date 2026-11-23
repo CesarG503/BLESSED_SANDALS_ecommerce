@@ -130,6 +130,7 @@ export class CircularShowcase {
         const baseWidth = 290;
         const calcHeight = Math.round(baseWidth / ratio);
         const fitMode = prop.preserveWithoutDistortion ? 'contain' : 'fill';
+        const showShadow = prop.showShadow !== false;
 
         return `
       <div 
@@ -138,9 +139,9 @@ export class CircularShowcase {
         data-index="${i}"
       >
         <div class="shoe-card-shell">
-          <div class="shoe-visual-core" style="--shoe-core-width: ${baseWidth}px; --shoe-core-height: ${calcHeight}px; --shoe-img-fit: ${fitMode};">
+          <div class="shoe-visual-core ${!showShadow ? 'has-no-shadow' : ''}" style="--shoe-core-width: ${baseWidth}px; --shoe-core-height: ${calcHeight}px; --shoe-img-fit: ${fitMode};">
             <img src="${item.image}" alt="${item.name}" class="shoe-img" draggable="false" />
-            <div class="shoe-shadow"></div>
+            ${showShadow ? '<div class="shoe-shadow"></div>' : ''}
             <span class="shoe-indicator-dot">${i + 1}</span>
           </div>
         </div>
@@ -341,7 +342,7 @@ export class CircularShowcase {
     hoverCard.addEventListener('pointerdown', (e: PointerEvent) => {
       const target = e.target as HTMLElement;
       // NUNCA iniciar arrastre si se hizo clic en botones o elementos interactivos
-      if (target.closest('button, a, input, select, .btn-card-icon, .btn-hover-add, .btn-hover-action, [data-action]')) {
+      if (target.closest('button, a, input, select, .btn-card-icon, .btn-hover-add, .btn-hover-action, [data-action], .shadow-radio-lbl, .hover-card-shadow-ctrl')) {
         return;
       }
 
@@ -351,7 +352,7 @@ export class CircularShowcase {
 
       try {
         hoverCard.setPointerCapture(e.pointerId);
-      } catch {}
+      } catch { }
 
       this.cardDragStartPointer = { x: e.clientX, y: e.clientY };
       const currentLeft = parseFloat(hoverCard.style.left) || hoverCard.offsetLeft;
@@ -409,7 +410,7 @@ export class CircularShowcase {
       hoverCard.classList.remove('is-dragging');
       try {
         hoverCard.releasePointerCapture(e.pointerId);
-      } catch {}
+      } catch { }
 
       const inner = hoverCard.querySelector('.hover-card-inner') as HTMLElement | null;
       if (inner) {
@@ -548,8 +549,10 @@ export class CircularShowcase {
     const shoeY = cy - ry * Math.sin(angle);
 
     const isWishlisted = this.store.isInWishlist(item.id);
+    const prop = ShowcaseSettingsService.getProductProportion(item.id);
+    const showShadow = prop.showShadow !== false;
     const cardWidth = 320;
-    const cardHeight = 260;
+    const cardHeight = 295;
 
     // SIEMPRE UN POQUITO MÁS ABAJO DEL PAR (shoeY + 75px sitúa el inicio de la tarjeta justo debajo de la suela de forma limpia)
     let cardY = shoeY + 75;
@@ -591,7 +594,7 @@ export class CircularShowcase {
         </div>
 
         <!-- IMAGEN DEL OBJETO / CALZADO (CLICK ABRE VISTA RÁPIDA) -->
-        <div class="hover-card-img-wrap btn-hover-action" data-action="quickview" style="cursor: pointer;" title="Vista rápida de ${item.name}">
+        <div class="hover-card-img-wrap btn-hover-action ${!showShadow ? 'has-no-shadow' : ''}" data-action="quickview" style="cursor: pointer;" title="Vista rápida de ${item.name}">
           <img src="${item.image}" alt="${item.name}" class="hover-card-img" draggable="false" />
         </div>
 
@@ -652,6 +655,21 @@ export class CircularShowcase {
         e.preventDefault();
         e.stopPropagation();
         this.quickAddToCart(item);
+      });
+    });
+
+    // Control de sombra mediante radio buttons (Predeterminado activado)
+    hoverCard.querySelectorAll(`input[name="card-shadow-${item.id}"]`).forEach((radio) => {
+      radio.addEventListener('change', (e) => {
+        e.stopPropagation();
+        const target = e.target as HTMLInputElement;
+        const enableShadow = target.value === 'show';
+        ShowcaseSettingsService.setProductShadow(item.id, enableShadow);
+        Toast.show(
+          enableShadow ? `Sombra activada para ${item.name}` : `Sombra eliminada de ${item.name}`,
+          'Circular Showcase',
+          'info'
+        );
       });
     });
   }
