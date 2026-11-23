@@ -6169,9 +6169,12 @@ body.profile-page-body {
 }
 
 .card-wise-emblem {
-  width: 32px;
-  height: 32px;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.25));
+  height: 38px;
+  width: auto;
+  max-width: 48px;
+  object-fit: contain;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.35));
+  display: block;
 }
 
 .card-chip-cluster {
@@ -6291,18 +6294,18 @@ body.profile-page-body {
 }
 
 .official-visa-svg {
-  height: 25px;
+  height: 28px;
   width: auto;
-  max-width: 66px;
+  max-width: 86px;
   fill: #ffffff;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.4));
 }
 
 .official-mastercard-svg {
-  height: 25px;
+  height: 28px;
   width: auto;
-  max-width: 40px;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
+  max-width: 44px;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.4));
 }
 
 /* Barra de Acciones del Perfil */
