@@ -18,6 +18,12 @@ export default defineConfig({
     port: 5173,
     open: false,
     allowedHosts: allowedHosts,
+    proxy: {
+      '/ecommerce-assets': {
+        target: process.env.S3_ENDPOINT || 'http://minio:9000',
+        changeOrigin: true
+      }
+    },
     watch: {
       usePolling: process.env.VITE_USE_POLLING === 'true'
     }
@@ -25,7 +31,13 @@ export default defineConfig({
   preview: {
     host: '0.0.0.0',
     port: 5173,
-    allowedHosts: allowedHosts
+    allowedHosts: allowedHosts,
+    proxy: {
+      '/ecommerce-assets': {
+        target: process.env.S3_ENDPOINT || 'http://minio:9000',
+        changeOrigin: true
+      }
+    }
   },
   publicDir: 'public',
   build: {

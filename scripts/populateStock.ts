@@ -16,7 +16,17 @@ const s3Client = new S3Client({
 });
 
 const S3_BUCKET = process.env.S3_BUCKET || 'ecommerce-assets';
-const S3_PUBLIC_BASE = `http://localhost:9002/${S3_BUCKET}`;
+let S3_PUBLIC_BASE = `/${S3_BUCKET}`;
+if (process.env.S3_PUBLIC_URL && !process.env.S3_PUBLIC_URL.includes('localhost') && !process.env.S3_PUBLIC_URL.includes('127.0.0.1')) {
+  const pUrl = process.env.S3_PUBLIC_URL.trim().replace(/\/+$/, '');
+  if (pUrl.startsWith('/')) {
+    S3_PUBLIC_BASE = pUrl;
+  } else if (pUrl.endsWith(`/${S3_BUCKET}`)) {
+    S3_PUBLIC_BASE = pUrl;
+  } else {
+    S3_PUBLIC_BASE = `${pUrl}/${S3_BUCKET}`;
+  }
+}
 
 interface StockMetadata {
   slug: string;

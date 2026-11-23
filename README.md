@@ -40,6 +40,46 @@ docker compose up -d
 
 ---
 
+## 🌐 Despliegue en Servidor Remoto / VPS (Distinción Local vs Deploy)
+
+El proyecto incluye dos plantillas de configuración según el entorno de trabajo:
+
+| Entorno | Archivo Plantilla | Comando de Preparación | Características Clave |
+|---|---|---|---|
+| **Local (Tu PC)** | `.env.example` | `cp .env.example .env` | `ALLOWED_HOSTS=localhost,127.0.0.1`<br>`S3_ENDPOINT=http://localhost:9002`<br>`S3_PUBLIC_URL=/ecommerce-assets` |
+| **Deploy (VPS / Servidor)** | `.env.deploy.example` | `cp .env.deploy.example .env` | `ALLOWED_HOSTS=blessed-sandals.mixgyt.com,.mixgyt.com`<br>`S3_ENDPOINT=http://minio:9000`<br>`S3_PUBLIC_URL=/ecommerce-assets` |
+
+### Pasos para Desplegar en un Servidor:
+```bash
+# 1. Clonar el repositorio en el servidor
+git clone <URL_DEL_REPOSITORIO>
+cd e-comerce
+
+# 2. Usar la plantilla de deploy
+cp .env.deploy.example .env
+
+# 3. Editar las variables para tu dominio y contraseñas
+nano .env
+# Ajusta ALLOWED_HOSTS con tu dominio: ALLOWED_HOSTS=blessed-sandals.mixgyt.com,.mixgyt.com
+# Ajusta contraseñas seguras para POSTGRES_PASSWORD y S3_SECRET_ACCESS_KEY
+
+# 4. Levantar con Docker Compose
+docker compose up -d --build
+```
+
+### 🔒 ¿Por qué fallaban las imágenes de MinIO en Deploy y cómo se solucionó?
+1. **El Problema Original**: MinIO en desarrollo local suele referenciarse como `http://localhost:9002/ecommerce-assets/...`. Al desplegar en un servidor remoto o dominio público (como `blessed-sandals.mixgyt.com`), el navegador del usuario visitante intentaba resolver `localhost:9002` en la computadora del visitante (donde MinIO no existe), rompiendo todas las imágenes y modelos 3D. Además, si el sitio usa HTTPS, los navegadores bloquean peticiones HTTP a puertos no seguros ("Mixed Content").
+2. **La Solución Implementada**:
+   - **Reverse Proxy Transparente**: El servidor web de la aplicación incluye un proxy inverso interno para la ruta `/ecommerce-assets/*` que reenvía el tráfico directamente a `http://minio:9000` dentro de la red privada de Docker.
+   - **Rutas Relativas Universales**: Todos los productos, fotos y modelos 3D se almacenan y sirven con rutas relativas (`/ecommerce-assets/nombre-archivo.jpg`).
+   - **Ventajas**:
+     - Las imágenes cargan directamente sobre el dominio del sitio (`https://blessed-sandals.mixgyt.com/ecommerce-assets/...`).
+     - **No es necesario abrir el puerto 9002 en el firewall del servidor**.
+     - Cero errores de contenido mixto (Mixed Content) en conexiones HTTPS.
+     - Funciona de forma idéntica en local y en producción sin modificar código ni base de datos.
+
+---
+
 ## 💻 Desarrollo Local en Host (Alternativa sin Docker Web)
 
 Si prefieres ejecutar el frontend Vite directamente en tu máquina host y solo usar Docker para PostgreSQL y MinIO:

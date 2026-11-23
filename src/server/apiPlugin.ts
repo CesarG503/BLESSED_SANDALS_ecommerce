@@ -15,7 +15,62 @@ const s3Client = new S3Client({
   forcePathStyle: true
 });
 const S3_BUCKET = process.env.S3_BUCKET || 'ecommerce-assets';
-const S3_PUBLIC_URL = process.env.S3_PUBLIC_URL || 'http://localhost:9002';
+
+export function cleanStorageUrl(url: string | null | undefined): string | null | undefined {
+  if (!url || typeof url !== 'string') return url;
+  const trimmed = url.trim();
+  const bucketKey = `/${S3_BUCKET}/`;
+  if (trimmed.includes(bucketKey)) {
+    return trimmed.substring(trimmed.indexOf(bucketKey));
+  }
+  if (trimmed.startsWith(`${S3_BUCKET}/`)) {
+    return `/${trimmed}`;
+  }
+  return trimmed;
+}
+
+export function cleanStorageGallery(gallery: string[] | null | undefined): string[] {
+  if (!Array.isArray(gallery)) return [];
+  return gallery.map((item) => cleanStorageUrl(item) || item).filter(Boolean);
+}
+
+export function normalizeAssetUrl(url: string | null | undefined, req?: IncomingMessage): string | undefined {
+  if (!url || typeof url !== 'string') return url || undefined;
+
+  let cleanUrl = url.trim();
+  if (cleanUrl.startsWith(`${S3_BUCKET}/`)) {
+    cleanUrl = `/${cleanUrl}`;
+  }
+
+  // Si contiene referencia al bucket de MinIO (sea localhost:9002, otra IP, o ruta absoluta)
+  if (cleanUrl.includes(`/${S3_BUCKET}/`)) {
+    const bucketIdx = cleanUrl.indexOf(`/${S3_BUCKET}/`);
+    const assetPath = cleanUrl.substring(bucketIdx); // ej. "/ecommerce-assets/filename.jpg"
+
+    // 1. Si se configuró explícitamente un dominio público / CDN externo
+    const publicUrl = process.env.S3_PUBLIC_URL?.trim();
+    if (publicUrl && !publicUrl.includes('localhost') && !publicUrl.includes('127.0.0.1')) {
+      if (publicUrl.startsWith('/')) {
+        return assetPath;
+      }
+      const cleanBase = publicUrl.endsWith(`/${S3_BUCKET}`)
+        ? publicUrl.slice(0, -`/${S3_BUCKET}`.length)
+        : publicUrl.replace(/\/+$/, '');
+      return `${cleanBase}${assetPath}`;
+    }
+
+    // 2. Ruta relativa para que el navegador del visitante resuelva sobre el dominio actual
+    // y pase por el proxy interno del servidor web
+    return assetPath;
+  }
+
+  return cleanUrl;
+}
+
+export function normalizeAssetGallery(gallery: string[] | null | undefined, req?: IncomingMessage): string[] {
+  if (!Array.isArray(gallery)) return [];
+  return gallery.map((item) => normalizeAssetUrl(item, req) || item).filter(Boolean);
+}
 
 async function checkIsAdmin(req: IncomingMessage, parsedUrl: URL, bodyUserId?: string): Promise<boolean> {
   const userId = (req.headers['x-user-id'] as string) || parsedUrl.searchParams.get('userId') || bodyUserId;
@@ -58,6 +113,64 @@ export function apiPlugin(): Plugin {
     configureServer(server: ViteDevServer) {
       server.middlewares.use(async (req, res, next) => {
         const reqUrl = req.url || '';
+
+        // Proxy transparente para recursos multimedia de MinIO (/ecommerce-assets/*)
+        // Permite servir fotos y modelos 3D directamente a través del mismo dominio y puerto del servidor web
+        // resolviendo automáticamente en local y en deploy sin problemas de puertos bloqueados ni HTTPS mixto.
+        if (reqUrl.startsWith(`/${S3_BUCKET}/`)) {
+          if (req.method === 'OPTIONS') {
+            res.statusCode = 204;
+            res.setHeader('Access-Control-Allow-Origin', '*');
+            res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+            res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Range');
+            return res.end();
+          }
+
+          const endpointStr = process.env.S3_ENDPOINT || 'http://minio:9000';
+          try {
+            const targetUrl = new URL(endpointStr);
+            const isHttps = targetUrl.protocol === 'https:';
+            const httpLib = isHttps ? await import('https') : await import('http');
+
+            const proxyReq = httpLib.request(
+              {
+                protocol: targetUrl.protocol,
+                hostname: targetUrl.hostname,
+                port: targetUrl.port || (isHttps ? 443 : 80),
+                path: reqUrl,
+                method: req.method,
+                headers: {
+                  ...req.headers,
+                  host: targetUrl.host
+                }
+              },
+              (proxyRes) => {
+                const headers = { ...proxyRes.headers };
+                headers['access-control-allow-origin'] = '*';
+                headers['access-control-allow-methods'] = 'GET, HEAD, OPTIONS';
+                if (!headers['cache-control']) {
+                  headers['cache-control'] = 'public, max-age=86400';
+                }
+                res.writeHead(proxyRes.statusCode || 200, headers);
+                proxyRes.pipe(res);
+              }
+            );
+
+            proxyReq.on('error', (err) => {
+              res.statusCode = 502;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: 'Error conectando con MinIO Storage', message: err.message }));
+            });
+
+            req.pipe(proxyReq);
+            return;
+          } catch (e: any) {
+            res.statusCode = 500;
+            res.end('Proxy error: ' + e.message);
+            return;
+          }
+        }
+
         if (!reqUrl.startsWith('/api/')) {
           return next();
         }
@@ -812,14 +925,14 @@ export function apiPlugin(): Plugin {
                 color: {
                   name: ci.colorName,
                   hex: ci.colorHex || '#000000',
-                  image: ci.colorImage || ci.product.image
+                  image: normalizeAssetUrl(ci.colorImage || ci.product.image, req)
                 },
                 product: {
                   id: ci.product.id,
                   name: ci.product.name,
                   price: ci.product.price,
                   originalPrice: ci.product.originalPrice,
-                  image: ci.product.image,
+                  image: normalizeAssetUrl(ci.product.image, req),
                   badge: ci.product.badge
                 }
               }))
@@ -837,7 +950,7 @@ export function apiPlugin(): Plugin {
 
             const colorName = color.name || body.colorName || 'Original';
             const colorHex = color.hex || body.colorHex || '#000000';
-            const colorImage = color.image || body.colorImage || null;
+            const colorImage = cleanStorageUrl(color.image || body.colorImage || null);
 
             if (quantity <= 0) {
               await prisma.cartItem.deleteMany({
@@ -926,7 +1039,7 @@ export function apiPlugin(): Plugin {
               const size = Number(item.size) || 9;
               const colorName = item.color?.name || 'Original';
               const colorHex = item.color?.hex || '#000000';
-              const colorImage = item.color?.image || item.product?.image || null;
+              const colorImage = cleanStorageUrl(item.color?.image || item.product?.image || null);
               const quantity = Number(item.quantity) || 1;
 
               try {
@@ -980,14 +1093,14 @@ export function apiPlugin(): Plugin {
                 color: {
                   name: ci.colorName,
                   hex: ci.colorHex || '#000000',
-                  image: ci.colorImage || ci.product.image
+                  image: normalizeAssetUrl(ci.colorImage || ci.product.image, req)
                 },
                 product: {
                   id: ci.product.id,
                   name: ci.product.name,
                   price: ci.product.price,
                   originalPrice: ci.product.originalPrice,
-                  image: ci.product.image,
+                  image: normalizeAssetUrl(ci.product.image, req),
                   badge: ci.product.badge
                 }
               }))
@@ -1729,16 +1842,20 @@ export function apiPlugin(): Plugin {
                 (mp) => mp.id === p.id || mp.name.toLowerCase() === p.name.toLowerCase()
               );
 
+              const pImage = normalizeAssetUrl(p.image, req) || p.image;
               const colorImages = p.colors
-                .map((c) => c.image)
+                .map((c) => normalizeAssetUrl(c.image, req))
                 .filter((img): img is string => Boolean(img));
               
-              const defaultGallery = Array.from(new Set([p.image, ...colorImages]));
-              const gallery = (p.gallery && p.gallery.length > 0)
-                ? p.gallery
-                : (mockMatch?.gallery && mockMatch.gallery.length > 0
-                    ? mockMatch.gallery
-                    : (defaultGallery.length > 0 ? defaultGallery : [p.image]));
+              const defaultGallery = Array.from(new Set([pImage, ...colorImages]));
+              const gallery = normalizeAssetGallery(
+                (p.gallery && p.gallery.length > 0)
+                  ? p.gallery
+                  : (mockMatch?.gallery && mockMatch.gallery.length > 0
+                      ? mockMatch.gallery
+                      : (defaultGallery.length > 0 ? defaultGallery : [pImage])),
+                req
+              );
 
               return {
                 id: p.id,
@@ -1751,23 +1868,27 @@ export function apiPlugin(): Plugin {
                 gender: (p.gender as any) || mockMatch?.gender || 'Unisex',
                 height: (p.height as any) || mockMatch?.height || undefined,
                 category: (p.category.slug as any) || mockMatch?.category || 'sandals',
-                image: p.image,
+                image: pImage,
                 gallery,
-                model3dUrl: p.model3dUrl || mockMatch?.model3dUrl || undefined,
+                model3dUrl: normalizeAssetUrl(p.model3dUrl || mockMatch?.model3dUrl, req),
                 has3DModel: Boolean(p.model3dUrl || mockMatch?.has3DModel),
-                carouselImage: p.carouselImage || undefined,
+                carouselImage: normalizeAssetUrl(p.carouselImage, req) || undefined,
                 showcaseActive: p.showcaseActive,
                 showcaseOrder: p.showcaseOrder,
                 colors: p.colors.length > 0
                   ? p.colors.map((c) => {
-                      const colGallery = Array.isArray(c.gallery) && c.gallery.length > 0
-                        ? c.gallery
-                        : (c.image ? [c.image] : [p.image]);
+                      const colImg = normalizeAssetUrl(c.image, req);
+                      const colGallery = normalizeAssetGallery(
+                        Array.isArray(c.gallery) && c.gallery.length > 0
+                          ? c.gallery
+                          : (colImg ? [colImg] : [pImage]),
+                        req
+                      );
                       return {
                         id: c.id,
                         name: c.name,
                         hex: c.hex,
-                        image: c.image || colGallery[0] || p.image,
+                        image: colImg || colGallery[0] || pImage,
                         gallery: colGallery,
                         price: c.price !== null && c.price !== undefined ? c.price : p.price,
                         originalPrice: c.originalPrice !== null && c.originalPrice !== undefined ? c.originalPrice : (p.originalPrice || undefined),
@@ -1828,10 +1949,10 @@ export function apiPlugin(): Plugin {
                   originalPrice: p.originalPrice,
                   badge: p.badge,
                   gender: p.gender,
-                  image: p.image,
-                  gallery: p.gallery && p.gallery.length > 0 ? p.gallery : (p.image ? [p.image] : []),
-                  model3dUrl: p.model3dUrl,
-                  carouselImage: p.carouselImage,
+                  image: normalizeAssetUrl(p.image, req),
+                  gallery: normalizeAssetGallery(p.gallery && p.gallery.length > 0 ? p.gallery : (p.image ? [p.image] : []), req),
+                  model3dUrl: normalizeAssetUrl(p.model3dUrl, req),
+                  carouselImage: normalizeAssetUrl(p.carouselImage, req),
                   showcaseActive: Boolean(p.showcaseActive),
                   showcaseOrder: p.showcaseOrder || 0,
                   categoryId: p.categoryId,
@@ -1844,8 +1965,8 @@ export function apiPlugin(): Plugin {
                     id: c.id,
                     name: c.name,
                     hex: c.hex,
-                    image: c.image,
-                    gallery: Array.isArray(c.gallery) && c.gallery.length > 0 ? c.gallery : (c.image ? [c.image] : []),
+                    image: normalizeAssetUrl(c.image, req),
+                    gallery: normalizeAssetGallery(Array.isArray(c.gallery) && c.gallery.length > 0 ? c.gallery : (c.image ? [c.image] : []), req),
                     price: c.price !== null && c.price !== undefined ? c.price : p.price,
                     originalPrice: c.originalPrice !== null && c.originalPrice !== undefined ? c.originalPrice : (p.originalPrice || null),
                     sizes: Array.isArray(c.sizes) ? c.sizes : []
@@ -1887,10 +2008,12 @@ export function apiPlugin(): Plugin {
               colors = []
             } = body;
 
-            const finalGallery: string[] = Array.isArray(gallery) && gallery.length > 0
-              ? gallery
-              : (image ? [image] : []);
-            const finalImage: string = finalGallery.length > 0 ? finalGallery[0] : (image || '');
+            const finalGallery: string[] = cleanStorageGallery(
+              Array.isArray(gallery) && gallery.length > 0
+                ? gallery
+                : (image ? [image] : [])
+            );
+            const finalImage: string = (finalGallery.length > 0 ? finalGallery[0] : cleanStorageUrl(image)) || '';
 
             if (!name || price === undefined || !finalImage) {
               return sendJson(res, 400, {
@@ -1937,10 +2060,10 @@ export function apiPlugin(): Plugin {
                 originalPrice: originalPrice ? Number(originalPrice) : null,
                 badge: badge ? badge.trim() : null,
                 gender,
-                image: finalImage.trim(),
-                gallery: finalGallery,
-                model3dUrl: model3dUrl ? model3dUrl.trim() : null,
-                carouselImage: carouselImage ? carouselImage.trim() : null,
+                image: cleanStorageUrl(finalImage.trim()) || finalImage.trim(),
+                gallery: cleanStorageGallery(finalGallery),
+                model3dUrl: model3dUrl ? cleanStorageUrl(model3dUrl.trim()) : null,
+                carouselImage: carouselImage ? cleanStorageUrl(carouselImage.trim()) : null,
                 showcaseActive: Boolean(showcaseActive),
                 showcaseOrder: Number(showcaseOrder) || 0,
                 categoryId: finalCategoryId,
@@ -1960,13 +2083,15 @@ export function apiPlugin(): Plugin {
                     ? colors
                     : [{ name: 'Original', hex: '#111827', image: finalImage, gallery: finalGallery, price, originalPrice, sizes }]
                   ).map((c: any) => {
-                    const colGallery = Array.isArray(c.gallery) && c.gallery.length > 0
-                      ? c.gallery
-                      : (c.image ? [c.image] : (finalGallery.length > 0 ? [finalGallery[0]] : []));
+                    const colGallery = cleanStorageGallery(
+                      Array.isArray(c.gallery) && c.gallery.length > 0
+                        ? c.gallery
+                        : (c.image ? [c.image] : (finalGallery.length > 0 ? [finalGallery[0]] : []))
+                    );
                     return {
                       name: c.name || 'Color Principal',
                       hex: c.hex || '#000000',
-                      image: colGallery[0] || c.image || null,
+                      image: cleanStorageUrl(colGallery[0] || c.image || null),
                       gallery: colGallery,
                       price: c.price !== undefined && c.price !== null && c.price !== '' ? Number(c.price) : Number(price),
                       originalPrice: c.originalPrice !== undefined && c.originalPrice !== null && c.originalPrice !== '' ? Number(c.originalPrice) : (originalPrice ? Number(originalPrice) : null),
@@ -2023,8 +2148,8 @@ export function apiPlugin(): Plugin {
               return sendJson(res, 400, { success: false, message: 'ID del producto requerido para actualizar.' });
             }
 
-            let finalImage = image;
-            let finalGallery = Array.isArray(gallery) ? gallery : undefined;
+            let finalImage = cleanStorageUrl(image);
+            let finalGallery = Array.isArray(gallery) ? cleanStorageGallery(gallery) : undefined;
             if (finalGallery && finalGallery.length > 0) {
               finalImage = finalGallery[0];
             }
@@ -2042,10 +2167,10 @@ export function apiPlugin(): Plugin {
                   originalPrice: originalPrice !== undefined ? (originalPrice ? Number(originalPrice) : null) : undefined,
                   badge: badge !== undefined ? (badge ? badge.trim() : null) : undefined,
                   ...(gender ? { gender } : {}),
-                  ...(finalImage ? { image: finalImage.trim() } : {}),
-                  ...(finalGallery !== undefined ? { gallery: finalGallery } : {}),
-                  model3dUrl: model3dUrl !== undefined ? (model3dUrl ? model3dUrl.trim() : null) : undefined,
-                  ...(carouselImage !== undefined ? { carouselImage: carouselImage ? carouselImage.trim() : null } : {}),
+                  ...(finalImage ? { image: cleanStorageUrl(finalImage.trim()) || finalImage.trim() } : {}),
+                  ...(finalGallery !== undefined ? { gallery: cleanStorageGallery(finalGallery) } : {}),
+                  model3dUrl: model3dUrl !== undefined ? (model3dUrl ? cleanStorageUrl(model3dUrl.trim()) : null) : undefined,
+                  ...(carouselImage !== undefined ? { carouselImage: carouselImage ? cleanStorageUrl(carouselImage.trim()) : null } : {}),
                   ...(showcaseActive !== undefined ? { showcaseActive: Boolean(showcaseActive) } : {}),
                   ...(showcaseOrder !== undefined ? { showcaseOrder: Number(showcaseOrder) } : {}),
                   ...(categoryId ? { categoryId } : {}),
@@ -2073,14 +2198,16 @@ export function apiPlugin(): Plugin {
                 await tx.productColor.deleteMany({ where: { productId: id } });
                 await tx.productColor.createMany({
                   data: colors.map((c: any) => {
-                    const colGallery = Array.isArray(c.gallery) && c.gallery.length > 0
-                      ? c.gallery
-                      : (c.image ? [c.image] : []);
+                    const colGallery = cleanStorageGallery(
+                      Array.isArray(c.gallery) && c.gallery.length > 0
+                        ? c.gallery
+                        : (c.image ? [c.image] : [])
+                    );
                     return {
                       productId: id,
                       name: c.name || 'Color',
                       hex: c.hex || '#000000',
-                      image: colGallery[0] || c.image || null,
+                      image: cleanStorageUrl(colGallery[0] || c.image || null),
                       gallery: colGallery,
                       price: c.price !== undefined && c.price !== null && c.price !== '' ? Number(c.price) : (price !== undefined ? Number(price) : null),
                       originalPrice: c.originalPrice !== undefined && c.originalPrice !== null && c.originalPrice !== '' ? Number(c.originalPrice) : (originalPrice !== undefined ? Number(originalPrice) : null),
@@ -2176,7 +2303,7 @@ export function apiPlugin(): Plugin {
               data: {
                 ...(showcaseActive !== undefined ? { showcaseActive: Boolean(showcaseActive) } : {}),
                 ...(showcaseOrder !== undefined ? { showcaseOrder: Number(showcaseOrder) } : {}),
-                ...(carouselImage !== undefined ? { carouselImage: carouselImage ? carouselImage.trim() : null } : {})
+                ...(carouselImage !== undefined ? { carouselImage: carouselImage ? cleanStorageUrl(carouselImage.trim()) : null } : {})
               }
             });
 
@@ -2418,7 +2545,7 @@ export function apiPlugin(): Plugin {
               })
             );
 
-            const fileUrl = `${S3_PUBLIC_URL}/${S3_BUCKET}/${objectKey}`;
+            const fileUrl = normalizeAssetUrl(`/${S3_BUCKET}/${objectKey}`, req) || `/${S3_BUCKET}/${objectKey}`;
 
             return sendJson(res, 201, {
               success: true,
@@ -2441,7 +2568,7 @@ export function apiPlugin(): Plugin {
               const s3Res = await s3Client.send(new ListObjectsV2Command({ Bucket: S3_BUCKET }));
               const assets = (s3Res.Contents || []).map((c) => ({
                 key: c.Key || '',
-                url: `${S3_PUBLIC_URL}/${S3_BUCKET}/${c.Key}`,
+                url: normalizeAssetUrl(`/${S3_BUCKET}/${c.Key}`, req) || `/${S3_BUCKET}/${c.Key}`,
                 size: c.Size || 0,
                 lastModified: c.LastModified ? c.LastModified.toISOString() : null
               }));
