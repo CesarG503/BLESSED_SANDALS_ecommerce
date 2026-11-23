@@ -36,6 +36,7 @@ docker compose up -d
 > - **PostgreSQL**: Se inicializa automáticamente en el primer arranque a partir de `docker/postgres-init/01-init.sql`, cargando todas las tablas, usuarios, productos, categorías, pedidos y cupones.
 > - **MinIO S3**: El contenedor `ecommerce-minio-init` crea automáticamente el bucket público `ecommerce-assets`, sincroniza todas las fotos desde `docker/minio-seed/ecommerce-assets/` y copia el modelo 3D `Nike Air Jordan 1.glb`.
 > - **Servicio Web**: Corre en el contenedor `ecommerce-web`, genera el cliente de Prisma para Linux y se enlaza internamente a PostgreSQL y MinIO.
+> - **Dominios y Hosts Personalizados**: Si usas un dominio propio (por ejemplo `blessed-sandals.mixgyt.com`) o un reverse proxy / túnel, configúralo en la variable `ALLOWED_HOSTS` de tu archivo `.env`. Puedes especificar una lista separada por comas o `ALLOWED_HOSTS=true` para permitir cualquier host.
 
 ---
 
