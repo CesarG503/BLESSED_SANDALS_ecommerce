@@ -12,7 +12,7 @@ export class ProductCard {
     this.store = Store.getInstance();
   }
 
-  public render(index: number = 0): string {
+  public render(index: number = 0, extraClass: string = ''): string {
     const isFav = this.store.isInWishlist(this.product.id);
     const delayStyle = `animation-delay: ${Math.min(index * 60, 600)}ms;`;
 
@@ -32,9 +32,10 @@ export class ProductCard {
       .join('');
 
     const colorCountText = `${this.product.colors.length} Color${this.product.colors.length > 1 ? 'es' : ''}`;
+    const cardClasses = `product-card animate-card-fade ${extraClass}`.trim();
 
     return `
-      <article class="product-card animate-card-fade" style="${delayStyle}" data-id="${this.product.id}">
+      <article class="${cardClasses}" style="${delayStyle}" data-id="${this.product.id}">
         <!-- PARTE SUPERIOR: BADGE Y FAVORITO -->
         <div class="product-card-top">
           <div class="badge-wrapper">

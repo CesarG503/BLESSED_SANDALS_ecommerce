@@ -2,6 +2,7 @@ import { Store } from '../state/store';
 import { Product } from '../types/product';
 import { MOCK_PRODUCTS } from '../data/mockProducts';
 import { ProductCard } from './ProductCard';
+import { Icons } from './Icons';
 import { HorseShowcaseSettingsService } from '../data/horseShowcaseSettings';
 
 export class HorseShowcase {
@@ -36,10 +37,17 @@ export class HorseShowcase {
     this.setupScrollEvents();
     this.startLoop();
 
-    // Sincronizar dinámicamente si los productos cambian en el Store
+    // Sincronizar dinámicamente si los productos cambian en el Store (sin destruir el DOM innecesariamente)
     this.store.subscribe(() => {
+      const prevSig = this.getProductSignature();
       this.initProducts();
-      this.renderProductGrid();
+      const newSig = this.getProductSignature();
+
+      if (prevSig !== newSig) {
+        this.renderProductGrid();
+      } else {
+        this.syncCardStates();
+      }
     });
 
     // Sincronizar dinámicamente si cambia la configuración de Horse Showcase
@@ -57,6 +65,19 @@ export class HorseShowcase {
   private initProducts(): void {
     const raw = this.store.products.length > 0 ? [...this.store.products] : [...MOCK_PRODUCTS];
     this.products = HorseShowcaseSettingsService.getOrderedVisibleProducts(raw);
+  }
+
+  /**
+   * Genera una firma única del estado actual de los productos
+   * (IDs, stock, precios, badges, imágenes) para detectar cambios reales en el inventario.
+   */
+  private getProductSignature(): string {
+    return this.products
+      .map(
+        (p) =>
+          `${p.id}:${p.price}:${p.originalPrice ?? ''}:${p.totalStock ?? ''}:${p.badge ?? ''}:${p.image}`
+      )
+      .join('|');
   }
 
   /**
@@ -107,7 +128,7 @@ export class HorseShowcase {
   }
 
   /**
-   * Actualiza el grid de productos si cambian los productos en el Store
+   * Actualiza el grid de productos si cambian los productos en el Store o configuración
    */
   private renderProductGrid(): void {
     const gridEl = this.container.querySelector('#horse-products-grid') as HTMLElement | null;
@@ -121,13 +142,67 @@ export class HorseShowcase {
         </div>
       `;
     } else {
-      gridEl.innerHTML = this.products.map((p, idx) => new ProductCard(p).render(idx)).join('');
+      // Determinar si la sección ya está dentro del campo visual para que las tarjetas nazcan reveladas
+      const section = this.container.querySelector('#horse-showcase-section') as HTMLElement | null;
+      const windowH = typeof window !== 'undefined' ? window.innerHeight : 800;
+      const sectionRect = section ? section.getBoundingClientRect() : null;
+      const isSectionInView = sectionRect ? sectionRect.top < windowH && sectionRect.bottom > 0 : false;
+      const extraClass = isSectionInView ? 'horse-card-revealed' : '';
+
+      gridEl.innerHTML = this.products.map((p, idx) => new ProductCard(p).render(idx, extraClass)).join('');
       ProductCard.attachListeners(gridEl);
+
+      // Sincronizar inmediatamente la visibilidad de las tarjetas en pantalla
+      this.updateCardVisibility();
+      if (typeof window !== 'undefined') {
+        requestAnimationFrame(() => this.updateCardVisibility());
+      }
     }
 
     if (endNote) {
       endNote.textContent = `Has visto todos los ${this.products.length} productos disponibles.`;
     }
+  }
+
+  /**
+   * Sincroniza estados reactivos (favoritos, badges) sin reconstruir el DOM,
+   * preservando la posición de scroll, animaciones y evitando parpadeos o pantallas en blanco.
+   */
+  private syncCardStates(): void {
+    const cards = this.container.querySelectorAll<HTMLElement>('.horse-products-grid .product-card');
+    cards.forEach((card) => {
+      const prodId = card.dataset.id;
+      if (!prodId) return;
+
+      const isFav = this.store.isInWishlist(prodId);
+      const favBtn = card.querySelector('.wishlist-toggle-btn') as HTMLElement | null;
+      if (favBtn) {
+        favBtn.classList.toggle('is-active', isFav);
+        favBtn.innerHTML = Icons.heart('w-5 h-5', isFav);
+      }
+    });
+
+    this.updateCardVisibility();
+  }
+
+  /**
+   * Evalúa la posición de cada tarjeta en el viewport y añade o mantiene
+   * la clase 'horse-card-revealed' para evitar que se desvanezcan o queden invisibles.
+   */
+  public updateCardVisibility(): void {
+    if (typeof window === 'undefined') return;
+    const windowH = window.innerHeight;
+    const triggerY = windowH * 0.85; // Umbral cómodo de aparición
+    const cards = this.container.querySelectorAll<HTMLElement>('.horse-products-grid .product-card');
+
+    cards.forEach((card) => {
+      const cardRect = card.getBoundingClientRect();
+      if (cardRect.top < triggerY) {
+        card.classList.add('horse-card-revealed');
+      } else {
+        card.classList.remove('horse-card-revealed');
+      }
+    });
   }
 
   /**
@@ -283,16 +358,7 @@ export class HorseShowcase {
       }
 
       // 2. Animación de aparición de productos con elevación y nitidez cinematográfica
-      const cards = this.container.querySelectorAll<HTMLElement>('.horse-products-grid .product-card');
-      const triggerY = windowH * 0.75; // Umbral ajustado para que los productos tarden un poco más en empezar a aparecer al hacer scroll
-      cards.forEach((card) => {
-        const cardRect = card.getBoundingClientRect();
-        if (cardRect.top < triggerY) {
-          card.classList.add('horse-card-revealed');
-        } else {
-          card.classList.remove('horse-card-revealed');
-        }
-      });
+      this.updateCardVisibility();
     };
 
     window.addEventListener('scroll', onScroll, { passive: true });
