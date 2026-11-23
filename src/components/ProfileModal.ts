@@ -5,124 +5,7 @@ import { Icons } from './Icons';
 import { Toast } from './Toast';
 import confetti from 'canvas-confetti';
 import { MapPickerModal, SelectedLocation } from './MapPickerModal';
-
-// Departamentos y Municipios oficiales de El Salvador
-const EL_SALVADOR_DEPARTMENTS: Record<string, string[]> = {
-  'San Salvador': [
-    'San Salvador Centro (Escalón, San Benito, Centro)',
-    'Antiguo Cuscatlán (La Sultana, Santa Elena)',
-    'Santa Tecla',
-    'Soyapango',
-    'Mejicanos',
-    'Ilopango',
-    'Apopa',
-    'San Marcos',
-    'Ciudad Delgado',
-    'Cuscatancingo',
-    'Ayutuxtepeque'
-  ],
-  'La Libertad': [
-    'Santa Tecla',
-    'Antiguo Cuscatlán',
-    'Nuevo Cuscatlán',
-    'Colón (Lourdes)',
-    'San Juan Opico',
-    'Quezaltepeque',
-    'Zaragoza',
-    'Puerto de La Libertad',
-    'San José Villanueva'
-  ],
-  'Santa Ana': [
-    'Santa Ana Centro',
-    'Chalchuapa',
-    'Metapán',
-    'Coatepeque',
-    'El Congo',
-    'Candelaria de la Frontera'
-  ],
-  'San Miguel': [
-    'San Miguel Centro',
-    'Chinameca',
-    'Ciudad Barrios',
-    'Moncagua',
-    'Lolotique',
-    'Sesori'
-  ],
-  'Sonsonate': [
-    'Sonsonate Centro',
-    'Acajutla (Puerto)',
-    'Izalco',
-    'Nahuizalco',
-    'Armenia',
-    'Juayúa',
-    'Sonzacate'
-  ],
-  'Usulután': [
-    'Usulután Centro',
-    'Jiquilisco',
-    'Santiago de María',
-    'Berlín',
-    'Puerto El Triunfo',
-    'Santa Elena'
-  ],
-  'Ahuachapán': [
-    'Ahuachapán Centro',
-    'Atiquizaya',
-    'Apaneca',
-    'Tacuba',
-    'Guaymango',
-    'Concepción de Ataco'
-  ],
-  'La Paz': [
-    'Zacatecoluca',
-    'Olocuilta',
-    'San Luis Talpa (Aeropuerto Internacional)',
-    'Santiago Nonualco',
-    'San Pedro Masahuat',
-    'Cuyultitán'
-  ],
-  'Cuscatlán': [
-    'Cojutepeque',
-    'Suchitoto',
-    'San Pedro Perulapán',
-    'San Martín',
-    'San Rafael Cedros'
-  ],
-  'Chalatenango': [
-    'Chalatenango Centro',
-    'Nueva Concepción',
-    'La Palma',
-    'Tejutla',
-    'Dulce Nombre de María'
-  ],
-  'Morazán': [
-    'San Francisco Gotera',
-    'Perquín',
-    'Jocoaitique',
-    'Corinto',
-    'Guatajiagua'
-  ],
-  'San Vicente': [
-    'San Vicente Centro',
-    'Apastepeque',
-    'Tecoluca',
-    'San Sebastián',
-    'Guadalupe'
-  ],
-  'Cabañas': [
-    'Sensuntepeque',
-    'Ilobasco',
-    'Victoria',
-    'Tejutepeque'
-  ],
-  'La Unión': [
-    'La Unión (Puerto)',
-    'Conchagua',
-    'Santa Rosa de Lima',
-    'Pasaquina',
-    'Anamorós'
-  ]
-};
+import { EL_SALVADOR_DEPARTMENTS } from '../data/departments';
 
 export type ProfileTab = 'overview' | 'coupons' | 'orders' | 'addresses' | 'cards' | 'reviews' | 'wishlist';
 
@@ -1035,7 +918,24 @@ export class ProfileModal {
 
             <div class="input-field">
               <label for="card-number">Número de Tarjeta (16 dígitos) *</label>
-              <input type="text" id="card-number" placeholder="4000 1234 5678 9010" maxlength="19" required />
+              <input type="text" id="card-number" placeholder="4242 4242 4242 4242" maxlength="19" required />
+              <small style="color:#64748b; font-size:11px; margin-top:3px; display:block;">
+                Tarjetas Stripe Test: <strong>4242 4242 4242 4242</strong> (Aprobada), terminada en <strong>0002</strong> (Declinada), terminada en <strong>0003</strong> (Fondos insuficientes).
+              </small>
+            </div>
+
+            <div class="input-field">
+              <label for="card-balance">Fondos / Saldo de Prueba Stripe ($ USD)</label>
+              <div style="display:flex; gap:8px; align-items:center;">
+                <input type="number" id="card-balance" min="0" step="50" value="500" placeholder="500.00" style="flex:1;" />
+                <button type="button" class="btn-balance-preset" data-val="50" style="padding:6px 10px; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:6px; font-size:12px; cursor:pointer;">$50</button>
+                <button type="button" class="btn-balance-preset" data-val="150" style="padding:6px 10px; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:6px; font-size:12px; cursor:pointer;">$150</button>
+                <button type="button" class="btn-balance-preset" data-val="500" style="padding:6px 10px; background:#0B3B24; color:#fff; border:1px solid #0B3B24; border-radius:6px; font-size:12px; cursor:pointer;">$500</button>
+                <button type="button" class="btn-balance-preset" data-val="1500" style="padding:6px 10px; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:6px; font-size:12px; cursor:pointer;">$1500</button>
+              </div>
+              <small style="color:#64748b; font-size:11px; margin-top:3px; display:block;">
+                Saldo real debitable al pagar. Agrega una tarjeta con $50 para probar validación de fondos insuficientes en compras mayores.
+              </small>
             </div>
 
             <div class="form-row-2">
@@ -1085,36 +985,61 @@ export class ProfileModal {
           <div class="cards-grid profile-component-pop pop-step-4">
             ${paymentCards
           .map((c: any) => {
-            const brandLogos: Record<string, string> = {
-              VISA: 'VISA',
-              MASTERCARD: 'MC',
-              AMEX: 'AMEX'
-            };
+            const isMastercard = (c.brand || '').toUpperCase() === 'MASTERCARD';
+            const brandSvg = isMastercard
+              ? Icons.mastercardLogo('official-mastercard-svg')
+              : Icons.visaLogo('official-visa-svg');
+            const expShort = `${c.expMonth < 10 ? '0' + c.expMonth : c.expMonth}/${c.expYear.toString().slice(-2)}`;
+
             return `
-              <div class="credit-card-item ${c.isDefault ? 'is-default' : ''}">
-                <div class="card-chip-line">
-                  <div class="card-emv-chip"></div>
-                  <strong class="card-brand-name">${brandLogos[c.brand] || c.brand}</strong>
-                </div>
+              <div class="user-card-item ${c.isDefault ? 'is-default' : ''}">
+                <div class="luxury-credit-card">
+                  <div class="card-bg-gradient"></div>
+                  <div class="card-grain-overlay"></div>
+                  <div class="card-shimmer-sheen"></div>
+                  <div class="card-light-glint"></div>
 
-                <div class="card-masked-number">
-                  •••• •••• •••• <strong>${c.last4}</strong>
-                </div>
+                  <div class="card-top-bar">
+                    <div class="card-emblem-badge" title="Blessed Card">
+                      ${Icons.cardEmblem('card-wise-emblem')}
+                    </div>
 
-                <div class="card-lower-info">
-                  <div>
-                    <span class="card-label">TITULAR</span>
-                    <strong class="card-holder-name">${c.cardHolder}</strong>
+                    <div class="card-chip-cluster">
+                      <div class="luxury-emv-chip" aria-hidden="true">
+                        <div class="chip-center-core"></div>
+                        <div class="chip-line chip-line-h1"></div>
+                        <div class="chip-line chip-line-h2"></div>
+                        <div class="chip-line chip-line-v1"></div>
+                        <div class="chip-line chip-line-v2"></div>
+                      </div>
+                      <div class="luxury-contactless-wave" aria-hidden="true">
+                        ${Icons.contactless('contactless-waves-svg')}
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <span class="card-label">VENCE</span>
-                    <strong class="card-expiry">${c.expMonth < 10 ? '0' + c.expMonth : c.expMonth}/${c.expYear.toString().slice(-2)}</strong>
+
+                  <div class="card-middle-number">
+                    <span class="card-num-text">•••• &nbsp;•••• &nbsp;•••• &nbsp;<strong>${c.last4}</strong></span>
+                  </div>
+
+                  <div class="card-bottom-bar">
+                    <div class="card-identity-block">
+                      <span class="card-holder-name-text">${c.cardHolder}</span>
+                      <span class="card-expiry-badge">VENCE: ${expShort}</span>
+                    </div>
+
+                    <div class="card-network-badge">
+                      ${brandSvg}
+                    </div>
                   </div>
                 </div>
 
-                <div class="card-action-bar">
-                  ${c.isDefault ? `<span class="badge-default-pill">Predeterminada</span>` : ''}
-                  <button class="btn-delete-card" data-id="${c.id}" title="Eliminar tarjeta">
+                <div class="user-card-actions-strip">
+                  <div class="user-card-meta-tags">
+                    ${c.isDefault ? `<span class="badge-card-pill-default">Predeterminada</span>` : ''}
+                    <span class="badge-card-pill-balance">Saldo: $${Number(c.balance ?? 500).toFixed(2)}</span>
+                  </div>
+                  <button type="button" class="btn-delete-card" data-id="${c.id}" title="Eliminar tarjeta">
                     Eliminar
                   </button>
                 </div>
@@ -1869,6 +1794,23 @@ export class ProfileModal {
       boxCard?.classList.add('is-hidden');
     });
 
+    // Preset buttons para balance de prueba Stripe
+    this.container.querySelectorAll('.btn-balance-preset').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const val = (btn as HTMLElement).dataset.val;
+        const balanceInput = this.container.querySelector('#card-balance') as HTMLInputElement | null;
+        if (balanceInput && val) {
+          balanceInput.value = val;
+          this.container.querySelectorAll('.btn-balance-preset').forEach((b) => {
+            (b as HTMLElement).style.background = '#f1f5f9';
+            (b as HTMLElement).style.color = '#1e293b';
+          });
+          (btn as HTMLElement).style.background = '#0B3B24';
+          (btn as HTMLElement).style.color = '#ffffff';
+        }
+      });
+    });
+
     // Submit nueva tarjeta
     const formCard = this.container.querySelector('#form-add-card');
     formCard?.addEventListener('submit', async (e) => {
@@ -1879,6 +1821,7 @@ export class ProfileModal {
       const cardNumber = (this.container.querySelector('#card-number') as HTMLInputElement | null)?.value.trim() || '';
       const expMonth = Number((this.container.querySelector('#card-month') as HTMLSelectElement | null)?.value) || 12;
       const expYear = Number((this.container.querySelector('#card-year') as HTMLSelectElement | null)?.value) || 2028;
+      const balance = Number((this.container.querySelector('#card-balance') as HTMLInputElement | null)?.value) || 500;
       const isDefault = (this.container.querySelector('#card-default') as HTMLInputElement | null)?.checked ?? true;
 
       const res = await ApiService.addPaymentCard({
@@ -1887,6 +1830,7 @@ export class ProfileModal {
         cardNumber,
         expMonth,
         expYear,
+        balance,
         isDefault
       });
 

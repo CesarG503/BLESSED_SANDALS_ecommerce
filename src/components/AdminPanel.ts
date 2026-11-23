@@ -2,6 +2,7 @@ import { Store } from '../state/store';
 import { ApiService } from '../services/apiService';
 import { Icons } from './Icons';
 import { Toast } from './Toast';
+import confetti from 'canvas-confetti';
 import {
   SizeUnit,
   formatSizeDisplay,
@@ -24,7 +25,8 @@ export type AdminTab =
   | 'promos-store-create'
   | 'minio-storage'
   | 'circular-showcase'
-  | 'horse-showcase';
+  | 'horse-showcase'
+  | 'stripe-test-cards';
 
 export interface ProductVariantForm {
   id: string;
@@ -70,6 +72,8 @@ export class AdminPanel {
   private demosAccordionOpen: boolean = false;
   private activeModalProductId: string | null = null;
   private promoStoreItems: Array<{ productId: string; promoPrice: number; badgeLabel: string }> = [];
+  private adminCards: any[] = [];
+  private adminUsers: any[] = [];
 
   private initFormVariants(): void {
     if (this.editingProduct) {
@@ -308,6 +312,8 @@ export class AdminPanel {
       if (catRes.success && catRes.categories) {
         this.categories = catRes.categories;
       }
+
+      await this.loadAdminCardsData();
     } catch (err) {
       console.error('Error al cargar datos del panel de administración:', err);
     }
@@ -417,6 +423,18 @@ export class AdminPanel {
               </nav>
             </div>
 
+            <div class="admin-nav-divider"></div>
+
+            <!-- SECCIÓN 5: PAGOS & PRUEBAS STRIPE -->
+            <div class="admin-nav-group">
+              <span class="admin-group-title">PAGOS & PRUEBAS STRIPE</span>
+              <nav class="admin-group-links">
+                <button type="button" class="admin-tab-btn ${this.activeTab === 'stripe-test-cards' ? 'active' : ''}" data-tab="stripe-test-cards">
+                  Tarjetas de Prueba Stripe
+                </button>
+              </nav>
+            </div>
+
             <div class="admin-sidebar-footer">
               <div class="admin-server-status">
                 <span class="status-pulse-dot"></span>
@@ -454,6 +472,8 @@ export class AdminPanel {
         return this.renderCircularShowcaseTab();
       case 'horse-showcase':
         return this.renderHorseShowcaseTab();
+      case 'stripe-test-cards':
+        return this.renderStripeTestCardsTab();
       default:
         return this.renderProductsListTab();
     }
@@ -2990,6 +3010,11 @@ export class AdminPanel {
               this.promoStoreItems = [];
             }
           }
+          if (tab === 'stripe-test-cards') {
+            this.activeTab = tab;
+            this.loadAdminCardsData().then(() => this.updateMainContentOnly());
+            return;
+          }
           this.activeTab = tab;
           this.updateMainContentOnly();
         }
@@ -3039,6 +3064,11 @@ export class AdminPanel {
     // Si estamos en la pestaña de Horse Showcase
     if (this.activeTab === 'horse-showcase') {
       this.setupHorseShowcaseEvents();
+    }
+
+    // Si estamos en la pestaña de Tarjetas de Prueba Stripe
+    if (this.activeTab === 'stripe-test-cards') {
+      this.setupStripeTestCardsEvents();
     }
 
     // --- TAB 1: PRODUCTOS LIST ---
@@ -4454,6 +4484,585 @@ export class AdminPanel {
           submitBtn.textContent = 'Guardar Código Tienda Promo';
         }
       }
+    });
+  }
+
+  // ==========================================================================
+  // SECCIÓN: TARJETAS DE PRUEBA STRIPE (CREACIÓN Y GESTIÓN DE SALDOS EN ADMIN)
+  // ==========================================================================
+
+  private async loadAdminCardsData(): Promise<void> {
+    const userId = this.store.currentUser?.id;
+    if (!userId) return;
+    try {
+      const [usersRes, cardsRes] = await Promise.all([
+        ApiService.getAdminUsers(userId),
+        ApiService.getAdminCards(userId)
+      ]);
+      if (usersRes.success && usersRes.users) {
+        this.adminUsers = usersRes.users;
+      }
+      if (cardsRes.success && cardsRes.cards) {
+        this.adminCards = cardsRes.cards;
+      }
+    } catch (err) {
+      console.error('Error cargando tarjetas para pruebas:', err);
+    }
+  }
+
+  private renderStripeTestCardsTab(): string {
+    const userList = this.adminUsers || [];
+    const cardList = this.adminCards || [];
+    const currentUserId = this.store.currentUser?.id;
+
+    return `
+      <div class="admin-view-panel">
+        <div class="admin-view-header">
+          <div>
+            <h2 class="admin-view-title">Tarjetas de Prueba & Simulación de Fondos</h2>
+            <p class="admin-view-subtitle">
+              Administra tarjetas bancarias de prueba con diferentes balances y estados para simular compras en el checkout de Blessed Sandals.
+            </p>
+          </div>
+          <button type="button" class="btn-table-action" id="btn-refresh-admin-cards" style="display:inline-flex; align-items:center; gap:6px; height:38px; padding:0 14px;">
+            ${Icons.refresh('w-4 h-4')}
+            <span>Actualizar Lista</span>
+          </button>
+        </div>
+
+        <div class="admin-stripe-cards-grid">
+          
+          <!-- FORMULARIO CREAR TARJETA DE PRUEBA -->
+          <div class="admin-form-section">
+            <h3 class="admin-section-heading">Crear Tarjeta de Prueba</h3>
+            <p class="admin-section-sub">Asigna una tarjeta con saldo a una cuenta de usuario.</p>
+
+            <!-- PRESETS DE TARJETAS DE PRUEBA -->
+            <div class="admin-card-presets-wrap">
+              <span class="admin-presets-label">Presets Rápidos de Tarjeta:</span>
+              <div class="admin-presets-buttons">
+                <button type="button" class="btn-card-preset is-active" data-num="4242 4242 4242 4242" data-holder="PRUEBA APROBADA STRIPE" data-funds="500">
+                  ✓ Aprobada (4242)
+                </button>
+                <button type="button" class="btn-card-preset" data-num="4000 0000 0000 0002" data-holder="PRUEBA DECLINADA" data-funds="500">
+                  ✕ Declinada (0002)
+                </button>
+                <button type="button" class="btn-card-preset" data-num="4000 0000 0000 0003" data-holder="PRUEBA SIN FONDOS" data-funds="500">
+                  ⚠️ Sin Fondos (0003)
+                </button>
+                <button type="button" class="btn-card-preset" data-num="4242 4242 4242 1010" data-holder="PRUEBA FONDOS BAJOS" data-funds="20">
+                  🔻 Saldo Bajo ($20)
+                </button>
+              </div>
+            </div>
+
+            <form id="form-admin-create-card">
+              <div class="admin-input-group">
+                <label for="admin-card-user">Cuenta de Usuario Destino *</label>
+                <select id="admin-card-user" required>
+                  ${userList.length === 0 ? `<option value="">Cargando usuarios...</option>` : ''}
+                  ${userList.map((u) => `
+                    <option value="${u.id}" ${u.id === currentUserId ? 'selected' : ''}>
+                      ${u.name} (${u.email}) [${u.role}]
+                    </option>
+                  `).join('')}
+                </select>
+                <small class="admin-input-help">Esta tarjeta aparecerá en la bolsa y checkout de esta cuenta.</small>
+              </div>
+
+              <div class="admin-input-group">
+                <label for="admin-card-holder">Nombre del Titular *</label>
+                <input type="text" id="admin-card-holder" value="PRUEBA APROBADA STRIPE" required />
+              </div>
+
+              <div class="admin-input-group">
+                <label for="admin-card-number">Número de Tarjeta (16 dígitos) *</label>
+                <input type="text" id="admin-card-number" value="4242 4242 4242 4242" maxlength="19" required />
+              </div>
+
+              <div class="admin-form-grid-2">
+                <div class="admin-input-group">
+                  <label for="admin-card-month">Mes Vencimiento *</label>
+                  <select id="admin-card-month">
+                    ${Array.from({ length: 12 }, (_, i) => i + 1).map((m) => `
+                      <option value="${m}" ${m === 12 ? 'selected' : ''}>${m < 10 ? '0' + m : m}</option>
+                    `).join('')}
+                  </select>
+                </div>
+                <div class="admin-input-group">
+                  <label for="admin-card-year">Año Vencimiento *</label>
+                  <select id="admin-card-year">
+                    ${Array.from({ length: 10 }, (_, i) => 2026 + i).map((y) => `
+                      <option value="${y}" ${y === 2028 ? 'selected' : ''}>${y}</option>
+                    `).join('')}
+                  </select>
+                </div>
+              </div>
+
+              <!-- FONDOS ASIGNADOS A LA TARJETA -->
+              <div class="admin-input-group">
+                <label for="admin-card-balance">Fondos / Saldo Inicial de Prueba ($ USD) *</label>
+                <div class="admin-funds-input-row">
+                  <input type="number" id="admin-card-balance" min="0" step="10" value="500" required />
+                  <div class="admin-fund-presets-chips">
+                    <button type="button" class="btn-admin-fund-preset" data-val="0">$0</button>
+                    <button type="button" class="btn-admin-fund-preset" data-val="25">$25</button>
+                    <button type="button" class="btn-admin-fund-preset" data-val="100">$100</button>
+                    <button type="button" class="btn-admin-fund-preset is-active" data-val="500">$500</button>
+                    <button type="button" class="btn-admin-fund-preset" data-val="1500">$1500</button>
+                  </div>
+                </div>
+                <small class="admin-input-help">
+                  El saldo se debitará en PostgreSQL con cada compra. Si una orden supera el saldo, el checkout la rechazará por fondos insuficientes.
+                </small>
+              </div>
+
+              <div class="admin-checkbox-group">
+                <label>
+                  <input type="checkbox" id="admin-card-default" checked />
+                  <span>Establecer como tarjeta principal del usuario</span>
+                </label>
+              </div>
+
+              <button type="submit" class="btn-admin-action-primary" id="btn-submit-admin-card" style="width:100%; justify-content:center; height:42px;">
+                ${Icons.plus('w-4 h-4')}
+                <span>Crear Tarjeta de Prueba</span>
+              </button>
+            </form>
+          </div>
+
+          <!-- LISTA DE TARJETAS REGISTRADAS -->
+          <div class="admin-form-section">
+            <h3 class="admin-section-heading">Tarjetas en el Sistema (${cardList.length})</h3>
+            <p class="admin-section-sub">Supervisa credenciales bancarias y ajusta el saldo en tiempo real.</p>
+
+            ${cardList.length === 0 ? `
+              <div class="admin-empty-state" style="padding: 40px 20px; text-align: center;">
+                <div style="font-size: 36px; margin-bottom: 10px;">💳</div>
+                <h4>No hay tarjetas registradas</h4>
+                <p>Crea una tarjeta en el formulario para comenzar las pruebas de checkout.</p>
+              </div>
+            ` : `
+              <div class="admin-table-container">
+                <table class="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Usuario</th>
+                      <th>Tarjeta</th>
+                      <th>Saldo BD</th>
+                      <th>Tipo Simulación</th>
+                      <th style="text-align: right;">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${cardList.map((c) => {
+                      const balance = Number(c.balance) || 0;
+                      let simTypeBadge = `<span class="badge-sim-ok">✓ Aprobada</span>`;
+                      if (c.last4 === '0002') simTypeBadge = `<span class="badge-sim-decline">✕ Declinada</span>`;
+                      else if (c.last4 === '0003') simTypeBadge = `<span class="badge-sim-insufficient">⚠️ Sin Fondos</span>`;
+                      else if (balance < 50) simTypeBadge = `<span class="badge-sim-low">🔻 Saldo Bajo</span>`;
+
+                      return `
+                        <tr>
+                          <td>
+                            <div class="table-user-cell">
+                              <strong>${c.userName || 'Usuario'}</strong>
+                              <small>${c.userEmail}</small>
+                            </div>
+                          </td>
+                          <td>
+                            <div class="table-card-cell">
+                              <span class="card-brand-pill ${c.brand.toLowerCase()}">${c.brand}</span>
+                              <strong style="font-family:monospace; font-size:13px;">•••• ${c.last4}</strong>
+                            </div>
+                            <small style="color:#64748b; font-size:11px;">${c.cardHolder}</small>
+                          </td>
+                          <td>
+                            <strong class="card-balance-val ${balance > 0 ? 'text-positive' : 'text-zero'}">
+                              $${balance.toFixed(2)}
+                            </strong>
+                          </td>
+                          <td>
+                            ${simTypeBadge}
+                          </td>
+                          <td style="text-align: right;">
+                            <div class="table-actions-cluster">
+                              <button type="button" class="btn-table-action-icon btn-view-card-details" data-id="${c.id}" title="Ver datos completos (Número, CVC, Expiración)">
+                                ${Icons.eye('w-4 h-4')}
+                              </button>
+                              <button type="button" class="btn-table-action-icon btn-edit-balance" data-id="${c.id}" data-balance="${balance}" title="Modificar saldo">
+                                💵
+                              </button>
+                              <button type="button" class="btn-table-action-icon btn-table-action-danger btn-delete-admin-card" data-id="${c.id}" title="Eliminar tarjeta">
+                                ${Icons.trash('w-4 h-4')}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      `;
+                    }).join('')}
+                  </tbody>
+                </table>
+              </div>
+            `}
+
+            <!-- GUÍA DE REFERENCIA DE COMPORTAMIENTO -->
+            <div style="margin-top: 18px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 16px;">
+              <strong style="font-size: 11px; color: #0f172a; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 6px;">
+                Guía de Respuestas en el Checkout
+              </strong>
+              <ul style="font-size: 12px; color: #475569; margin: 0; padding-left: 16px; line-height: 1.55;">
+                <li><strong>Aprobada:</strong> Número <code>4242...</code> con saldo $\ge$ total de la compra $\to$ Completa la orden y debita el saldo en PostgreSQL.</li>
+                <li><strong>Fondos Insuficientes:</strong> Cualquier tarjeta con saldo $<$ total $\to$ Muestra alerta: <em>"Fondos insuficientes en tu tarjeta..."</em>.</li>
+                <li><strong>Declinada:</strong> Número terminado en <code>0002</code> $\to$ Muestra alerta de rechazo bancario de Stripe.</li>
+                <li><strong>Sin Fondos Forzado:</strong> Número terminado en <code>0003</code> $\to$ Muestra rechazo forzado de fondos insuficientes.</li>
+              </ul>
+            </div>
+
+          </div>
+
+        </div>
+
+        <!-- MODAL DETALLES COMPLETOS DE TARJETA -->
+        <div class="modal-card-details-backdrop is-hidden" id="modal-card-details" role="dialog" aria-modal="true">
+          <div class="modal-card-details-box">
+            <div class="modal-card-details-header">
+              <div>
+                <h3 class="modal-card-details-title">Datos Completos de Tarjeta</h3>
+                <p class="modal-card-details-sub">Credenciales bancarias listas para pruebas de checkout</p>
+              </div>
+              <button type="button" class="btn-close-modal-icon" id="btn-close-card-details-x" aria-label="Cerrar modal">
+                ✕
+              </button>
+            </div>
+
+            <div class="modal-card-details-body">
+              <!-- Tarjeta Visual Estética con Proporciones y Brillo Sutil -->
+              <div class="modal-visual-card-wrap">
+                <div class="luxury-credit-card">
+                  <div class="card-bg-gradient"></div>
+                  <div class="card-grain-overlay"></div>
+                  <div class="card-shimmer-sheen"></div>
+                  <div class="card-light-glint"></div>
+
+                  <div class="card-top-bar">
+                    <div class="card-emblem-badge" title="Blessed Card">
+                      ${Icons.cardEmblem('card-wise-emblem')}
+                    </div>
+
+                    <div class="card-chip-cluster">
+                      <div class="luxury-emv-chip" aria-hidden="true">
+                        <div class="chip-center-core"></div>
+                        <div class="chip-line chip-line-h1"></div>
+                        <div class="chip-line chip-line-h2"></div>
+                        <div class="chip-line chip-line-v1"></div>
+                        <div class="chip-line chip-line-v2"></div>
+                      </div>
+                      <div class="luxury-contactless-wave" aria-hidden="true">
+                        ${Icons.contactless('contactless-waves-svg')}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="card-middle-number">
+                    <span class="card-num-text" id="modal-view-visual-num">4242 &nbsp;4242 &nbsp;4242 &nbsp;4242</span>
+                  </div>
+
+                  <div class="card-bottom-bar">
+                    <div class="card-identity-block">
+                      <span class="card-holder-name-text" id="modal-view-visual-holder">PRUEBA APROBADA STRIPE</span>
+                      <div style="display:flex; gap:8px; align-items:center;">
+                        <span class="card-expiry-badge" id="modal-view-visual-exp">12/28</span>
+                        <span class="card-expiry-badge" id="modal-view-visual-cvc" style="background:rgba(255,255,255,0.18); padding:1px 6px; border-radius:4px;">CVC: 123</span>
+                      </div>
+                    </div>
+
+                    <div class="card-network-badge" id="modal-view-brand-wrap">
+                      ${Icons.visaLogo('official-visa-svg')}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Tabla de Copia Rápida -->
+              <div class="card-data-sheet">
+                <div class="card-data-row">
+                  <span class="card-data-label">Número Completo</span>
+                  <div class="card-data-val-group">
+                    <span class="card-data-val" id="modal-view-card-number">4242 4242 4242 4242</span>
+                    <button type="button" class="btn-copy-chip" id="btn-copy-card-number">
+                      ${Icons.copy('w-3.5 h-3.5')}
+                      <span>Copiar</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div class="card-data-row">
+                  <span class="card-data-label">Código CVC</span>
+                  <div class="card-data-val-group">
+                    <span class="card-data-val" id="modal-view-card-cvc">123</span>
+                    <button type="button" class="btn-copy-chip" id="btn-copy-card-cvc">
+                      ${Icons.copy('w-3.5 h-3.5')}
+                      <span>Copiar</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div class="card-data-row">
+                  <span class="card-data-label">Fecha de Expiración</span>
+                  <div class="card-data-val-group">
+                    <span class="card-data-val" id="modal-view-card-exp">12/2028</span>
+                    <button type="button" class="btn-copy-chip" id="btn-copy-card-exp">
+                      ${Icons.copy('w-3.5 h-3.5')}
+                      <span>Copiar</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div class="card-data-row">
+                  <span class="card-data-label">Saldo en Base de Datos</span>
+                  <span class="card-data-val text-positive" id="modal-view-card-balance" style="font-size: 14px;">$500.00 USD</span>
+                </div>
+
+                <div class="card-data-row">
+                  <span class="card-data-label">Usuario Asignado</span>
+                  <span class="card-data-val" id="modal-view-card-user" style="font-family: inherit; font-size: 12px; color: #334155;">Alexander (alexander@blessed.com)</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="modal-card-details-footer">
+              <button type="button" class="btn-admin-action-secondary" id="btn-close-card-details-footer">
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    `;
+  }
+
+  private setupStripeTestCardsEvents(): void {
+    const adminUserId = this.store.currentUser?.id;
+    if (!adminUserId) return;
+
+    // Botón refrescar lista
+    this.container.querySelector('#btn-refresh-admin-cards')?.addEventListener('click', async () => {
+      await this.loadAdminCardsData();
+      this.updateMainContentOnly();
+      Toast.show('Lista de tarjetas actualizada.', 'Stripe Test', 'info');
+    });
+
+    // Presets rápidos de tarjetas
+    this.container.querySelectorAll('.btn-card-preset').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const num = (btn as HTMLElement).dataset.num;
+        const holder = (btn as HTMLElement).dataset.holder;
+        const funds = (btn as HTMLElement).dataset.funds;
+
+        const numInput = this.container.querySelector('#admin-card-number') as HTMLInputElement | null;
+        const holderInput = this.container.querySelector('#admin-card-holder') as HTMLInputElement | null;
+        const fundsInput = this.container.querySelector('#admin-card-balance') as HTMLInputElement | null;
+
+        if (num && numInput) numInput.value = num;
+        if (holder && holderInput) holderInput.value = holder;
+        if (funds && fundsInput) fundsInput.value = funds;
+
+        this.container.querySelectorAll('.btn-card-preset').forEach((b) => b.classList.remove('is-active'));
+        btn.classList.add('is-active');
+      });
+    });
+
+    // Presets de saldo rápido
+    this.container.querySelectorAll('.btn-admin-fund-preset').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const val = (btn as HTMLElement).dataset.val;
+        const fundsInput = this.container.querySelector('#admin-card-balance') as HTMLInputElement | null;
+        if (val && fundsInput) {
+          fundsInput.value = val;
+          this.container.querySelectorAll('.btn-admin-fund-preset').forEach((b) => b.classList.remove('is-active'));
+          btn.classList.add('is-active');
+        }
+      });
+    });
+
+    // Submit crear tarjeta
+    const formCreate = this.container.querySelector('#form-admin-create-card');
+    formCreate?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const targetUserId = (this.container.querySelector('#admin-card-user') as HTMLSelectElement | null)?.value;
+      const cardHolder = (this.container.querySelector('#admin-card-holder') as HTMLInputElement | null)?.value.trim() || '';
+      const cardNumber = (this.container.querySelector('#admin-card-number') as HTMLInputElement | null)?.value.trim() || '';
+      const expMonth = Number((this.container.querySelector('#admin-card-month') as HTMLSelectElement | null)?.value) || 12;
+      const expYear = Number((this.container.querySelector('#admin-card-year') as HTMLSelectElement | null)?.value) || 2028;
+      const balance = Number((this.container.querySelector('#admin-card-balance') as HTMLInputElement | null)?.value) || 0;
+      const isDefault = (this.container.querySelector('#admin-card-default') as HTMLInputElement | null)?.checked ?? false;
+
+      if (!targetUserId || !cardHolder || !cardNumber) {
+        Toast.show('Por favor completa todos los campos requeridos.', 'Atención', 'warning');
+        return;
+      }
+
+      const res = await ApiService.createAdminCard(adminUserId, {
+        targetUserId,
+        cardHolder,
+        cardNumber,
+        expMonth,
+        expYear,
+        balance,
+        isDefault
+      });
+
+      if (res.success) {
+        confetti({ particleCount: 30, spread: 50, origin: { y: 0.3 } });
+        Toast.show(res.message || 'Tarjeta de prueba creada exitosamente.', 'Stripe Test', 'success');
+        await this.loadAdminCardsData();
+        this.updateMainContentOnly();
+      } else {
+        Toast.show(res.message || 'Error al crear tarjeta.', 'Atención', 'warning');
+      }
+    });
+
+    // Editar saldo
+    this.container.querySelectorAll('.btn-edit-balance').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const cardId = (btn as HTMLElement).dataset.id;
+        const currentBalance = (btn as HTMLElement).dataset.balance || '0';
+        if (!cardId) return;
+
+        const newBalStr = prompt(`Ingresa el nuevo saldo para esta tarjeta ($ USD):`, currentBalance);
+        if (newBalStr === null) return;
+        const newBalance = parseFloat(newBalStr);
+        if (isNaN(newBalance) || newBalance < 0) {
+          Toast.show('Por favor ingresa un monto válido mayor o igual a 0.', 'Atención', 'warning');
+          return;
+        }
+
+        const res = await ApiService.updateAdminCardBalance(adminUserId, cardId, newBalance);
+        if (res.success) {
+          Toast.show(`Saldo actualizado a $${newBalance.toFixed(2)}.`, 'Stripe Test', 'success');
+          await this.loadAdminCardsData();
+          this.updateMainContentOnly();
+        } else {
+          Toast.show(res.message || 'Error al actualizar saldo.', 'Atención', 'warning');
+        }
+      });
+    });
+
+    // Eliminar tarjeta
+    this.container.querySelectorAll('.btn-delete-admin-card').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const cardId = (btn as HTMLElement).dataset.id;
+        if (!cardId) return;
+
+        if (confirm('¿Estás seguro de eliminar esta tarjeta de prueba?')) {
+          const res = await ApiService.deleteAdminCard(adminUserId, cardId);
+          if (res.success) {
+            Toast.show('Tarjeta de prueba eliminada.', 'Stripe Test', 'info');
+            await this.loadAdminCardsData();
+            this.updateMainContentOnly();
+          } else {
+            Toast.show(res.message || 'Error al eliminar tarjeta.', 'Atención', 'warning');
+          }
+        }
+      });
+    });
+
+    // Modal ver detalles completos con icono de ojo
+    const modalDetails = this.container.querySelector('#modal-card-details') as HTMLElement | null;
+    const closeModal = () => {
+      modalDetails?.classList.add('is-hidden');
+    };
+
+    this.container.querySelector('#btn-close-card-details-x')?.addEventListener('click', closeModal);
+    this.container.querySelector('#btn-close-card-details-footer')?.addEventListener('click', closeModal);
+    modalDetails?.addEventListener('click', (e) => {
+      if (e.target === modalDetails) closeModal();
+    });
+
+    this.container.querySelectorAll('.btn-view-card-details').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const cardId = (btn as HTMLElement).dataset.id;
+        if (!cardId) return;
+
+        const card = this.adminCards.find((c) => c.id === cardId);
+        if (!card) return;
+
+        const rawNum = card.cardNumber || (
+          card.last4 === '0002' ? '4000 0000 0000 0002' :
+          card.last4 === '0003' ? '4000 0000 0000 0003' :
+          `4242 4242 4242 ${card.last4}`
+        );
+        const formattedNum = rawNum.replace(/\s+/g, '').replace(/(\d{4})/g, '$1 ').trim();
+        const cvc = card.cvc || '123';
+        const expMonthStr = card.expMonth < 10 ? '0' + card.expMonth : String(card.expMonth);
+        const expStr = `${expMonthStr}/${card.expYear}`;
+        const expShortStr = `${expMonthStr}/${String(card.expYear).slice(-2)}`;
+        const balance = Number(card.balance) || 0;
+
+        // Visual card preview
+        const viewBrandWrap = modalDetails?.querySelector('#modal-view-brand-wrap');
+        const viewVisualNum = modalDetails?.querySelector('#modal-view-visual-num');
+        const viewVisualHolder = modalDetails?.querySelector('#modal-view-visual-holder');
+        const viewVisualExp = modalDetails?.querySelector('#modal-view-visual-exp');
+        const viewVisualCvc = modalDetails?.querySelector('#modal-view-visual-cvc');
+
+        if (viewBrandWrap) {
+          if (card.brand?.toUpperCase() === 'MASTERCARD') {
+            viewBrandWrap.innerHTML = Icons.mastercardLogo('official-mastercard-svg');
+          } else {
+            viewBrandWrap.innerHTML = Icons.visaLogo('official-visa-svg');
+          }
+        }
+        if (viewVisualNum) viewVisualNum.textContent = formattedNum;
+        if (viewVisualHolder) viewVisualHolder.textContent = card.cardHolder || 'Titular';
+        if (viewVisualExp) viewVisualExp.textContent = expShortStr;
+        if (viewVisualCvc) viewVisualCvc.textContent = `CVC: ${cvc}`;
+
+        // Data sheet
+        const viewNum = modalDetails?.querySelector('#modal-view-card-number');
+        const viewCvc = modalDetails?.querySelector('#modal-view-card-cvc');
+        const viewExp = modalDetails?.querySelector('#modal-view-card-exp');
+        const viewBal = modalDetails?.querySelector('#modal-view-card-balance');
+        const viewUser = modalDetails?.querySelector('#modal-view-card-user');
+
+        if (viewNum) viewNum.textContent = formattedNum;
+        if (viewCvc) viewCvc.textContent = cvc;
+        if (viewExp) viewExp.textContent = expStr;
+        if (viewBal) {
+          viewBal.textContent = `$${balance.toFixed(2)} USD`;
+          viewBal.className = `card-data-val ${balance > 0 ? 'text-positive' : 'text-zero'}`;
+        }
+        if (viewUser) viewUser.textContent = `${card.userName || 'Usuario'} (${card.userEmail || ''})`;
+
+        // Configurar botones de copia
+        const btnCopyNum = modalDetails?.querySelector('#btn-copy-card-number') as HTMLButtonElement | null;
+        if (btnCopyNum) {
+          btnCopyNum.onclick = async () => {
+            await navigator.clipboard.writeText(formattedNum);
+            Toast.show('Número de tarjeta copiado al portapapeles.', 'Copiado', 'success');
+          };
+        }
+
+        const btnCopyCvc = modalDetails?.querySelector('#btn-copy-card-cvc') as HTMLButtonElement | null;
+        if (btnCopyCvc) {
+          btnCopyCvc.onclick = async () => {
+            await navigator.clipboard.writeText(cvc);
+            Toast.show('Código CVC copiado al portapapeles.', 'Copiado', 'success');
+          };
+        }
+
+        const btnCopyExp = modalDetails?.querySelector('#btn-copy-card-exp') as HTMLButtonElement | null;
+        if (btnCopyExp) {
+          btnCopyExp.onclick = async () => {
+            await navigator.clipboard.writeText(expStr);
+            Toast.show('Fecha de expiración copiada al portapapeles.', 'Copiado', 'success');
+          };
+        }
+
+        modalDetails?.classList.remove('is-hidden');
+      });
     });
   }
 }

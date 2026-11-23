@@ -350,6 +350,7 @@ export function apiPlugin(): Plugin {
                   last4: c.last4,
                   expMonth: c.expMonth,
                   expYear: c.expYear,
+                  balance: Number(c.balance) || 0,
                   isDefault: c.isDefault,
                   createdAt: c.createdAt.toISOString()
                 })),
@@ -526,10 +527,10 @@ export function apiPlugin(): Plugin {
             return sendJson(res, 200, { success: true, message: 'Dirección predeterminada actualizada.' });
           }
 
-          // POST /api/user/cards (Agregar tarjeta de crédito / débito)
+          // POST /api/user/cards (Agregar tarjeta de crédito / débito con saldo Stripe Test)
           if (pathname === '/api/user/cards' && req.method === 'POST') {
             const body = await parseBody(req);
-            const { userId, cardHolder, cardNumber, expMonth, expYear, isDefault = false } = body;
+            const { userId, cardHolder, cardNumber, expMonth, expYear, balance = 500, isDefault = false } = body;
 
             if (!userId) {
               return sendJson(res, 401, { success: false, message: 'Usuario no autenticado.' });
@@ -562,8 +563,11 @@ export function apiPlugin(): Plugin {
                 cardHolder: cardHolder.trim().toUpperCase(),
                 brand,
                 last4,
+                cardNumber: cleanNumber,
+                cvc: body.cvc ? String(body.cvc).trim() : '123',
                 expMonth: Number(expMonth),
                 expYear: Number(expYear),
+                balance: Number(balance) >= 0 ? Number(balance) : 500.0,
                 isDefault: setAsDefault
               }
             });
@@ -571,7 +575,7 @@ export function apiPlugin(): Plugin {
             return sendJson(res, 201, {
               success: true,
               card: newCard,
-              message: `Tarjeta ${brand} terminada en ${last4} guardada exitosamente.`
+              message: `Tarjeta ${brand} terminada en ${last4} guardada exitosamente con saldo de $${Number(newCard.balance).toFixed(2)}.`
             });
           }
 
@@ -1356,10 +1360,22 @@ export function apiPlugin(): Plugin {
             });
           }
 
-          // 8. POST /api/orders/checkout (Finalizar orden y marcar cupón como usado)
+          // 8. POST /api/orders/checkout (Finalizar orden con validación y débito de Stripe Test Mode)
           if (pathname === '/api/orders/checkout' && req.method === 'POST') {
             const body = await parseBody(req);
-            const { userId, items = [], promoCodeId, subtotal, discount = 0, shipping = 0, total } = body;
+            const {
+              userId,
+              items = [],
+              promoCodeId,
+              subtotal,
+              discount = 0,
+              shipping = 0,
+              total,
+              paymentCardId,
+              newCard,
+              shippingAddressId,
+              newAddress
+            } = body;
 
             if (!userId) {
               return sendJson(res, 401, {
@@ -1369,7 +1385,162 @@ export function apiPlugin(): Plugin {
               });
             }
 
+            if (!items || items.length === 0) {
+              return sendJson(res, 400, {
+                success: false,
+                message: 'La bolsa de compras está vacía.'
+              });
+            }
+
+            const finalTotal = Math.max(0, Number(total) || 0);
+            let remainingBalance: number | undefined;
+            let cardBrand = 'VISA';
+            let cardLast4 = '4242';
+
+            // --- VALIDACIÓN DE FONDOS Y TARJETA CON STRIPE TEST MODE ---
+            if (finalTotal > 0) {
+              if (paymentCardId) {
+                // Tarjeta guardada en la base de datos
+                const card = await prisma.paymentCard.findUnique({
+                  where: { id: paymentCardId }
+                });
+
+                if (!card || card.userId !== userId) {
+                  return sendJson(res, 400, {
+                    success: false,
+                    errorType: 'CARD_NOT_FOUND',
+                    message: 'La tarjeta seleccionada no existe o no pertenece a tu cuenta.'
+                  });
+                }
+
+                const currentBalance = Number(card.balance) || 0;
+                if (currentBalance < finalTotal) {
+                  return sendJson(res, 400, {
+                    success: false,
+                    errorType: 'INSUFFICIENT_FUNDS',
+                    message: `Fondos insuficientes en tu tarjeta Stripe Test (${card.brand} •••• ${card.last4}). Saldo disponible: $${currentBalance.toFixed(2)}, pero el total es $${finalTotal.toFixed(2)}.`
+                  });
+                }
+
+                // Debitar el monto de la compra
+                const updatedCard = await prisma.paymentCard.update({
+                  where: { id: card.id },
+                  data: {
+                    balance: { decrement: finalTotal }
+                  }
+                });
+
+                remainingBalance = Number(updatedCard.balance);
+                cardBrand = card.brand;
+                cardLast4 = card.last4;
+              } else if (newCard) {
+                // Tarjeta nueva ingresada durante el checkout
+                const {
+                  cardNumber = '',
+                  cardHolder = 'CLIENTE STRIPE',
+                  expMonth = 12,
+                  expYear = 2028,
+                  balance = 500,
+                  saveCard = false
+                } = newCard;
+
+                const cleanNumber = cardNumber.replace(/\D/g, '');
+
+                if (!cleanNumber || cleanNumber.length < 13) {
+                  return sendJson(res, 400, {
+                    success: false,
+                    errorType: 'INVALID_NUMBER',
+                    message: 'Por favor ingresa un número de tarjeta válido (mínimo 13 dígitos) para Stripe Test Mode.'
+                  });
+                }
+
+                // Simulación de códigos de error de prueba oficiales de Stripe
+                if (cleanNumber.endsWith('0002')) {
+                  return sendJson(res, 400, {
+                    success: false,
+                    errorType: 'CARD_DECLINED',
+                    message: 'Stripe Test Mode: Tarjeta declinada por el banco emisor (Simulación: generic_decline).'
+                  });
+                }
+
+                if (cleanNumber.endsWith('0003')) {
+                  return sendJson(res, 400, {
+                    success: false,
+                    errorType: 'INSUFFICIENT_FUNDS',
+                    message: 'Stripe Test Mode: Fondos insuficientes forzado por tarjeta de prueba (Simulación: insufficient_funds).'
+                  });
+                }
+
+                const testBalance = Number(balance) >= 0 ? Number(balance) : 500.0;
+                if (testBalance < finalTotal) {
+                  return sendJson(res, 400, {
+                    success: false,
+                    errorType: 'INSUFFICIENT_FUNDS',
+                    message: `Fondos insuficientes en la tarjeta Stripe Test. Saldo de prueba: $${testBalance.toFixed(2)}, total a pagar: $${finalTotal.toFixed(2)}.`
+                  });
+                }
+
+                remainingBalance = testBalance - finalTotal;
+
+                if (cleanNumber.startsWith('5')) cardBrand = 'MASTERCARD';
+                else if (cleanNumber.startsWith('3')) cardBrand = 'AMEX';
+                else cardBrand = 'VISA';
+
+                cardLast4 = cleanNumber.slice(-4);
+
+                if (saveCard) {
+                  await prisma.paymentCard.create({
+                    data: {
+                      userId,
+                      cardHolder: cardHolder.trim().toUpperCase(),
+                      brand: cardBrand,
+                      last4: cardLast4,
+                      cardNumber: cleanNumber,
+                      cvc: newCard.cvc ? String(newCard.cvc).trim() : '123',
+                      expMonth: Number(expMonth) || 12,
+                      expYear: Number(expYear) || 2028,
+                      balance: remainingBalance,
+                      isDefault: false
+                    }
+                  });
+                }
+              } else {
+                return sendJson(res, 400, {
+                  success: false,
+                  errorType: 'NO_PAYMENT_METHOD',
+                  message: 'Por favor selecciona o ingresa una tarjeta de crédito o débito para procesar el pago.'
+                });
+              }
+            }
+
+            // --- GESTIÓN DE DIRECCIÓN DE ENVÍO ---
+            let addressText = 'Dirección no especificada';
+            if (shippingAddressId) {
+              const addr = await prisma.address.findUnique({ where: { id: shippingAddressId } });
+              if (addr) {
+                addressText = `${addr.fullName} (${addr.phone}), ${addr.street}, ${addr.city}, ${addr.state}, El Salvador`;
+              }
+            } else if (newAddress && newAddress.street) {
+              addressText = `${newAddress.fullName || 'Destinatario'} (${newAddress.phone || ''}), ${newAddress.street}, ${newAddress.city || 'San Salvador'}, ${newAddress.state || 'San Salvador'}, El Salvador`;
+              if (newAddress.saveAddress) {
+                await prisma.address.create({
+                  data: {
+                    userId,
+                    fullName: (newAddress.fullName || '').trim(),
+                    phone: (newAddress.phone || '').trim(),
+                    street: (newAddress.street || '').trim(),
+                    city: (newAddress.city || '').trim(),
+                    state: (newAddress.state || '').trim(),
+                    postalCode: (newAddress.postalCode || '1101').trim(),
+                    country: 'SV',
+                    isDefault: false
+                  }
+                });
+              }
+            }
+
             const orderNumber = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+            const orderNotes = `Stripe Test Mode (Aprobado) • ${cardBrand} •••• ${cardLast4} • Envío a: ${addressText}`;
 
             const order = await prisma.order.create({
               data: {
@@ -1379,8 +1550,9 @@ export function apiPlugin(): Plugin {
                 subtotal: Number(subtotal) || 0,
                 discount: Number(discount) || 0,
                 shipping: Number(shipping) || 0,
-                total: Number(total) || 0,
+                total: finalTotal,
                 promoCodeId: promoCodeId || null,
+                notes: orderNotes,
                 items: {
                   create: items.map((item: any) => ({
                     productId: item.productId || item.product?.id,
@@ -1396,7 +1568,6 @@ export function apiPlugin(): Plugin {
 
             // Si se aplicó un cupón: marcar como usado en la cuenta personal y registrar en promo_usages
             if (promoCodeId) {
-              // Marcar como usado en userCoupons
               await prisma.userCoupon.updateMany({
                 where: { userId, promoCodeId },
                 data: {
@@ -1405,7 +1576,6 @@ export function apiPlugin(): Plugin {
                 }
               });
 
-              // Registrar historial en promoUsages
               await prisma.promoUsage.create({
                 data: {
                   promoCodeId,
@@ -1414,7 +1584,6 @@ export function apiPlugin(): Plugin {
                 }
               });
 
-              // Incrementar contador de usos global
               await prisma.promoCode.update({
                 where: { id: promoCodeId },
                 data: { timesUsed: { increment: 1 } }
@@ -1428,7 +1597,11 @@ export function apiPlugin(): Plugin {
               success: true,
               orderNumber: order.orderNumber,
               orderId: order.id,
-              message: '¡Pedido realizado exitosamente!'
+              cardBrand,
+              cardLast4,
+              remainingBalance,
+              shippingAddress: addressText,
+              message: '¡Pago procesado exitosamente con Stripe Test Mode!'
             });
           }
 
@@ -2203,6 +2376,171 @@ export function apiPlugin(): Plugin {
           if (pathname === '/api/admin/categories' && req.method === 'GET') {
             const categories = await prisma.category.findMany({ orderBy: { name: 'asc' } });
             return sendJson(res, 200, { success: true, categories });
+          }
+
+          // 15. GET /api/admin/users (Listar usuarios registrados para asignación de tarjetas de prueba)
+          if (pathname === '/api/admin/users' && req.method === 'GET') {
+            const isAdmin = await checkIsAdmin(req, parsedUrl);
+            if (!isAdmin) {
+              return sendJson(res, 403, { success: false, message: 'Acceso no autorizado.' });
+            }
+
+            const users = await prisma.user.findMany({
+              select: { id: true, name: true, email: true, role: true },
+              orderBy: { createdAt: 'desc' }
+            });
+            return sendJson(res, 200, { success: true, users });
+          }
+
+          // 16. GET /api/admin/cards (Listar todas las tarjetas para pruebas de Stripe)
+          if (pathname === '/api/admin/cards' && req.method === 'GET') {
+            const isAdmin = await checkIsAdmin(req, parsedUrl);
+            if (!isAdmin) {
+              return sendJson(res, 403, { success: false, message: 'Acceso no autorizado.' });
+            }
+
+            const cards = await prisma.paymentCard.findMany({
+              include: {
+                user: { select: { id: true, name: true, email: true } }
+              },
+              orderBy: { createdAt: 'desc' }
+            });
+
+            return sendJson(res, 200, {
+              success: true,
+              cards: cards.map((c) => {
+                const fullNumber = c.cardNumber || (
+                  c.last4 === '0002' ? '4000 0000 0000 0002' :
+                  c.last4 === '0003' ? '4000 0000 0000 0003' :
+                  `4242 4242 4242 ${c.last4}`
+                );
+                return {
+                  id: c.id,
+                  userId: c.userId,
+                  userName: c.user.name,
+                  userEmail: c.user.email,
+                  cardHolder: c.cardHolder,
+                  brand: c.brand,
+                  last4: c.last4,
+                  cardNumber: fullNumber,
+                  cvc: c.cvc || '123',
+                  expMonth: c.expMonth,
+                  expYear: c.expYear,
+                  balance: Number(c.balance) || 0,
+                  isDefault: c.isDefault,
+                  createdAt: c.createdAt.toISOString()
+                };
+              })
+            });
+          }
+
+          // 17. POST /api/admin/cards (Crear tarjeta de prueba con saldo y tipo específico para Stripe)
+          if (pathname === '/api/admin/cards' && req.method === 'POST') {
+            const body = await parseBody(req);
+            const isAdmin = await checkIsAdmin(req, parsedUrl, body.adminUserId);
+            if (!isAdmin) {
+              return sendJson(res, 403, { success: false, message: 'Acceso no autorizado.' });
+            }
+
+            const { targetUserId, cardHolder, cardNumber, expMonth = 12, expYear = 2028, balance = 500, isDefault = false } = body;
+
+            if (!targetUserId || !cardHolder || !cardNumber) {
+              return sendJson(res, 400, { success: false, message: 'Usuario destino, titular y número de tarjeta son obligatorios.' });
+            }
+
+            const cleanNumber = cardNumber.replace(/\D/g, '');
+            const last4 = cleanNumber.slice(-4) || '1234';
+
+            let brand = 'VISA';
+            if (cleanNumber.startsWith('5')) brand = 'MASTERCARD';
+            else if (cleanNumber.startsWith('3')) brand = 'AMEX';
+
+            if (isDefault) {
+              await prisma.paymentCard.updateMany({
+                where: { userId: targetUserId },
+                data: { isDefault: false }
+              });
+            }
+
+            const card = await prisma.paymentCard.create({
+              data: {
+                userId: targetUserId,
+                cardHolder: cardHolder.trim().toUpperCase(),
+                brand,
+                last4,
+                cardNumber: cleanNumber,
+                cvc: body.cvc ? String(body.cvc).trim() : '123',
+                expMonth: Number(expMonth),
+                expYear: Number(expYear),
+                balance: Math.max(0, Number(balance)),
+                isDefault: Boolean(isDefault)
+              },
+              include: {
+                user: { select: { id: true, name: true, email: true } }
+              }
+            });
+
+            return sendJson(res, 201, {
+              success: true,
+              card: {
+                id: card.id,
+                userId: card.userId,
+                userName: card.user.name,
+                userEmail: card.user.email,
+                cardHolder: card.cardHolder,
+                brand: card.brand,
+                last4: card.last4,
+                expMonth: card.expMonth,
+                expYear: card.expYear,
+                balance: Number(card.balance) || 0,
+                isDefault: card.isDefault,
+                createdAt: card.createdAt.toISOString()
+              },
+              message: `Tarjeta de prueba ${brand} •••• ${last4} creada con saldo de $${Number(card.balance).toFixed(2)}.`
+            });
+          }
+
+          // 18. PUT /api/admin/cards/balance (Ajustar saldo de cualquier tarjeta para pruebas)
+          if (pathname === '/api/admin/cards/balance' && req.method === 'PUT') {
+            const body = await parseBody(req);
+            const isAdmin = await checkIsAdmin(req, parsedUrl, body.adminUserId);
+            if (!isAdmin) {
+              return sendJson(res, 403, { success: false, message: 'Acceso no autorizado.' });
+            }
+
+            const { cardId, balance } = body;
+            if (!cardId || balance === undefined) {
+              return sendJson(res, 400, { success: false, message: 'ID de tarjeta y nuevo balance requeridos.' });
+            }
+
+            const updated = await prisma.paymentCard.update({
+              where: { id: cardId },
+              data: { balance: Math.max(0, Number(balance)) }
+            });
+
+            return sendJson(res, 200, {
+              success: true,
+              cardId: updated.id,
+              balance: Number(updated.balance),
+              message: `Saldo de la tarjeta actualizado a $${Number(updated.balance).toFixed(2)}.`
+            });
+          }
+
+          // 19. DELETE /api/admin/cards (Eliminar tarjeta de prueba)
+          if (pathname === '/api/admin/cards' && req.method === 'DELETE') {
+            const cardId = parsedUrl.searchParams.get('cardId');
+            const adminUserId = parsedUrl.searchParams.get('adminUserId');
+            const isAdmin = await checkIsAdmin(req, parsedUrl, adminUserId || undefined);
+            if (!isAdmin) {
+              return sendJson(res, 403, { success: false, message: 'Acceso no autorizado.' });
+            }
+
+            if (!cardId) {
+              return sendJson(res, 400, { success: false, message: 'ID de tarjeta requerido.' });
+            }
+
+            await prisma.paymentCard.delete({ where: { id: cardId } });
+            return sendJson(res, 200, { success: true, message: 'Tarjeta de prueba eliminada exitosamente.' });
           }
 
           // Ruta no encontrada

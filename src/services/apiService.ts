@@ -16,6 +16,13 @@ export interface ApiResponse<T = any> {
   promo?: PromoCode;
   orderNumber?: string;
   orderId?: string;
+  address?: any;
+  remainingBalance?: number;
+  cardBrand?: string;
+  cardLast4?: string;
+  shippingAddress?: string;
+  cards?: any[];
+  users?: any[];
   products?: any[];
   promos?: any[];
   categories?: any[];
@@ -138,7 +145,7 @@ export class ApiService {
   }
 
   /**
-   * Finaliza la orden y marca el cupón como utilizado en la BD
+   * Finaliza la orden y procesa el pago con Stripe Test Mode en PostgreSQL
    */
   static async checkout(payload: {
     userId: string;
@@ -148,6 +155,26 @@ export class ApiService {
     discount?: number;
     shipping?: number;
     total: number;
+    paymentCardId?: string;
+    newCard?: {
+      cardHolder: string;
+      cardNumber: string;
+      expMonth: number;
+      expYear: number;
+      cvc?: string;
+      balance?: number;
+      saveCard?: boolean;
+    };
+    shippingAddressId?: string;
+    newAddress?: {
+      fullName: string;
+      phone: string;
+      street: string;
+      city: string;
+      state: string;
+      postalCode?: string;
+      saveAddress?: boolean;
+    };
   }): Promise<ApiResponse> {
     try {
       const res = await fetch('/api/orders/checkout', {
@@ -157,7 +184,7 @@ export class ApiService {
       });
       return await res.json();
     } catch {
-      return { success: false, message: 'Error al procesar la compra.' };
+      return { success: false, message: 'Error de conexión al procesar el pago con Stripe Test Mode.' };
     }
   }
 
@@ -246,7 +273,7 @@ export class ApiService {
   }
 
   /**
-   * Agrega una tarjeta de crédito o débito
+   * Agrega una tarjeta de crédito o débito con saldo de prueba Stripe
    */
   static async addPaymentCard(payload: {
     userId: string;
@@ -254,6 +281,7 @@ export class ApiService {
     cardNumber: string;
     expMonth: number;
     expYear: number;
+    balance?: number;
     isDefault?: boolean;
   }): Promise<ApiResponse> {
     try {
@@ -663,6 +691,96 @@ export class ApiService {
       return await res.json();
     } catch {
       return { success: false, message: 'Error al consultar categorías.' };
+    }
+  }
+
+  /**
+   * Obtiene la lista de usuarios para asignar tarjetas de prueba en Admin
+   */
+  static async getAdminUsers(adminUserId: string): Promise<ApiResponse> {
+    try {
+      const res = await fetch(`/api/admin/users?userId=${encodeURIComponent(adminUserId)}`, {
+        headers: { 'x-user-id': adminUserId }
+      });
+      return await res.json();
+    } catch {
+      return { success: false, message: 'Error al consultar usuarios.' };
+    }
+  }
+
+  /**
+   * Obtiene todas las tarjetas registradas para gestión y pruebas en Admin
+   */
+  static async getAdminCards(adminUserId: string): Promise<ApiResponse> {
+    try {
+      const res = await fetch(`/api/admin/cards?userId=${encodeURIComponent(adminUserId)}`, {
+        headers: { 'x-user-id': adminUserId }
+      });
+      return await res.json();
+    } catch {
+      return { success: false, message: 'Error al consultar tarjetas para pruebas.' };
+    }
+  }
+
+  /**
+   * Crea una tarjeta de prueba desde el Panel de Administrador con tipo y fondos específicos
+   */
+  static async createAdminCard(adminUserId: string, payload: {
+    targetUserId: string;
+    cardHolder: string;
+    cardNumber: string;
+    cvc?: string;
+    expMonth?: number;
+    expYear?: number;
+    balance: number;
+    isDefault?: boolean;
+  }): Promise<ApiResponse> {
+    try {
+      const res = await fetch('/api/admin/cards', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': adminUserId
+        },
+        body: JSON.stringify({ ...payload, adminUserId })
+      });
+      return await res.json();
+    } catch {
+      return { success: false, message: 'Error al crear tarjeta de prueba.' };
+    }
+  }
+
+  /**
+   * Ajusta los fondos / saldo de una tarjeta desde el Panel Admin
+   */
+  static async updateAdminCardBalance(adminUserId: string, cardId: string, balance: number): Promise<ApiResponse> {
+    try {
+      const res = await fetch('/api/admin/cards/balance', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': adminUserId
+        },
+        body: JSON.stringify({ adminUserId, cardId, balance })
+      });
+      return await res.json();
+    } catch {
+      return { success: false, message: 'Error al actualizar saldo de tarjeta.' };
+    }
+  }
+
+  /**
+   * Elimina una tarjeta de prueba desde el Panel Admin
+   */
+  static async deleteAdminCard(adminUserId: string, cardId: string): Promise<ApiResponse> {
+    try {
+      const res = await fetch(`/api/admin/cards?cardId=${encodeURIComponent(cardId)}&adminUserId=${encodeURIComponent(adminUserId)}`, {
+        method: 'DELETE',
+        headers: { 'x-user-id': adminUserId }
+      });
+      return await res.json();
+    } catch {
+      return { success: false, message: 'Error al eliminar tarjeta.' };
     }
   }
 }

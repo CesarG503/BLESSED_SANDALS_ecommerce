@@ -86,8 +86,11 @@ model PaymentCard {
   cardHolder String
   brand      String   @default("VISA")
   last4      String
+  cardNumber String?
+  cvc        String?  @default("123")
   expMonth   Int
   expYear    Int
+  balance    Float    @default(500.0)
   isDefault  Boolean  @default(false)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt

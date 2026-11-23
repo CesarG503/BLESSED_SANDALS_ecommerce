@@ -10,6 +10,7 @@ import { SearchModal } from './components/SearchModal';
 import { PromoModal } from './components/PromoModal';
 import { AuthModal } from './components/AuthModal';
 import { ProfileModal } from './components/ProfileModal';
+import { CheckoutModal } from './components/CheckoutModal';
 import { AdminPanel } from './components/AdminPanel';
 import { Model3DModal } from './components/Model3DModal';
 import { HorseShowcase } from './components/HorseShowcase';
@@ -34,6 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
   new PromoModal('promo-modal-app');
   new AuthModal('auth-modal-app');
   new ProfileModal('profile-modal-app');
+  new CheckoutModal('checkout-modal-app');
   new AdminPanel('admin-panel-app');
   new Model3DModal('modal-3d-app');
   new ShowcasePromo('promo-showcase-app');

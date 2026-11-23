@@ -37,6 +37,7 @@ export class Store {
   public isAuthOpen: boolean = false;
   public isProfileOpen: boolean = false;
   public isAdminOpen: boolean = false;
+  public isCheckoutOpen: boolean = false;
 
   // Promociones y Descuentos conectados a BD
   public isPromoOpen: boolean = false;
@@ -764,6 +765,7 @@ export class Store {
     this.appliedPromo = null;
     this.pendingPromoCode = null;
     this.isProfileOpen = false;
+    this.isCheckoutOpen = false;
     this.wishlist = [];
     this.cart = [];
     StorageService.saveUser(null);
@@ -792,6 +794,11 @@ export class Store {
     this.notify();
   }
 
+  public toggleCheckout(open?: boolean): void {
+    this.isCheckoutOpen = open !== undefined ? open : !this.isCheckoutOpen;
+    this.notify();
+  }
+
   public toggleAdmin(open?: boolean): void {
     const shouldOpen = open !== undefined ? open : !this.isAdminOpen;
     if (shouldOpen && (!this.currentUser || this.currentUser.role !== 'ADMIN')) {
@@ -805,9 +812,39 @@ export class Store {
   }
 
   // ==========================================================================
-  // CHECKOUT REAL CONECTADO A BASE DE DATOS
+  // CHECKOUT REAL CONECTADO A BASE DE DATOS Y STRIPE TEST MODE
   // ==========================================================================
-  public async checkout(): Promise<{ success: boolean; orderNumber?: string; message: string; requireAuth?: boolean }> {
+  public async checkout(paymentDetails?: {
+    paymentCardId?: string;
+    newCard?: {
+      cardHolder: string;
+      cardNumber: string;
+      expMonth: number;
+      expYear: number;
+      cvc?: string;
+      balance?: number;
+      saveCard?: boolean;
+    };
+    shippingAddressId?: string;
+    newAddress?: {
+      fullName: string;
+      phone: string;
+      street: string;
+      city: string;
+      state: string;
+      postalCode?: string;
+      saveAddress?: boolean;
+    };
+  }): Promise<{
+    success: boolean;
+    orderNumber?: string;
+    message: string;
+    requireAuth?: boolean;
+    remainingBalance?: number;
+    cardBrand?: string;
+    cardLast4?: string;
+    shippingAddress?: string;
+  }> {
     if (!this.currentUser) {
       this.toggleAuth(true);
       return {
@@ -833,7 +870,8 @@ export class Store {
       subtotal,
       discount,
       shipping,
-      total
+      total,
+      ...(paymentDetails || {})
     });
 
     if (res.success) {
@@ -845,13 +883,17 @@ export class Store {
       return {
         success: true,
         orderNumber: res.orderNumber,
-        message: '¡Pago completado con éxito! Tu orden ha sido guardada en la base de datos.'
+        remainingBalance: res.remainingBalance,
+        cardBrand: res.cardBrand,
+        cardLast4: res.cardLast4,
+        shippingAddress: res.shippingAddress,
+        message: res.message || '¡Pago completado con éxito con Stripe Test Mode!'
       };
     }
 
     return {
       success: false,
-      message: res.message || 'Error al procesar el pedido.'
+      message: res.message || 'Error al procesar el pago.'
     };
   }
 

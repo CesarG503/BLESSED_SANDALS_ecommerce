@@ -205,5 +205,46 @@ export const Icons = {
       <line x1="12" y1="12" x2="12" y2="21"></line>
       <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"></path>
       <polyline points="16 16 12 12 8 16"></polyline>
+    </svg>`,
+
+  copy: (cls: string = 'w-4 h-4') => `
+    <svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+    </svg>`,
+
+  refresh: (cls: string = 'w-4 h-4') => `
+    <svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="23 4 23 10 17 10"></polyline>
+      <polyline points="1 20 1 14 7 14"></polyline>
+      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+    </svg>`,
+
+  visaLogo: (cls: string = 'official-visa-svg') => `
+    <svg class="${cls}" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M9.112 8.262L5.97 15.758H3.92L2.374 9.775c-.094-.368-.175-.503-.461-.658C1.447 8.864.677 8.627 0 8.479l.046-.217h3.3a.904.904 0 01.894.764l.817 4.338 2.018-5.102zm8.033 5.049c.008-1.979-2.736-2.088-2.717-2.972.006-.269.262-.555.822-.628a3.66 3.66 0 011.913.336l.34-1.59a5.207 5.207 0 00-1.814-.333c-1.917 0-3.266 1.02-3.278 2.479-.012 1.079.963 1.68 1.698 2.04.756.367 1.01.603 1.006.931-.005.504-.602.725-1.16.734-.975.015-1.54-.263-1.992-.473l-.351 1.642c.453.208 1.289.39 2.156.398 2.037 0 3.37-1.006 3.377-2.564m5.061 2.447H24l-1.565-7.496h-1.656a.883.883 0 00-.826.55l-2.909 6.946h2.036l.405-1.12h2.488zm-2.163-2.656l1.02-2.815.588 2.815zm-8.16-4.84l-1.603 7.496H8.34l1.605-7.496z"/>
+    </svg>`,
+
+  mastercardLogo: (cls: string = 'official-mastercard-svg') => `
+    <svg class="${cls}" viewBox="0 0 24 24">
+      <circle cx="7.5" cy="12" r="7.5" fill="#EB001B"/>
+      <circle cx="16.5" cy="12" r="7.5" fill="#F79E1B"/>
+      <path d="M12 6.5A7.5 7.5 0 0 0 9.25 12 7.5 7.5 0 0 0 12 17.5 7.5 7.5 0 0 0 14.75 12 7.5 7.5 0 0 0 12 6.5Z" fill="#FF5F00"/>
+    </svg>`,
+
+  cardEmblem: (cls: string = 'card-wise-emblem') => `
+    <svg class="${cls}" viewBox="0 0 32 32" fill="white">
+      <path d="M14 6C8.48 6 4 10.48 4 16s4.48 10 10 10c2.4 0 4.6-.85 6.33-2.27l-2.12-2.12A6.96 6.96 0 0 1 14 23c-3.86 0-7-3.14-7-7s3.14-7 7-7c1.55 0 2.98.51 4.14 1.36l2.15-2.15A9.94 9.94 0 0 0 14 6z"/>
+      <rect x="18" y="9" width="8" height="2.2" rx="1.1"/>
+      <rect x="17" y="13" width="9" height="2.2" rx="1.1"/>
+      <rect x="17" y="17" width="9" height="2.2" rx="1.1"/>
+      <rect x="19" y="21" width="7" height="2.2" rx="1.1"/>
+    </svg>`,
+
+  contactless: (cls: string = 'contactless-waves-svg') => `
+    <svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <path d="M7 15a4.5 4.5 0 0 0 0-6" />
+      <path d="M11 17.5a8 8 0 0 0 0-11" />
+      <path d="M15 20a11.5 11.5 0 0 0 0-16" />
     </svg>`
 };

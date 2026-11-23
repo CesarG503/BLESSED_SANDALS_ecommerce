@@ -1,7 +1,6 @@
 import { Store } from '../state/store';
 import { Icons } from './Icons';
 import { Toast } from './Toast';
-import confetti from 'canvas-confetti';
 
 export class CartDrawer {
   private container: HTMLElement;
@@ -286,34 +285,20 @@ export class CartDrawer {
       Toast.show('Cupón removido');
     });
 
-    // Checkout conectado a PostgreSQL
-    this.container.querySelector('#btn-checkout')?.addEventListener('click', async () => {
-      await this.handleCheckout();
-    });
-  }
-
-  private async handleCheckout(): Promise<void> {
-    const total = this.store.getCartTotal();
-    const res = await this.store.checkout();
-
-    if (res.success) {
-      // Disparo de confetti festivo
-      confetti({
-        particleCount: 120,
-        spread: 70,
-        origin: { y: 0.6 },
-        colors: ['#0B3B24', '#d2b588', '#ffffff', '#cf2228']
-      });
-
+    // Checkout conectado a PostgreSQL y Stripe Test Mode
+    this.container.querySelector('#btn-checkout')?.addEventListener('click', () => {
+      if (!this.store.currentUser) {
+        this.store.toggleCart(false);
+        this.store.toggleAuth(true);
+        Toast.show('Inicia sesión para finalizar tu compra y pagar con Stripe.', 'Iniciar Sesión', 'info');
+        return;
+      }
+      if (this.store.cart.length === 0) {
+        Toast.show('Tu bolsa de compras está vacía.', 'Bolsa vacía', 'warning');
+        return;
+      }
       this.store.toggleCart(false);
-      Toast.show(
-        `¡Pedido ${res.orderNumber} por $${total.toFixed(2)} registrado con éxito! Tu cupón ha sido procesado en la base de datos.`,
-        '¡Compra Exitosa!',
-        'success',
-        6000
-      );
-    } else {
-      Toast.show(res.message, 'Atención', 'warning');
-    }
+      this.store.toggleCheckout(true);
+    });
   }
 }
