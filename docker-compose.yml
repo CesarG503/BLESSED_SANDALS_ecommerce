@@ -13,9 +13,10 @@ services:
       - "${POSTGRES_PORT:-5434}:5432"
     volumes:
       - ecommerce_postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ecommerce_user} -d ${POSTGRES_DB:-ecommerce_db}"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
       retries: 5
 
@@ -32,13 +33,22 @@ services:
       - "${MINIO_CONSOLE_PORT:-9003}:9001"
     volumes:
       - ecommerce_minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   minio-init:
     image: minio/mc:latest
     container_name: ecommerce-minio-init
     depends_on:
-      - minio
+      minio:
+        condition: service_healthy
     restart: "no"
+    volumes:
+      - ./docker/minio-seed/ecommerce-assets:/minio-seed:ro
+      - ./assets/modelos:/seed-modelos:ro
     entrypoint: >
       /bin/sh -c "
       until mc alias set local http://minio:9000 ${S3_ACCESS_KEY_ID:-minioadmin} ${S3_SECRET_ACCESS_KEY:-minioadmin123}; do
@@ -47,8 +57,45 @@ services:
       done;
       mc mb --ignore-existing local/${S3_BUCKET:-ecommerce-assets};
       mc anonymous set download local/${S3_BUCKET:-ecommerce-assets};
-      echo 'Bucket ${S3_BUCKET:-ecommerce-assets} creado y configurado correctamente para descargas públicas.';
+      echo 'Bucket ${S3_BUCKET:-ecommerce-assets} configurado.';
+      if [ -d '/minio-seed' ]; then
+        echo 'Sincronizando recursos multimedia iniciales en MinIO...';
+        mc mirror --overwrite /minio-seed local/${S3_BUCKET:-ecommerce-assets};
+      fi;
+      if [ -f '/seed-modelos/Nike Air Jordan 1.glb' ]; then
+        echo 'Sincronizando modelo 3D en MinIO...';
+        mc cp '/seed-modelos/Nike Air Jordan 1.glb' local/${S3_BUCKET:-ecommerce-assets}/1795446796100-nike_air_jordan_1.glb;
+      fi;
+      echo 'MinIO inicializado con todos los recursos correctamente.';
       "
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ecommerce-web
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-5173}:5173"
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-ecommerce_user}:${POSTGRES_PASSWORD:-ecommerce_password}@postgres:5432/${POSTGRES_DB:-ecommerce_db}
+      - S3_ENDPOINT=http://minio:9000
+      - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID:-minioadmin}
+      - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY:-minioadmin123}
+      - S3_BUCKET=${S3_BUCKET:-ecommerce-assets}
+      - S3_PUBLIC_URL=http://localhost:${MINIO_PORT:-9002}
+      - VITE_USE_POLLING=true
+    volumes:
+      - .:/app
+      - /app/node_modules
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
 
 volumes:
   ecommerce_postgres_data:

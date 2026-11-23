@@ -15,6 +15,7 @@ const s3Client = new S3Client({
   forcePathStyle: true
 });
 const S3_BUCKET = process.env.S3_BUCKET || 'ecommerce-assets';
+const S3_PUBLIC_URL = process.env.S3_PUBLIC_URL || 'http://localhost:9002';
 
 async function checkIsAdmin(req: IncomingMessage, parsedUrl: URL, bodyUserId?: string): Promise<boolean> {
   const userId = (req.headers['x-user-id'] as string) || parsedUrl.searchParams.get('userId') || bodyUserId;
@@ -2417,7 +2418,7 @@ export function apiPlugin(): Plugin {
               })
             );
 
-            const fileUrl = `http://localhost:9002/${S3_BUCKET}/${objectKey}`;
+            const fileUrl = `${S3_PUBLIC_URL}/${S3_BUCKET}/${objectKey}`;
 
             return sendJson(res, 201, {
               success: true,
@@ -2440,7 +2441,7 @@ export function apiPlugin(): Plugin {
               const s3Res = await s3Client.send(new ListObjectsV2Command({ Bucket: S3_BUCKET }));
               const assets = (s3Res.Contents || []).map((c) => ({
                 key: c.Key || '',
-                url: `http://localhost:9002/${S3_BUCKET}/${c.Key}`,
+                url: `${S3_PUBLIC_URL}/${S3_BUCKET}/${c.Key}`,
                 size: c.Size || 0,
                 lastModified: c.LastModified ? c.LastModified.toISOString() : null
               }));

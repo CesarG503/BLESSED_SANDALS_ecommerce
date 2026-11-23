@@ -5,8 +5,12 @@ import { apiPlugin } from './src/server/apiPlugin';
 export default defineConfig({
   plugins: [apiPlugin()],
   server: {
+    host: '0.0.0.0',
     port: 5173,
-    open: true
+    open: false,
+    watch: {
+      usePolling: process.env.VITE_USE_POLLING === 'true'
+    }
   },
   publicDir: 'public',
   build: {

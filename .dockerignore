@@ -1,0 +1,9 @@
+node_modules
+dist
+dist-ssr
+.git
+.gitignore
+.DS_Store
+*.log
+docker/minio-seed
+docker/postgres-init
